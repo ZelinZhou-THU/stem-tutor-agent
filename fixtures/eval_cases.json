@@ -1,0 +1,132 @@
+{
+  "cases": [
+    {
+      "case_id": "eval-001",
+      "problem_input": {
+        "problem_id": "p-eval-001",
+        "problem_text": "Differentiate y = sin(x^2).",
+        "topic_tags": ["derivative", "chain_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) y' = cos(x^2)\n2) therefore final answer",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "inconsistent_or_unsupported"}
+      ],
+      "gold_first_error_step": "S2",
+      "gold_diagnosis_codes": ["UNSUPPORTED_JUMP"]
+    },
+    {
+      "case_id": "eval-002",
+      "problem_input": {
+        "problem_id": "p-eval-002",
+        "problem_text": "Compute integral of 2x*cos(x^2) dx.",
+        "topic_tags": ["integral", "substitution"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) u = x^2\n2) integral becomes integral cos(u) du",
+      "gold_verification": [
+        {"step_id": "S1", "label": "incorrect_math"},
+        {"step_id": "S2", "label": "correct"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["SUBSTITUTION_MAPPING_MISMATCH"]
+    },
+    {
+      "case_id": "eval-003",
+      "problem_input": {
+        "problem_id": "p-eval-003",
+        "problem_text": "Differentiate y = x^3 + 2x.",
+        "topic_tags": ["derivative", "power_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) derivative of x^3 is 3x^2\n2) derivative of 2x is 2",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"}
+      ],
+      "gold_first_error_step": null,
+      "gold_diagnosis_codes": []
+    },
+    {
+      "case_id": "eval-004",
+      "problem_input": {
+        "problem_id": "p-eval-004",
+        "problem_text": "Simplify derivative result of y = sin(x^2).",
+        "topic_tags": ["derivative", "chain_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) y' = 2x cos(x^2)\n2) therefore done",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "inconsistent_or_unsupported"}
+      ],
+      "gold_first_error_step": "S2",
+      "gold_diagnosis_codes": ["UNSUPPORTED_JUMP"]
+    },
+    {
+      "case_id": "eval-005",
+      "problem_input": {
+        "problem_id": "p-eval-005",
+        "problem_text": "Explain a derivative step clearly.",
+        "topic_tags": ["derivative", "reasoning"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) ok\n2) derivative result is 2x",
+      "gold_verification": [
+        {"step_id": "S1", "label": "unclear"},
+        {"step_id": "S2", "label": "correct"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["NOTATION_UNCLEAR"]
+    },
+    {
+      "case_id": "eval-006",
+      "problem_input": {
+        "problem_id": "p-eval-006",
+        "problem_text": "Compute integral using substitution.",
+        "topic_tags": ["integral", "substitution"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) u = x^2\n2) therefore integral is sin(u)",
+      "gold_verification": [
+        {"step_id": "S1", "label": "incorrect_math"},
+        {"step_id": "S2", "label": "inconsistent_or_unsupported"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["SUBSTITUTION_MAPPING_MISMATCH", "UNSUPPORTED_JUMP"]
+    },
+    {
+      "case_id": "eval-007",
+      "problem_input": {
+        "problem_id": "p-eval-007",
+        "problem_text": "Differentiate y = e^(x^2).",
+        "topic_tags": ["derivative", "chain_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) y' = e^(x^2) * 2x\n2) simplification keeps same result",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"}
+      ],
+      "gold_first_error_step": null,
+      "gold_diagnosis_codes": []
+    },
+    {
+      "case_id": "eval-008",
+      "problem_input": {
+        "problem_id": "p-eval-008",
+        "problem_text": "Evaluate whether steps are justified.",
+        "topic_tags": ["reasoning", "justification"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) therefore result follows\n2) therefore finished",
+      "gold_verification": [
+        {"step_id": "S1", "label": "inconsistent_or_unsupported"},
+        {"step_id": "S2", "label": "inconsistent_or_unsupported"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["UNSUPPORTED_JUMP"]
+    }
+  ]
+}

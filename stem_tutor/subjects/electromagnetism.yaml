@@ -1,0 +1,103 @@
+subject_id: electromagnetism
+display_name: 电磁学
+display_name_en: Electromagnetism
+
+error_taxonomy:
+  GAUSS_LAW_SURFACE_ERROR:
+    category: "Law Application Errors"
+    short_desc: "高斯面选择错误或通量计算错误。"
+    cues: ["Gauss", "高斯", "flux", "电通量", "Gaussian surface", "高斯面"]
+  RIGHT_HAND_RULE_MISUSE:
+    category: "Direction Errors"
+    short_desc: "叉乘运算中右手定则应用错误。"
+    cues: ["right hand", "右手", "cross product", "direction", "方向"]
+  MAXWELL_EQUATION_CONFUSION:
+    category: "Conceptual Confusion"
+    short_desc: "麦克斯韦方程组混淆或应用在了错误的场景中。"
+    cues: ["Maxwell", "麦克斯韦", "displacement current", "位移电流", "Ampere"]
+  POTENTIAL_FIELD_RELATION_ERROR:
+    category: "Computational Errors"
+    short_desc: "电势与电场关系计算错误。"
+    cues: ["potential", "电势", "electric field", "电场", "gradient", "梯度"]
+  CIRCUIT_ANALYSIS_ERROR:
+    category: "Circuit Errors"
+    short_desc: "基尔霍夫定律或电路分析应用错误。"
+    cues: ["Kirchhoff", "基尔霍夫", "circuit", "回路", "节点", "KVL", "KCL"]
+  BOUNDARY_CONDITION_ERROR:
+    category: "Condition Misuse"
+    short_desc: "电磁边界条件应用错误。"
+    cues: ["boundary", "边界", "interface", "介质", "continuity", "连续"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation", "vector", "矢量"]
+
+topic_keywords:
+  静电场: ["静电", "Coulomb", "库仑", "电场", "electric field", "电势", "potential"]
+  高斯定理: ["高斯", "Gauss", "电通量", "flux", "对称性", "symmetry"]
+  稳恒磁场: ["磁场", "magnetic field", "Biot-Savart", "毕奥-萨伐尔", "安培环路"]
+  电磁感应: ["电磁感应", "Faraday", "法拉第", "Lenz", "楞次", "感应电动势", "磁通量"]
+  麦克斯韦方程组: ["Maxwell", "麦克斯韦", "位移电流", "displacement current", "电磁波"]
+  电路分析: ["电路", "circuit", "Kirchhoff", "基尔霍夫", "RC", "RL", "LC", "阻抗"]
+  电磁波: ["电磁波", "electromagnetic wave", "坡印廷矢量", "Poynting", "传播"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。物理公式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。矢量用箭头表示。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 特别注意矢量的方向和积分面的选择
+    3. 检查定理的适用条件（对称性、稳恒/时变等）
+    4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查矢量的方向、单位和量纲。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "Gauss"
+      - type: not_contains
+        value: "symmetry"
+    label: "unclear"
+    evidence: "Gauss's law applied without discussing symmetry justification."
+    violated_principles: ["clarity"]
+
+mock:
+  reference_solution:
+    reference_text: "Apply Gauss's law. Choose an appropriate Gaussian surface based on symmetry, compute the flux, and solve for the field."
+    key_assertions:
+      - "Identify the symmetry of the charge distribution."
+      - "Choose a Gaussian surface matching the symmetry."
+      - "Compute the enclosed charge and apply Q_enc/epsilon_0."
+  review_problems:
+    - problem_text: "求均匀带电球壳（总电荷 Q，半径 R）内外的电场分布。"
+      related_weakness_code: "GAUSS_LAW_SURFACE_ERROR"
+      rationale: "Reinforces Gaussian surface selection for spherical symmetry."
+      difficulty_label: "easy"
+    - problem_text: "一长直导线载有电流 I，求距导线 r 处的磁感应强度。"
+      related_weakness_code: "RIGHT_HAND_RULE_MISUSE"
+      rationale: "Targets Ampere's law with correct field direction."
+      difficulty_label: "medium"

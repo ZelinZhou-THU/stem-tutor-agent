@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数理基础课程学习辅导系统</title>
+    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@14.1.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+</head>
+<body>
+    <div id="overlay" class="overlay"></div>
+
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">🎓</div>
+            <div class="sidebar-title">
+                <h1>STEM 辅导系统</h1>
+                <p class="sidebar-subtitle">智能解题诊断</p>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#new" class="nav-item active" data-page="new">
+                <span class="nav-icon">📋</span>
+                <span class="nav-text">新建诊断</span>
+            </a>
+            <a href="#history" class="nav-item" data-page="history">
+                <span class="nav-icon">📜</span>
+                <span class="nav-text">历史记录</span>
+            </a>
+            <a href="#stats" class="nav-item" data-page="stats">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">统计概览</span>
+            </a>
+            <a href="#report" class="nav-item" data-page="report">
+                <span class="nav-icon">📄</span>
+                <span class="nav-text">学习报告</span>
+            </a>
+            <a href="#settings" class="nav-item" data-page="settings">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">设置</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <p>Powered by LangGraph · FastAPI</p>
+        </div>
+    </aside>
+
+    <main id="main-content" class="main-content">
+        <header class="top-bar">
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle">☰</button>
+            <h2 id="page-title" class="top-bar-title">新建诊断</h2>
+        </header>
+
+        <div class="page-container">
+
+            <!-- ==================== 新建诊断页面 ==================== -->
+            <section id="page-new" class="page active">
+
+                <!-- 输入面板 -->
+                <div id="input-panel" class="panel">
+                    <div class="panel-header" id="input-panel-header">
+                        <h3>📥 输入题目与解答</h3>
+                        <button type="button" id="toggle-input" class="panel-toggle">▼</button>
+                    </div>
+                    <div class="panel-body" id="input-panel-body">
+                        <form id="analysis-form">
+                            <div class="form-group">
+                                <label id="problem-label">题目</label>
+                                <div class="mode-switch" style="margin-bottom:8px;">
+                                    <label class="radio-label">
+                                        <input type="radio" name="problem_source" value="text" checked>
+                                        文本输入
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="problem_source" value="ocr">
+                                        拍照识别
+                                    </label>
+                                </div>
+                                <div id="problem-text-mode">
+                                    <input type="text" id="problem-text" name="problem_text"
+                                           placeholder="请输入题目内容">
+                                </div>
+                                <div id="problem-ocr-mode" style="display:none;">
+                                    <div class="upload-area upload-area-small" id="problem-upload-area">
+                                        <div class="upload-actions">
+                                            <label class="upload-btn upload-btn-camera">
+                                                拍照
+                                                <input type="file" id="problem-image-upload-camera" accept="image/*" capture="environment">
+                                            </label>
+                                            <label class="upload-btn upload-btn-album">
+                                                选择图片
+                                                <input type="file" id="problem-image-upload" name="problem_image" accept="image/*">
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div id="problem-image-preview" style="display:none;">
+                                        <img id="problem-preview-img" alt="题目预览">
+                                        <button type="button" id="remove-problem-image" class="btn-small">移除图片</button>
+                                    </div>
+                                    <div id="problem-ocr-result" style="display:none;">
+                                        <div class="ocr-result-header">
+                                            <span class="ocr-result-label">OCR 识别结果</span>
+                                            <span id="problem-ocr-quality" class="quality-badge"></span>
+                                            <span class="ocr-hint">（可编辑修改后提交）</span>
+                                            <span id="problem-ocr-loading" class="ocr-inline-loading" style="display:none;">
+                                                <span class="spinner-small"></span> 识别中...
+                                            </span>
+                                        </div>
+                                        <div class="ocr-edit-row">
+                                            <input type="text" id="problem-ocr-text" placeholder="识别结果将显示在这里...">
+                                            <div id="problem-ocr-preview" class="ocr-math-preview" data-placeholder="公式预览"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>输入方式</label>
+                                <div class="mode-switch">
+                                    <label class="radio-label">
+                                        <input type="radio" name="source_type" value="text" checked>
+                                        文本输入
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="source_type" value="ocr">
+                                        照片上传
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="text-mode" class="mode-panel">
+                                <div class="form-group">
+                                    <label for="student-solution">学生解答</label>
+                                    <textarea id="student-solution" name="student_solution" rows="6"
+                                              placeholder="输入学生的解题过程，每行一步（也支持整段粘贴）"></textarea>
+                                </div>
+                            </div>
+
+                            <div id="ocr-mode" class="mode-panel" style="display:none;">
+                                <div class="form-group">
+                                    <label>上传解题照片</label>
+                                    <div class="upload-area" id="upload-area">
+                                        <div class="upload-actions">
+                                            <label class="upload-btn upload-btn-camera">
+                                                拍照
+                                                <input type="file" id="image-upload-camera" accept="image/*" capture="environment">
+                                            </label>
+                                            <label class="upload-btn upload-btn-album">
+                                                选择图片
+                                                <input type="file" id="image-upload" name="image" accept="image/*">
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div id="image-preview" style="display:none;">
+                                        <img id="preview-img" alt="预览">
+                                        <button type="button" id="remove-image" class="btn-small">移除图片</button>
+                                    </div>
+                                    <div id="solution-ocr-result" style="display:none;">
+                                        <div class="ocr-result-header">
+                                            <span class="ocr-result-label">解题步骤识别结果</span>
+                                            <span id="solution-ocr-quality" class="quality-badge"></span>
+                                            <span class="ocr-hint">（可编辑修改后提交）</span>
+                                            <span id="solution-ocr-loading" class="ocr-inline-loading" style="display:none;">
+                                                <span class="spinner-small"></span> 识别中...
+                                            </span>
+                                        </div>
+                                        <div class="ocr-edit-row">
+                                            <textarea id="solution-ocr-text" rows="6"
+                                                      placeholder="识别结果将显示在这里，可编辑修改..."></textarea>
+                                            <div id="solution-ocr-preview" class="ocr-math-preview" data-placeholder="公式预览"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group form-group-half">
+                                    <label for="subject-select">学科</label>
+                                    <div class="subject-select-row">
+                                        <select id="subject-select" name="subject_id">
+                                            <option value="auto_detect" selected>自动识别</option>
+                                            <option value="calculus">微积分</option>
+                                            <option value="linear_algebra">线性代数</option>
+                                            <option value="mechanics">力学</option>
+                                            <option value="relativity">相对论</option>
+                                            <option value="optics">光学</option>
+                                            <option value="quantum">量子物理</option>
+                                            <option value="electromagnetism">电磁学</option>
+                                            <option value="thermodynamics">热学</option>
+                                        </select>
+                                        <span id="subject-detect-status" class="subject-status" style="display:none;"></span>
+                                    </div>
+                                </div>
+                                <div class="form-group form-group-half">
+                                    <label for="mode-select">运行模式</label>
+                                    <select id="mode-select" name="mode">
+                                        <option value="workflow_r1" selected>多步工作流（推荐）</option>
+                                        <option value="baseline_qwen3.6">单次基线</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>推理深度</label>
+                                <div class="depth-control">
+                                    <label class="depth-option" data-depth="quick">
+                                        <input type="radio" name="depth" value="quick">
+                                        <div class="depth-content">
+                                            <span class="depth-label">快速</span>
+                                            <span class="depth-desc">~1-2 min · 单轮验证</span>
+                                        </div>
+                                    </label>
+                                    <label class="depth-option depth-option-active" data-depth="standard">
+                                        <input type="radio" name="depth" value="standard" checked>
+                                        <div class="depth-content">
+                                            <span class="depth-label">标准</span>
+                                            <span class="depth-desc">~2-4 min · 双轮验证</span>
+                                        </div>
+                                    </label>
+                                    <label class="depth-option" data-depth="thorough">
+                                        <input type="radio" name="depth" value="thorough">
+                                        <div class="depth-content">
+                                            <span class="depth-label">深度</span>
+                                            <span class="depth-desc">~4-8 min · 多轮深度验证</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="depth-hint" id="depth-hint">
+                                    <span class="depth-hint-icon">ℹ</span>
+                                    <span id="depth-hint-text">标准模式：完整策略链，双轮工具验证</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="model-group">
+                                <label for="model-select">推理模型</label>
+                                <select id="model-select" name="model">
+                                    <option value="qwen/qwen3.6-plus" selected>Qwen 3.6 Plus（推荐）</option>
+                                    <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                                    <option value="deepseek/deepseek-chat-v3-0324">DeepSeek V3 0324</option>
+                                    <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
+                                    <option value="google/gemma-4-31b-it">Gemma 4 31B</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" id="run-btn" class="btn-primary">
+                                <span id="btn-text">▶ 运行诊断</span>
+                                <span id="btn-loading" style="display:none;">
+                                    <span class="spinner"></span> 正在分析中...
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 输出展示区 -->
+                <div id="output-area">
+                    <div id="error-msg" class="alert alert-error" style="display:none;"></div>
+
+                    <div id="loading" style="display:none;" class="loading-container">
+                        <div class="spinner-large"></div>
+                        <p class="loading-title">正在分析中，请稍候...</p>
+                        <p class="loading-status" style="display:none;"></p>
+                        <div class="loading-steps">
+                            <div class="loading-step" data-step="parse">
+                                <span class="loading-step-icon">☐</span> 解析解题步骤
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                            <div class="loading-step" data-step="reference">
+                                <span class="loading-step-icon">☐</span> 生成参考解答
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                            <div class="loading-step" data-step="verify">
+                                <span class="loading-step-icon">☐</span> 验证每步正确性
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                            <div class="loading-step" data-step="diagnose">
+                                <span class="loading-step-icon">☐</span> 诊断错误原因
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                            <div class="loading-step" data-step="feedback">
+                                <span class="loading-step-icon">☐</span> 生成学习反馈
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                            <div class="loading-step" data-step="review">
+                                <span class="loading-step-icon">☐</span> 生成复习练习
+                                <span class="loading-step-detail" style="display:none;"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="results" style="display:none;">
+                        <div id="ocr-warning" class="alert alert-warning" style="display:none;"></div>
+                        <div id="status-banner" class="alert" style="display:none;"></div>
+
+                        <div id="summary-card" class="card result-card"></div>
+
+                        <div id="steps-section" class="card result-card">
+                            <h2>步骤验证</h2>
+                            <div id="steps-table-container"></div>
+                        </div>
+
+                        <div id="diagnosis-section" class="card result-card" style="display:none;">
+                            <h2>错误诊断</h2>
+                            <div id="diagnosis-container"></div>
+                        </div>
+
+                        <div id="feedback-section" class="card result-card" style="display:none;">
+                            <h2>学习反馈</h2>
+                            <div id="feedback-container"></div>
+                        </div>
+
+                        <div id="review-section" class="card result-card" style="display:none;">
+                            <h2>复习练习</h2>
+                            <div id="review-container"></div>
+                        </div>
+
+                    <section id="chat-section" class="card" style="display:none;">
+                        <h2>
+                            继续提问
+                            <span id="chat-run-badge" class="mode-badge" style="display:none;"></span>
+                        </h2>
+                        <p class="chat-hint">基于以上分析结果，你可以继续向 AI 辅导老师提问</p>
+                        <div class="chat-model-row">
+                            <label for="chat-model-select">对话模型</label>
+                            <select id="chat-model-select">
+                                <option value="qwen/qwen3.6-plus" selected>Qwen 3.6 Plus（推荐）</option>
+                                <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                                <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
+                                <option value="google/gemma-4-31b-it">Gemma 4 31B</option>
+                            </select>
+                        </div>
+                        <div id="chat-messages" class="chat-messages"></div>
+                        <div class="chat-input-row">
+                            <input type="text" id="chat-input" placeholder="输入你的问题，如：第2步为什么错了？">
+                            <button type="button" id="chat-send-btn" class="chat-send-btn">发送</button>
+                        </div>
+                    </section>
+
+                    <details id="advanced-details" class="card">
+                        <summary>高级详情</summary>
+                        <div id="run-info"></div>
+                        <details class="inner-details">
+                            <summary>显示原始 JSON</summary>
+                            <pre id="raw-json"></pre>
+                        </details>
+                    </details>
+                </div>
+
+            </section>
+
+            <!-- ==================== 历史记录页面 ==================== -->
+            <section id="page-history" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">📜 历史记录</h3>
+                        <p class="page-section-desc">查看以往的题目分析</p>
+                    </div>
+                    <button type="button" id="btn-enter-batch" class="btn-secondary btn-sm">批量管理</button>
+                </div>
+
+                <div class="history-filters">
+                    <select id="history-filter-subject" class="filter-select">
+                        <option value="">全部学科</option>
+                        <option value="calculus">微积分</option>
+                        <option value="linear_algebra">线性代数</option>
+                        <option value="mechanics">力学</option>
+                        <option value="relativity">相对论</option>
+                        <option value="optics">光学</option>
+                        <option value="quantum">量子物理</option>
+                        <option value="electromagnetism">电磁学</option>
+                        <option value="thermodynamics">热学</option>
+                    </select>
+                    <select id="history-filter-status" class="filter-select">
+                        <option value="">全部状态</option>
+                        <option value="complete">分析完成</option>
+                        <option value="needs_review">待人工复核</option>
+                        <option value="unavailable">结果暂不可用</option>
+                        <option value="failed">分析失败（兼容）</option>
+                    </select>
+                    <input type="text" id="history-search" class="filter-input" placeholder="搜索题目内容...">
+                </div>
+
+                <div id="history-toolbar" class="history-toolbar" style="display:none;">
+                    <div class="toolbar-left">
+                        <label class="toolbar-checkbox">
+                            <input type="checkbox" id="history-select-all"> 全选
+                        </label>
+                        <span id="history-selected-count" class="toolbar-count">已选 0 条</span>
+                    </div>
+                    <div class="toolbar-right">
+                        <button type="button" id="btn-batch-delete" class="btn-danger" disabled>
+                            删除选中 (<span id="batch-delete-count">0</span>)
+                        </button>
+                        <select id="history-cleanup-select" class="filter-select">
+                            <option value="">按日期清理...</option>
+                            <option value="7">清理 7 天前的记录</option>
+                            <option value="30">清理 30 天前的记录</option>
+                            <option value="90">清理 90 天前的记录</option>
+                            <option value="0">清理全部记录</option>
+                        </select>
+                        <button type="button" id="btn-exit-batch" class="btn-secondary btn-sm">退出管理</button>
+                    </div>
+                </div>
+
+                <div id="history-list" class="history-list">
+                    <div class="history-empty">
+                        <div class="history-empty-icon">📜</div>
+                        <p class="history-empty-title">暂无历史记录</p>
+                        <p class="history-empty-desc">开始你的第一次诊断吧！</p>
+                        <button type="button" class="btn-primary btn-sm" data-goto="new">前往新建诊断</button>
+                    </div>
+                </div>
+
+                <div id="history-pagination" class="history-pagination" style="display:none;">
+                    <div class="pagination-info">
+                        <span id="pagination-summary">第 1-20 条，共 0 条</span>
+                        <select id="pagination-per-page" class="filter-select">
+                            <option value="10">每页 10 条</option>
+                            <option value="20" selected>每页 20 条</option>
+                            <option value="50">每页 50 条</option>
+                        </select>
+                    </div>
+                    <div class="pagination-controls">
+                        <button type="button" id="btn-page-first" class="btn-secondary btn-sm" disabled>首页</button>
+                        <button type="button" id="btn-page-prev" class="btn-secondary btn-sm" disabled>上一页</button>
+                        <span id="pagination-pages" class="pagination-pages"></span>
+                        <button type="button" id="btn-page-next" class="btn-secondary btn-sm" disabled>下一页</button>
+                        <button type="button" id="btn-page-last" class="btn-secondary btn-sm" disabled>末页</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== 统计概览页面 ==================== -->
+            <section id="page-stats" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">📊 统计概览</h3>
+                        <p class="page-section-desc">了解你的学习进度</p>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total">--</div>
+                        <div class="stat-label">总诊断次数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-success-rate">--</div>
+                        <div class="stat-label">成功率</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-avg-duration">--</div>
+                        <div class="stat-label">平均用时</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-streak">--</div>
+                        <div class="stat-label">连续使用天数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-today">--</div>
+                        <div class="stat-label">今日诊断</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-week">--</div>
+                        <div class="stat-label">本周诊断</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>学科分布</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="subject-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>使用趋势</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="trend-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== 学习报告页面 ==================== -->
+            <section id="page-report" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">📄 学习报告</h3>
+                        <p class="page-section-desc">基于诊断历史的深度学习分析</p>
+                    </div>
+                    <div class="page-header-actions report-header-actions">
+                        <button id="report-history-btn" class="btn-secondary">历史报告</button>
+                        <button id="report-generate-btn" class="btn-primary">生成报告</button>
+                    </div>
+                </div>
+
+                <div class="report-controls card">
+                    <div class="report-controls-row">
+                        <div class="form-group">
+                            <label>分析模型</label>
+                            <select id="report-model">
+                                <option value="qwen/qwen3.6-plus" selected>Qwen 3.6 Plus</option>
+                                <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                                <option value="deepseek/deepseek-chat-v3-0324">DeepSeek V3 0324</option>
+                                <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
+                                <option value="google/gemma-4-31b-it">Gemma 4 31B</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="report-mode-tabs">
+                        <button class="mode-tab active" data-mode="time">按时间范围</button>
+                        <button class="mode-tab" data-mode="manual">手动选择记录</button>
+                    </div>
+
+                    <div id="report-mode-time" class="report-mode-panel">
+                        <div class="report-time-btns">
+                            <button class="time-btn active" data-days="7">7天</button>
+                            <button class="time-btn" data-days="30">30天</button>
+                            <button class="time-btn" data-days="90">90天</button>
+                            <button class="time-btn" data-days="0">全部</button>
+                        </div>
+                        <div class="report-date-range">
+                            <span class="report-date-label">自定义日期：</span>
+                            <input type="date" id="report-start-date" class="report-date-input">
+                            <span class="report-date-sep">~</span>
+                            <input type="date" id="report-end-date" class="report-date-input">
+                            <span id="report-custom-hint" class="report-custom-hint" style="display:none;"></span>
+                        </div>
+                    </div>
+
+                    <div id="report-mode-manual" class="report-mode-panel" style="display:none;">
+                        <div class="report-manual-toolbar">
+                            <input type="text" id="report-run-search" class="filter-input" placeholder="搜索题目...">
+                            <select id="report-run-subject" class="filter-select">
+                                <option value="">全部科目</option>
+                            </select>
+                            <label class="report-select-all-label">
+                                <input type="checkbox" id="report-select-all">
+                                <span>全选</span>
+                            </label>
+                            <span id="report-selected-count" class="report-selected-count">已选 0 条</span>
+                        </div>
+                        <div id="report-run-list" class="report-run-list"></div>
+                    </div>
+                </div>
+
+                <div id="report-loading" class="report-loading" style="display:none;">
+                    <div class="spinner"></div>
+                    <span>正在分析诊断数据并生成学习报告...</span>
+                </div>
+
+                <div id="report-empty" class="report-empty" style="display:none;">
+                    <p>暂无诊断记录，继续使用后会生成更准确的学习报告。</p>
+                </div>
+
+                <div id="report-error" class="report-error" style="display:none;">
+                    <p id="report-error-msg"></p>
+                    <button class="report-error-retry" id="report-retry-btn">重试</button>
+                </div>
+
+                <div id="report-content" class="report-content" style="display:none;"></div>
+
+                <div id="report-history" class="report-history" style="display:none;">
+                    <div class="report-history-header">
+                        <h4>历史报告</h4>
+                        <button id="report-history-back" class="btn-secondary">返回</button>
+                    </div>
+                    <div id="report-history-list" class="report-history-list"></div>
+                    <div id="report-history-empty" class="report-empty" style="display:none;">
+                        <p>暂无历史报告，生成报告后将自动保存。</p>
+                    </div>
+                    <div id="report-history-pagination" class="history-pagination" style="display:none;"></div>
+                </div>
+            </section>
+
+            <!-- ==================== 设置页面 ==================== -->
+            <section id="page-settings" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">⚙️ 设置</h3>
+                        <p class="page-section-desc">自定义你的使用体验</p>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>外观设置</h4>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>主题模式</span>
+                            <span class="setting-desc">选择界面的配色方案</span>
+                        </div>
+                        <select id="setting-theme" class="setting-control">
+                            <option value="light">☀️ 浅色</option>
+                            <option value="dark">🌙 深色</option>
+                            <option value="auto">🔄 跟随系统</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>默认配置</h4>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>默认学科</span>
+                        </div>
+                        <select id="setting-default-subject" class="setting-control">
+                            <option value="auto_detect">自动识别</option>
+                            <option value="calculus">微积分</option>
+                            <option value="linear_algebra">线性代数</option>
+                            <option value="mechanics">力学</option>
+                            <option value="relativity">相对论</option>
+                            <option value="optics">光学</option>
+                            <option value="quantum">量子物理</option>
+                            <option value="electromagnetism">电磁学</option>
+                            <option value="thermodynamics">热学</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>默认推理深度</span>
+                        </div>
+                        <select id="setting-default-depth" class="setting-control">
+                            <option value="quick">快速</option>
+                            <option value="standard" selected>标准</option>
+                            <option value="thorough">深度</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>默认运行模式</span>
+                        </div>
+                        <select id="setting-default-mode" class="setting-control">
+                            <option value="workflow_r1">多步工作流</option>
+                            <option value="baseline_qwen3.6">单次基线</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>默认模型</span>
+                        </div>
+                        <select id="setting-default-model" class="setting-control">
+                            <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
+                            <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                            <option value="deepseek/deepseek-chat-v3-0324">DeepSeek V3 0324</option>
+                            <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
+                            <option value="google/gemma-4-31b-it">Gemma 4 31B</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>历史记录</h4>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>自动保存历史</span>
+                            <span class="setting-desc">自动将每次分析保存到历史记录</span>
+                        </div>
+                        <label class="setting-switch">
+                            <input type="checkbox" id="setting-auto-save" checked>
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>数据管理</h4>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <span>导出数据</span>
+                            <span class="setting-desc">下载所有历史记录为 JSON 文件</span>
+                        </div>
+                        <button type="button" class="btn-secondary btn-sm" id="btn-export-data">导出</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>关于</h4>
+                    <div class="setting-item">
+                        <span class="setting-label">
+                            <span>版本</span>
+                            <span class="setting-desc">STEM 辅导系统 v1.0 · Powered by LangGraph & Pydantic & FastAPI</span>
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <footer class="main-footer">
+            <p>Powered by LangGraph · Pydantic · FastAPI</p>
+        </footer>
+    </main>
+
+    <div id="crop-modal" class="crop-modal" style="display:none;">
+        <div class="crop-modal-content">
+            <div class="crop-header">
+                <span>调整裁剪区域</span>
+                <div class="crop-actions">
+                    <button type="button" id="crop-cancel" class="crop-btn-cancel">取消</button>
+                    <button type="button" id="crop-confirm" class="crop-btn-confirm">确认</button>
+                </div>
+            </div>
+            <div class="crop-body">
+                <img id="crop-image" src="" alt="裁剪">
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=7"></script>
+
+    <div id="confirm-overlay" class="confirm-overlay" style="display:none;">
+        <div class="confirm-dialog">
+            <div class="confirm-title" id="confirm-title">确认操作</div>
+            <div class="confirm-message" id="confirm-message"></div>
+            <div class="confirm-actions">
+                <button type="button" id="confirm-cancel" class="btn-secondary">取消</button>
+                <button type="button" id="confirm-ok" class="btn-danger">确认删除</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

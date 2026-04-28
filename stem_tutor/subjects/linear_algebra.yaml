@@ -1,0 +1,111 @@
+subject_id: linear_algebra
+display_name: 线性代数
+display_name_en: Linear Algebra
+
+error_taxonomy:
+  MATRIX_DIM_MISMATCH:
+    category: "Dimension Errors"
+    short_desc: "矩阵维度不匹配。"
+    cues: ["dimension", "size mismatch", "incompatible", "shape"]
+  DETERMINANT_CALCULATION_ERROR:
+    category: "Computational Errors"
+    short_desc: "行列式计算错误。"
+    cues: ["determinant", "det", "行列式"]
+  EIGENVALUE_EIGENVECTOR_ERROR:
+    category: "Spectral Theory Errors"
+    short_desc: "特征值或特征向量计算错误。"
+    cues: ["eigenvalue", "eigenvector", "特征值", "特征向量"]
+  RANK_MISJUDGMENT:
+    category: "Structural Property Errors"
+    short_desc: "矩阵秩判断错误。"
+    cues: ["rank", "秩", "linearly independent"]
+  LINEAR_DEPENDENCY_CONFUSION:
+    category: "Conceptual Confusion"
+    short_desc: "混淆了线性相关与线性无关。"
+    cues: ["linearly dependent", "linearly independent", "线性相关", "线性无关"]
+  BASIS_DIMENSION_ERROR:
+    category: "Vector Space Errors"
+    short_desc: "向量空间的基或维数确定错误。"
+    cues: ["basis", "dimension", "span", "基", "维数"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  矩阵运算: ["矩阵", "matrix", "乘法", "加法", "转置", "逆矩阵", "伴随矩阵"]
+  行列式: ["行列式", "determinant", "det", "代数余子式", "拉普拉斯展开"]
+  线性方程组: ["线性方程组", "高斯消元", "行阶梯", "增广矩阵", "齐次", "非齐次"]
+  向量空间: ["向量空间", "子空间", "基", "维数", "span", "basis", "dimension"]
+  特征值与特征向量: ["特征值", "特征向量", "eigenvalue", "eigenvector", "特征多项式", "对角化"]
+  线性变换: ["线性变换", "核", "像", "同构", "kernel", "image", "isomorphism"]
+  内积空间: ["内积", "正交", "Gram-Schmidt", "标准正交基", "inner product", "orthogonal"]
+  二次型: ["二次型", "正定", "负定", "合同", "quadratic form", "positive definite"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。数学表达式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。矩阵用方括号表示。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 矩阵运算中要特别注意维数匹配和运算顺序
+    3. 如果当前步骤是上一步的自然延续，且数学上正确，应判为正确
+    4. 只有当步骤本身存在数学错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。对矩阵、向量等结构型答案要特别注意维数和元素值。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "det"
+      - type: not_contains
+        value: "expansion"
+    label: "unclear"
+    evidence: "Determinant computation step lacks detail on expansion method."
+    violated_principles: ["clarity"]
+
+budget_overrides:
+  reference:
+    tool_budget_seconds: 25
+    max_tool_rounds: 2
+  verify:
+    tool_budget_seconds: 15
+    max_tool_rounds: 1
+
+mock:
+  reference_solution:
+    reference_text: "Compute the matrix product AB by multiplying rows of A with columns of B."
+    key_assertions:
+      - "Check dimension compatibility before multiplication."
+      - "Compute each entry as the dot product of corresponding row and column."
+  review_problems:
+    - problem_text: "Given A = [[1,2],[3,4]], compute A^2."
+      related_weakness_code: "MATRIX_DIM_MISMATCH"
+      rationale: "Reinforces matrix multiplication with compatible dimensions."
+      difficulty_label: "easy"
+    - problem_text: "Find the eigenvalues and eigenvectors of [[2,1],[1,2]]."
+      related_weakness_code: "EIGENVALUE_EIGENVECTOR_ERROR"
+      rationale: "Targets characteristic polynomial and eigenvector computation."
+      difficulty_label: "medium"

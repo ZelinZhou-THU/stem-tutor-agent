@@ -1,0 +1,102 @@
+subject_id: optics
+display_name: 光学
+display_name_en: Optics
+
+error_taxonomy:
+  RAY_DIAGRAM_ERROR:
+    category: "Geometric Optics Errors"
+    short_desc: "光路图绘制错误或缺少关键光线。"
+    cues: ["ray", "光路", "光线", "diagram", "principal axis"]
+  REFRACTION_SIGN_ERROR:
+    category: "Formula Application Errors"
+    short_desc: "违反了折射定律或透镜方程的符号规则。"
+    cues: ["Snell", "折射", "sign convention", "符号规则", "refraction"]
+  INTERFERENCE_CONDITION_MISJUDGMENT:
+    category: "Wave Optics Errors"
+    short_desc: "干涉相长/相消条件应用错误。"
+    cues: ["interference", "干涉", "constructive", "destructive", "phase difference"]
+  DIFFRACTION_FORMULA_MISUSE:
+    category: "Formula Application Errors"
+    short_desc: "衍射公式应用在了错误的场景中。"
+    cues: ["diffraction", "衍射", "single slit", "grating", "光栅"]
+  POLARIZATION_MISUNDERSTANDING:
+    category: "Conceptual Confusion"
+    short_desc: "偏振概念或马吕斯定律应用错误。"
+    cues: ["polarization", "偏振", "Malus", "Brewster"]
+  IMAGE_LOCATION_ERROR:
+    category: "Computational Errors"
+    short_desc: "像的位置或放大率计算错误。"
+    cues: ["image", "像", "object distance", "物距", "magnification", "放大率"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  几何光学: ["光线", "ray", "反射", "折射", "Snell", "全反射", "临界角"]
+  透镜成像: ["透镜", "lens", "焦距", "成像公式", "放大率", "实像", "虚像"]
+  干涉: ["干涉", "interference", "双缝", "薄膜", "Newton环", "Michelson", "相干"]
+  衍射: ["衍射", "diffraction", "单缝", "光栅", "圆孔", "分辨本领"]
+  偏振: ["偏振", "polarization", "马吕斯定律", "Malus", "布儒斯特角", "Brewster", "双折射"]
+  光的本性: ["波动性", "粒子性", "光子", "photon", "光电效应", "Compton"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。物理公式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。注意符号规则。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 特别注意符号规则（物距、像距、焦距的正负号约定）
+    3. 检查干涉/衍射条件中光程差的计算是否正确
+    4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查像的虚实、正倒和符号。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "interference"
+      - type: not_contains
+        value: "path difference"
+    label: "unclear"
+    evidence: "Interference condition stated without computing path difference."
+    violated_principles: ["clarity"]
+
+mock:
+  reference_solution:
+    reference_text: "Apply the thin lens equation 1/f = 1/u + 1/v. Determine sign conventions, solve for image distance, then compute magnification."
+    key_assertions:
+      - "Apply correct sign convention for object and image distances."
+      - "Use thin lens equation to find image position."
+      - "Compute magnification m = -v/u."
+  review_problems:
+    - problem_text: "一个凸透镜焦距为 10cm，物体放在距透镜 15cm 处。求像的位置、性质和放大率。"
+      related_weakness_code: "IMAGE_LOCATION_ERROR"
+      rationale: "Reinforces thin lens equation with sign conventions."
+      difficulty_label: "easy"
+    - problem_text: "波长为 500nm 的单色光通过双缝，缝距为 0.1mm，屏距为 1m。求相邻明纹间距。"
+      related_weakness_code: "INTERFERENCE_CONDITION_MISJUDGMENT"
+      rationale: "Targets double-slit interference fringe spacing formula."
+      difficulty_label: "medium"

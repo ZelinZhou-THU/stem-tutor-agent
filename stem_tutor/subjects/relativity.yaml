@@ -1,0 +1,103 @@
+subject_id: relativity
+display_name: 相对论
+display_name_en: Relativity
+
+error_taxonomy:
+  LORENTZ_TRANSFORM_SIGN_ERROR:
+    category: "Transformation Errors"
+    short_desc: "洛伦兹变换方程符号错误。"
+    cues: ["Lorentz", "洛伦兹", "sign", "符号", "gamma factor"]
+  PROPER_TIME_COORDINATE_TIME_CONFUSION:
+    category: "Conceptual Confusion"
+    short_desc: "混淆了固有时与坐标时。"
+    cues: ["proper time", "固有时", "coordinate time", "坐标时", "time dilation"]
+  VELOCITY_ADDITION_MISUSE:
+    category: "Formula Application Errors"
+    short_desc: "相对论速度叠加公式应用错误。"
+    cues: ["velocity addition", "速度叠加", "relativistic", "相对论速度"]
+  LENGTH_CONTRACTION_DIRECTION_ERROR:
+    category: "Conceptual Confusion"
+    short_desc: "长度收缩应用在了错误的方向上。"
+    cues: ["length contraction", "长度收缩", "parallel", "perpendicular"]
+  MASS_ENERGY_RELATION_ERROR:
+    category: "Computational Errors"
+    short_desc: "质能关系 E=mc^2 使用错误。"
+    cues: ["mass-energy", "质能", "rest energy", "静能", "total energy"]
+  SIMULTANEITY_MISUNDERSTANDING:
+    category: "Conceptual Confusion"
+    short_desc: "误解了同时性的相对性。"
+    cues: ["simultaneity", "同时性", "different frames", "不同参考系"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  洛伦兹变换: ["洛伦兹", "Lorentz", "变换", "gamma", "boost"]
+  时间膨胀: ["时间膨胀", "time dilation", "固有时", "proper time", "钟慢效应"]
+  长度收缩: ["长度收缩", "length contraction", "尺缩效应", "运动长度"]
+  速度叠加: ["速度叠加", "velocity addition", "相对论速度"]
+  质能关系: ["质能", "mass-energy", "E=mc", "静能", "rest energy", "动能"]
+  同时性的相对性: ["同时性", "simultaneity", "不同参考系", "different frames"]
+  四维矢量: ["四维", "four-vector", "时空间隔", "spacetime interval", "不变量"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。物理公式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。注意区分经典和相对论公式。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 特别注意参考系的标识和变换方向（正负号）
+    3. 检查是否混淆了固有量和坐标量
+    4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查是否满足光速不变原理和因果律。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "gamma"
+      - type: not_contains
+        value: "frame"
+    label: "unclear"
+    evidence: "Lorentz factor used without specifying reference frames."
+    violated_principles: ["clarity"]
+
+mock:
+  reference_solution:
+    reference_text: "Apply the Lorentz transformation. Identify the rest frame and moving frame, compute gamma, then transform coordinates."
+    key_assertions:
+      - "Identify which frame is the rest frame (primed) and which is moving (unprimed)."
+      - "Compute gamma = 1/sqrt(1 - v^2/c^2) correctly."
+      - "Apply x' = gamma(x - vt) and t' = gamma(t - vx/c^2)."
+  review_problems:
+    - problem_text: "一艘飞船以 0.6c 的速度远离地球。飞船上测得某事件持续 10 秒。地球上测得该事件持续多久？"
+      related_weakness_code: "PROPER_TIME_COORDINATE_TIME_CONFUSION"
+      rationale: "Reinforces distinction between proper time and coordinate time."
+      difficulty_label: "easy"
+    - problem_text: "两艘飞船分别以 0.8c 和 -0.6c 的速度相对地球运动。求它们之间的相对速度。"
+      related_weakness_code: "VELOCITY_ADDITION_MISUSE"
+      rationale: "Targets relativistic velocity addition formula."
+      difficulty_label: "medium"

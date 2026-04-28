@@ -1,0 +1,111 @@
+subject_id: mechanics
+display_name: 力学
+display_name_en: Mechanics
+
+error_taxonomy:
+  FORCE_ANALYSIS_INCOMPLETE:
+    category: "Force Analysis Errors"
+    short_desc: "受力分析遗漏了一个或多个力。"
+    cues: ["force", "受力", "遗漏", "free body diagram"]
+  REFERENCE_FRAME_CONFUSION:
+    category: "Conceptual Confusion"
+    short_desc: "混淆了惯性系与非惯性系。"
+    cues: ["reference frame", "惯性系", "非惯性系", "inertial"]
+  ENERGY_CONSERVATION_MISUSE:
+    category: "Conservation Law Errors"
+    short_desc: "在不适用条件下使用了能量守恒。"
+    cues: ["energy", "能量守恒", "mechanical energy", "conservative"]
+  MOMENTUM_DIRECTION_ERROR:
+    category: "Vector Analysis Errors"
+    short_desc: "动量方向或符号处理错误。"
+    cues: ["momentum", "动量", "direction", "方向", "vector"]
+  NEWTON_LAW_MISAPPLICATION:
+    category: "Law Application Errors"
+    short_desc: "牛顿定律应用错误或使用了错误的场景。"
+    cues: ["Newton", "牛顿", "F=ma", "second law"]
+  CONSTRAINT_CONDITION_IGNORED:
+    category: "Condition Misuse"
+    short_desc: "忽略了几何或运动学约束条件。"
+    cues: ["constraint", "约束", "绳子", "光滑", "无摩擦"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  牛顿运动定律: ["牛顿", "Newton", "F=ma", "加速度", "合力", "受力分析"]
+  能量守恒: ["能量守恒", "动能", "势能", "mechanical energy", "conservation", "功能关系"]
+  动量定理: ["动量", "momentum", "冲量", "碰撞", "弹性碰撞", "非弹性碰撞"]
+  圆周运动: ["圆周运动", "向心力", "centripetal", "角速度", "角加速度", "匀速圆周"]
+  万有引力: ["万有引力", "gravitation", "开普勒", "轨道", "卫星", "引力势能"]
+  简谐振动: ["简谐振动", "harmonic", "弹簧振子", "单摆", "周期", "频率", "振幅"]
+  刚体转动: ["刚体", "转动惯量", "力矩", "torque", "角动量", "转动动能"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。物理公式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。矢量用箭头或粗体表示。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 特别注意物理量的单位、方向和符号
+    3. 检查守恒定律的适用条件是否满足
+    4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查单位、量纲和有效数字。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given", "由", "根据"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "conservation"
+      - type: not_contains
+        value: "condition"
+    label: "unclear"
+    evidence: "Conservation law stated without verifying applicable conditions."
+    violated_principles: ["clarity"]
+
+budget_overrides:
+  reference:
+    tool_budget_seconds: 20
+    max_tool_rounds: 1
+  verify:
+    tool_budget_seconds: 15
+    max_tool_rounds: 1
+
+mock:
+  reference_solution:
+    reference_text: "Apply Newton's second law. Draw free body diagram, resolve forces, and solve F_net = ma."
+    key_assertions:
+      - "Identify all forces acting on the object."
+      - "Choose appropriate coordinate system."
+      - "Write component equations and solve."
+  review_problems:
+    - problem_text: "一个质量为 2kg 的物体在水平面上受到 10N 的水平拉力，摩擦系数为 0.2。求加速度。"
+      related_weakness_code: "FORCE_ANALYSIS_INCOMPLETE"
+      rationale: "Reinforces complete force analysis including friction."
+      difficulty_label: "easy"
+    - problem_text: "两个小球发生完全弹性碰撞，质量分别为 m 和 2m，初速度分别为 v 和 0。求碰后速度。"
+      related_weakness_code: "ENERGY_CONSERVATION_MISUSE"
+      rationale: "Targets simultaneous application of momentum and energy conservation."
+      difficulty_label: "medium"

@@ -1,0 +1,9 @@
+{
+  "problem_input": {
+    "problem_id": "demo-001",
+    "problem_text": "Differentiate y = sin(x^2).",
+    "topic_tags": ["derivative", "chain_rule"],
+    "expected_format": "text"
+  },
+  "raw_student_solution": "1) y' = cos(x^2)\n2) therefore final answer"
+}

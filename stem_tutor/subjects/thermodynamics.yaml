@@ -1,0 +1,103 @@
+subject_id: thermodynamics
+display_name: 热学
+display_name_en: Thermodynamics
+
+error_taxonomy:
+  FIRST_LAW_SIGN_ERROR:
+    category: "Law Application Errors"
+    short_desc: "违反了热力学第一定律的符号规则。"
+    cues: ["first law", "热力学第一定律", "sign", "符号", "work done", "功", "heat", "热"]
+  ENTROPY_CONDITION_MISUSE:
+    category: "Conceptual Confusion"
+    short_desc: "使用了错误的过程条件来计算熵变。"
+    cues: ["entropy", "熵", "reversible", "可逆", "irreversible", "不可逆", "isolated"]
+  EQUATION_OF_STATE_MISAPPLICATION:
+    category: "Formula Application Errors"
+    short_desc: "状态方程应用在了其有效范围之外。"
+    cues: ["ideal gas", "理想气体", "van der Waals", "状态方程", "real gas"]
+  PROCESS_PATH_CONFUSION:
+    category: "Conceptual Confusion"
+    short_desc: "混淆了不同的热力学过程路径（等温、绝热等）。"
+    cues: ["isothermal", "等温", "adiabatic", "绝热", "isobaric", "等压", "isochoric", "等容"]
+  CYCLE_EFFICIENCY_ERROR:
+    category: "Computational Errors"
+    short_desc: "热机或制冷机效率计算错误。"
+    cues: ["efficiency", "效率", "Carnot", "卡诺", "coefficient of performance", "制冷系数"]
+  PHASE_TRANSITION_CONDITION_IGNORED:
+    category: "Condition Misuse"
+    short_desc: "相变条件或潜热未正确处理。"
+    cues: ["phase", "相变", "latent heat", "潜热", "melting", "vaporization", "汽化"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  热力学第一定律: ["热力学第一定律", "内能", "internal energy", "功", "work", "热量", "heat", "delta U"]
+  热力学第二定律: ["热力学第二定律", "熵", "entropy", "克劳修斯", "Clausius", "不可逆"]
+  理想气体: ["理想气体", "ideal gas", "状态方程", "pV=nRT", "范德瓦尔斯"]
+  热机与制冷: ["热机", "heat engine", "制冷", "refrigerator", "卡诺", "Carnot", "效率"]
+  热力学过程: ["等温", "isothermal", "绝热", "adiabatic", "等压", "isobaric", "等容", "isochoric"]
+  相变: ["相变", "phase transition", "潜热", "latent heat", "熔化", "汽化", "升华"]
+  统计物理基础: ["统计", "statistical", "配分函数", "partition function", "Boltzmann", "自由度"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。物理公式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。注意区分不同热力学过程的公式。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 特别注意热力学第一定律中的符号约定（系统吸热为正，对外做功为正）
+    3. 检查过程类型（等温、绝热等）与所用公式是否匹配
+    4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
+    5. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查单位、量纲和热力学量的符号。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题的理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns: []
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "adiabatic"
+      - type: not_contains
+        value: "gamma"
+    label: "unclear"
+    evidence: "Adiabatic process stated without specifying heat capacity ratio."
+    violated_principles: ["clarity"]
+
+mock:
+  reference_solution:
+    reference_text: "Apply the first law of thermodynamics: delta U = Q - W. Identify the process type, compute work and heat, then find the change in internal energy."
+    key_assertions:
+      - "Identify the thermodynamic process (isothermal, adiabatic, etc.)."
+      - "Compute work done using the correct integral for the process."
+      - "Apply the first law with correct sign convention."
+  review_problems:
+    - problem_text: "1 mol 理想气体从状态 (p1, V1, T1) 等温膨胀到体积 V2 = 2*V1。求气体对外做的功和吸收的热量。"
+      related_weakness_code: "PROCESS_PATH_CONFUSION"
+      rationale: "Reinforces isothermal work computation for ideal gas."
+      difficulty_label: "easy"
+    - problem_text: "卡诺热机工作于 500K 和 300K 之间，每循环从高温热源吸热 1000J。求效率和对外做功。"
+      related_weakness_code: "CYCLE_EFFICIENCY_ERROR"
+      rationale: "Targets Carnot efficiency formula and energy balance."
+      difficulty_label: "medium"

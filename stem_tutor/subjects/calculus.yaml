@@ -1,0 +1,118 @@
+subject_id: calculus
+display_name: 微积分
+display_name_en: Calculus
+
+error_taxonomy:
+  CHAIN_RULE_MISUSE:
+    category: "Rule Application Errors"
+    short_desc: "链式法则应用错误。"
+    cues: ["composition", "inner derivative", "chain"]
+  SUBSTITUTION_MAPPING_MISMATCH:
+    category: "Rule Application Errors"
+    short_desc: "变量代换前后不一致。"
+    cues: ["u-sub", "substitution", "variable mismatch"]
+  SIGN_ARITHMETIC_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "符号或算术化简错误。"
+    cues: ["minus", "sign", "simplify"]
+  DOMAIN_CONDITION_IGNORED:
+    category: "Theorem/Condition Misuse"
+    short_desc: "忽略了定义域或定理前提条件。"
+    cues: ["domain", "condition", "precondition"]
+  OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL:
+    category: "Conceptual Confusion"
+    short_desc: "混淆了极限/导数/积分的概念。"
+    cues: ["limit", "derivative", "integral", "concept"]
+  UNSUPPORTED_JUMP:
+    category: "Reasoning Quality Issues"
+    short_desc: "步骤缺乏充分的推理依据。"
+    cues: ["therefore", "obvious", "skip"]
+  NOTATION_UNCLEAR:
+    category: "Reasoning Quality Issues"
+    short_desc: "符号表达模糊或不清晰。"
+    cues: ["unclear", "ambiguous", "notation"]
+
+topic_keywords:
+  常微分方程: ["微分方程", "ode", "通解", "特解", "分离变量", "齐次", "一阶线性", "伯努利", "初值问题"]
+  积分计算: ["euler积分", "beta函数", "gamma函数", "分部积分", "换元积分", "定积分", "不定积分", "反常积分"]
+  极限: ["极限", "lim", "洛必达", "无穷小", "无穷大", "收敛"]
+  导数与微分: ["导数", "微分", "求导", "链式法则", "隐函数", "参数方程", "高阶导数"]
+  级数: ["级数", "泰勒展开", "幂级数", "傅里叶", "收敛半径", "发散"]
+  多元微积分: ["偏导数", "重积分", "曲线积分", "曲面积分", "梯度", "散度", "旋度"]
+
+prompts:
+  system_role: "你是一个精确的{subject_name}辅导 JSON API。所有输出请使用中文（简体中文）。数学表达式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。"
+  verification_role: "你是一位{subject_name}阅卷老师。请判断学生的解题步骤是否正确。返回 JSON 格式。"
+  verification_extra: |
+    1. 请结合上下文判断：如果当前步骤是中间过渡形式，且下一步完成了该步骤的推导，则当前步骤应判为正确
+    2. 不要孤立地判断单个步骤的完整性，要考虑整个解题过程的连贯性
+    3. 如果当前步骤是上一步的自然延续（如等式链的下一环），且数学上正确，应判为正确
+    4. 跨步连贯性检查：请验证当前步骤的首个表达式是否与上一步的最后一个表达式在数学上等价，包括所有系数和常数。例如，若上一步以 "3∫..." 结尾，当前步骤不能直接跳到 "B(...)" 而丢掉系数 3
+    5. 如果当前步骤与上一步不连贯（如丢失系数、漏掉常数、表达式突变），应判为 incorrect_math
+    6. 请用中文输出 evidence 字段，说明判断依据
+  final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
+  final_answer_extra: "请先自己求解，然后与学生答案对比。对精确值要求严格。请用中文输出 explanation 字段。"
+  diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
+  feedback_extra: "请为学生撰写简洁的学习反馈。请用中文输出所有字段。"
+  review_problem_extra: |
+    请生成 1-3 道类似的复习练习题，并说明出题理由。
+    请用中文输出 problem_text 和 rationale 字段。
+  review_problem_all_correct_extra: |
+    该学生在本道题中表现优秀，所有步骤均正确。
+    请生成 1-3 道与原题主题相关的进阶练习题，难度由易到难。
+    difficulty_label 请分别使用 easy、medium、hard。
+    请用中文输出 problem_text 和 rationale 字段。
+
+sympy_postprocess:
+  strip_prefixes: ["解：", "解:", "therefore", "Thus", "So", "令", "设", "即", "得", "故", "所以", "因为", "where", "given"]
+  derivative_patterns:
+    - pattern: "d/dx\\[(.+?)\\]"
+      replacement: "diff(\\1, x)"
+    - pattern: "d/dt\\[(.+?)\\]"
+      replacement: "diff(\\1, t)"
+    - pattern: "d/du\\[(.+?)\\]"
+      replacement: "diff(\\1, u)"
+    - pattern: "d\\(([^)]+)\\)"
+      replacement: "*\\1"
+
+rule_adjustments:
+  - conditions:
+      - type: contains
+        value: "therefore"
+      - type: not_contains
+        value: "="
+    label: "inconsistent_or_unsupported"
+    evidence: "Step uses an inference marker without a concrete equivalence."
+    violated_principles: ["insufficient_justification"]
+  - conditions:
+      - type: contains
+        value: "u ="
+      - type: not_contains
+        value: "du"
+    label: "incorrect_math"
+    evidence: "Substitution appears without differential mapping."
+    violated_principles: ["substitution_mapping"]
+
+budget_overrides:
+  reference:
+    tool_budget_seconds: 35
+    max_tool_rounds: 2
+  verify:
+    tool_budget_seconds: 25
+    max_tool_rounds: 2
+
+mock:
+  reference_solution:
+    reference_text: "Differentiate using chain rule and simplify carefully."
+    key_assertions:
+      - "Apply derivative rules with inner derivative."
+      - "Keep signs and constants consistent."
+  review_problems:
+    - problem_text: "Compute d/dx [sin(x^2 + 1)]."
+      related_weakness_code: "CHAIN_RULE_MISUSE"
+      rationale: "Reinforces inner-function derivative tracking."
+      difficulty_label: "easy"
+    - problem_text: "Evaluate integral of 2x*cos(x^2) dx by substitution."
+      related_weakness_code: "SUBSTITUTION_MAPPING_MISMATCH"
+      rationale: "Targets correct u and du mapping."
+      difficulty_label: "medium"

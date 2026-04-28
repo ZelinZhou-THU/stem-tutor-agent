@@ -1,0 +1,45 @@
+# Ignore Python cache and temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Byte-compiled / optimized / DLL files
+*.so
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+
+# Pytest cache
+.pytest_cache/
+
+# Mypy cache
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Logs and coverage
+logs/
+*.log
+htmlcov/
+.coverage
+
+# Misc cache
+.cache/
+
+# Compiled files
+*.pyc
+
+# Sensitive config
+key.env
+
+# Internal planning docs
+acc_plan.md
+web/static/layout_plan.md

@@ -212,6 +212,7 @@
                 html += '<div class="history-card-actions">';
                 html += '<button type="button" class="btn-secondary" data-action="view" data-run-id="' + esc(run.run_id) + '">\u{1f441} \u67e5\u770b\u7ed3\u679c</button>';
                 html += '<button type="button" class="btn-secondary" data-action="reanalyze" data-run-id="' + esc(run.run_id) + '">\ud83d\udd04 \u91cd\u65b0\u5206\u6790</button>';
+                html += '<button type="button" class="btn-secondary" data-action="delete" data-run-id="' + esc(run.run_id) + '">\ud83d\udded \u5220\u9664</button>';
                 html += '</div>';
                 html += '</div>';
             });
@@ -230,6 +231,23 @@
                     if (!self.batchMode) self.reanalyze(btn.getAttribute("data-run-id"));
                 });
             });
+            container.querySelectorAll('[data-action="delete"]').forEach(function (btn) {
+                btn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    var runId = btn.getAttribute("data-run-id");
+                    self.showConfirm(
+                        "\u786e\u8ba4\u5220\u9664",
+                        "\u5220\u9664\u540e\u65e0\u6cd5\u6062\u590d\uff0c\u786e\u5b9a\u5417\uff1f",
+                        function () {
+                            fetch("/api/runs", {
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify([runId])
+                            }).then(function () { self.load(); });
+                        }
+                    );
+                });
+            });
 
             if (self.batchMode) {
                 container.querySelectorAll(".history-card-checkbox").forEach(function (cb) {
@@ -239,7 +257,8 @@
                     });
                 });
                 container.querySelectorAll(".history-card.batch-mode").forEach(function (card) {
-                    card.addEventListener("click", function () {
+                    card.addEventListener("click", function (e) {
+                        e.stopPropagation();
                         var rid = card.getAttribute("data-run-id");
                         self.toggleSelect(rid);
                         var cb = card.querySelector(".history-card-checkbox");
@@ -2213,6 +2232,8 @@
             if (depthRadio) formData.append("depth", depthRadio.value);
 
             InputPanel.collapse();
+            var lt = $("loading").querySelector(".loading-title");
+            if (lt) lt.textContent = "正在分析诊断...";
             showLoading();
             startStreamWithReconnect(formData);
         });

@@ -70,7 +70,7 @@
 
     /* ===== Router ===== */
     var AppRouter = {
-        pages: ["new", "history", "stats", "report", "settings"],
+        pages: ["new", "history", "stats", "report", "logs", "settings"],
         currentPage: "new",
 
         init: function () {
@@ -113,6 +113,7 @@
                 history: "\u5386\u53f2\u8bb0\u5f55",
                 stats: "\u7edf\u8ba1\u6982\u89c8",
                 report: "\u5b66\u4e60\u62a5\u544a",
+                logs: "\u8c03\u8bd5\u65e5\u5fd7",
                 settings: "\u8bbe\u7f6e"
             };
             var titleEl = $("page-title");
@@ -126,6 +127,7 @@
             if (page === "stats") StatsModule.load();
             if (page === "report") ReportModule.init();
             if (page === "settings") SettingsModule.loadValues();
+            if (page === "logs") LogsModule.init();
         },
 
         _closeMobileSidebar: function () {
@@ -133,6 +135,253 @@
             var overlay = $("overlay");
             if (sidebar) sidebar.classList.remove("open");
             if (overlay) overlay.classList.remove("active");
+        }
+    };
+
+    /* ===== LogsModule ===== */
+    var LogsModule = {
+        _loaded: false,
+        _currentData: null,
+        _tabsBound: false,
+
+        init: function () {
+            if (!this._loaded) {
+                this._loadRunList();
+                this._loaded = true;
+            }
+            if (!this._tabsBound) {
+                this._bindTabs();
+                this._tabsBound = true;
+            }
+        },
+
+        loadRunById: function (runId) {
+            this.init();
+            var sel = $("logs-run-select");
+            if (sel) sel.value = runId;
+            this._loadResult(runId);
+        },
+
+        _loadRunList: function () {
+            var sel = $("logs-run-select");
+            var currentVal = sel.value;
+            sel.innerHTML = '<option value="">选择一次分析记录...</option>';
+            fetch("/history?per_page=100")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var runs = data.runs || [];
+                    runs.forEach(function (run) {
+                        var opt = document.createElement("option");
+                        opt.value = run.run_id;
+                        var preview = (run.problem_preview || "无题目");
+                        if (preview.length > 50) preview = preview.substring(0, 50) + "...";
+                        opt.textContent = preview + "  [" + formatTimestamp(run.timestamp) + "]";
+                        sel.appendChild(opt);
+                    });
+                    if (currentVal) sel.value = currentVal;
+                });
+            var self = this;
+            sel.removeEventListener("change", sel._logsHandler);
+            sel._logsHandler = function () {
+                if (this.value) self._loadResult(this.value);
+            };
+            sel.addEventListener("change", sel._logsHandler);
+            $("logs-refresh-btn").onclick = function () {
+                self._loaded = false;
+                self.init();
+            };
+        },
+
+        _loadResult: function (runId) {
+            var self = this;
+            $("logs-content").style.display = "none";
+            fetch("/analyze/result/" + runId)
+                .then(function (r) {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    self._currentData = data;
+                    $("logs-content").style.display = "";
+                    self._renderMeta(data);
+                    self._renderState(data);
+                    self._renderTools(data);
+                    self._renderTrace(data);
+                    self._renderRaw(data);
+                })
+                .catch(function (err) {
+                    $("logs-content").style.display = "";
+                    $("logs-meta").innerHTML = '<div class="alert alert-error">加载失败: ' + esc(err.message) + '</div>';
+                });
+        },
+
+        _renderMeta: function (data) {
+            var meta = data.run_meta || {};
+            var html = '<div class="logs-meta-grid">';
+            html += '<span><b>Run ID</b>: ' + esc(meta.run_id || "-") + '</span>';
+            html += '<span><b>模式</b>: ' + esc(meta.mode || "-") + '</span>';
+            html += '<span><b>模型</b>: ' + esc(meta.model || "-") + '</span>';
+            html += '<span><b>状态</b>: ' + esc(data.user_status || data.status || "-") + '</span>';
+            if (meta.started_at) html += '<span><b>开始</b>: ' + esc(formatTimestamp(meta.started_at)) + '</span>';
+            if (meta.completed_at) html += '<span><b>完成</b>: ' + esc(formatTimestamp(meta.completed_at)) + '</span>';
+            if (meta.ocr_model) html += '<span><b>OCR 模型</b>: ' + esc(meta.ocr_model) + '</span>';
+            if (meta.provider) html += '<span><b>Provider</b>: ' + esc(meta.provider) + '</span>';
+            if (data.fail_reason) html += '<span><b>失败原因</b>: ' + esc(data.fail_reason) + '</span>';
+            html += '</div>';
+            $("logs-meta").innerHTML = html;
+        },
+
+        _renderState: function (data) {
+            var raw = data.raw_output || {};
+            var groups = [
+                { title: "输入", keys: ["problem_input", "raw_student_solution", "ocr_meta", "parse_warnings"] },
+                { title: "解析结果", keys: ["normalized_steps"] },
+                { title: "参考解答", keys: ["reference_solution", "reference_computation_hints"] },
+                { title: "验证结果", keys: ["verification_results", "uncertainty_flags"] },
+                { title: "诊断结果", keys: ["diagnosis_results"] },
+                { title: "反馈与复习", keys: ["final_feedback", "review_problems"] },
+                { title: "元数据", keys: ["run_meta", "budget_metadata", "quality_signals", "global_budget", "fail_reason"] }
+            ];
+            var html = "";
+            for (var gi = 0; gi < groups.length; gi++) {
+                var g = groups[gi];
+                var hasContent = false;
+                for (var ki = 0; ki < g.keys.length; ki++) {
+                    var val = raw[g.keys[ki]];
+                    if (val !== undefined && val !== null && (!(val instanceof Array) || val.length > 0) && (typeof val !== "object" || val instanceof Array || Object.keys(val).length > 0)) {
+                        hasContent = true;
+                        break;
+                    }
+                }
+                html += '<details class="logs-group"' + (hasContent ? ' open' : '') + '>';
+                html += '<summary class="logs-group-title">' + esc(g.title) + '</summary>';
+                for (var kj = 0; kj < g.keys.length; kj++) {
+                    var kval = raw[g.keys[kj]];
+                    if (kval === undefined || kval === null) continue;
+                    html += '<div class="logs-key-val">';
+                    html += '<div class="logs-key">' + esc(g.keys[kj]) + '</div>';
+                    html += '<div class="logs-val">' + LogsModule._renderValue(kval, 0) + '</div>';
+                    html += '</div>';
+                }
+                html += '</details>';
+            }
+            $("logs-panel-state").innerHTML = html;
+            if (window.renderMathInElement) {
+                renderMathInElement($("logs-panel-state"), {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    throwOnError: false, strict: false, trust: true
+                });
+            }
+        },
+
+        _renderValue: function (val, depth) {
+            if (val === null || val === undefined) return '<span class="logs-null">null</span>';
+            if (typeof val === "boolean") return '<span class="logs-bool">' + val + '</span>';
+            if (typeof val === "number") return '<span class="logs-num">' + val + '</span>';
+            if (typeof val === "string") {
+                var escaped = esc(val);
+                if (val.length > 300) {
+                    return '<details><summary class="logs-string-summary">' + esc(val.substring(0, 100)) + '...</summary><pre class="logs-string-full">' + escaped + '</pre></details>';
+                }
+                return '<span class="logs-string">' + escaped + '</span>';
+            }
+            if (Array.isArray(val)) {
+                if (val.length === 0) return '<span class="logs-empty">[] (empty)</span>';
+                var arrHtml = '<span class="logs-array-badge">Array[' + val.length + ']</span>';
+                arrHtml += '<ol class="logs-array">';
+                for (var ai = 0; ai < val.length; ai++) {
+                    arrHtml += '<li>' + LogsModule._renderValue(val[ai], depth + 1) + '</li>';
+                }
+                arrHtml += '</ol>';
+                return arrHtml;
+            }
+            if (typeof val === "object") {
+                var keys = Object.keys(val);
+                if (keys.length === 0) return '<span class="logs-empty">{} (empty)</span>';
+                var objHtml = '<details class="logs-obj"' + (depth < 2 ? ' open' : '') + '>';
+                objHtml += '<summary>{' + keys.length + ' keys}</summary>';
+                objHtml += '<table class="logs-obj-table">';
+                for (var oi = 0; oi < keys.length; oi++) {
+                    objHtml += '<tr><td class="logs-obj-key">' + esc(keys[oi]) + '</td><td>' + LogsModule._renderValue(val[keys[oi]], depth + 1) + '</td></tr>';
+                }
+                objHtml += '</table></details>';
+                return objHtml;
+            }
+            return esc(String(val));
+        },
+
+        _renderTools: function (data) {
+            var logs = data.tool_calls_log || [];
+            var panel = $("logs-panel-tools");
+            if (!logs.length) {
+                panel.innerHTML = '<div class="logs-empty-msg">无工具调用记录</div>';
+                return;
+            }
+            var html = '<div class="logs-timeline">';
+            html += '<div class="logs-tool-summary">共 ' + logs.length + ' 次工具调用</div>';
+            for (var i = 0; i < logs.length; i++) {
+                var tc = logs[i];
+                html += '<div class="logs-tool-card">';
+                html += '<div class="logs-tool-header">';
+                html += '<span class="logs-tool-index">#' + (i + 1) + '</span>';
+                html += '<span class="logs-tool-name">' + esc(tc.tool_name || "?") + '</span>';
+                html += '<span class="logs-tool-node">' + esc(tc.node || "?") + '</span>';
+                if (tc.step_id) html += '<span class="logs-tool-step">Step: ' + esc(tc.step_id) + '</span>';
+                if (tc.timestamp) html += '<span class="logs-tool-time">' + esc(tc.timestamp) + '</span>';
+                html += '</div>';
+                if (tc.code) html += '<pre class="logs-tool-code">' + esc(tc.code) + '</pre>';
+                if (tc.result_preview) html += '<div class="logs-tool-result">' + esc(tc.result_preview) + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            panel.innerHTML = html;
+        },
+
+        _renderTrace: function (data) {
+            var raw = data.raw_output || {};
+            var traces = raw.trace || [];
+            var panel = $("logs-panel-trace");
+            if (!traces.length) {
+                panel.innerHTML = '<div class="logs-empty-msg">无追踪记录</div>';
+                return;
+            }
+            var html = '<div class="logs-trace-count">共 ' + traces.length + ' 条追踪</div>';
+            html += '<ol class="logs-trace-list">';
+            for (var ti = 0; ti < traces.length; ti++) {
+                html += '<li class="logs-trace-item"><span class="logs-trace-idx">' + (ti + 1) + '</span> ' + esc(traces[ti]) + '</li>';
+            }
+            html += '</ol>';
+            panel.innerHTML = html;
+        },
+
+        _renderRaw: function (data) {
+            var raw = data.raw_output || {};
+            var panel = $("logs-panel-raw");
+            panel.innerHTML = "";
+            var pre = document.createElement("pre");
+            pre.className = "logs-raw-json";
+            pre.textContent = JSON.stringify(raw, null, 2);
+            panel.appendChild(pre);
+        },
+
+        _bindTabs: function () {
+            var tabs = document.querySelectorAll(".logs-tab");
+            var panels = ["logs-panel-state", "logs-panel-tools", "logs-panel-trace", "logs-panel-raw"];
+            for (var i = 0; i < tabs.length; i++) {
+                (function (tab) {
+                    tab.addEventListener("click", function () {
+                        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
+                        for (var k = 0; k < panels.length; k++) $(panels[k]).classList.remove("active");
+                        tab.classList.add("active");
+                        $("logs-panel-" + tab.getAttribute("data-tab")).classList.add("active");
+                    });
+                })(tabs[i]);
+            }
         }
     };
 
@@ -213,6 +462,7 @@
                 html += '<button type="button" class="btn-secondary" data-action="view" data-run-id="' + esc(run.run_id) + '">\u{1f441} \u67e5\u770b\u7ed3\u679c</button>';
                 html += '<button type="button" class="btn-secondary" data-action="reanalyze" data-run-id="' + esc(run.run_id) + '">\ud83d\udd04 \u91cd\u65b0\u5206\u6790</button>';
                 html += '<button type="button" class="btn-secondary" data-action="delete" data-run-id="' + esc(run.run_id) + '">\ud83d\udded \u5220\u9664</button>';
+                html += '<button type="button" class="btn-secondary" data-action="debug" data-run-id="' + esc(run.run_id) + '">\ud83d\udd0d \u8c03\u8bd5</button>';
                 html += '</div>';
                 html += '</div>';
             });
@@ -246,6 +496,15 @@
                             }).then(function () { self.load(); });
                         }
                     );
+                });
+            });
+            container.querySelectorAll('[data-action="debug"]').forEach(function (btn) {
+                btn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    if (!self.batchMode) {
+                        AppRouter.navigate("logs");
+                        LogsModule.loadRunById(btn.getAttribute("data-run-id"));
+                    }
                 });
             });
 

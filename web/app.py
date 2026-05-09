@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Body, FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -274,7 +274,7 @@ async def stats():
 
 
 @app.delete("/api/runs")
-async def delete_runs_endpoint(run_ids: list[str]):
+async def delete_runs_endpoint(run_ids: list[str] = Body(..., embed=True)):
     result = delete_runs(run_ids)
     return JSONResponse(content=result)
 

@@ -947,14 +947,20 @@ _SSE_HEARTBEAT_INTERVAL = 30
 
 async def _with_heartbeat(agen, interval=_SSE_HEARTBEAT_INTERVAL):
     import asyncio
+    pending_task = None
     while True:
         try:
-            event = await asyncio.wait_for(agen.__anext__(), timeout=interval)
-            yield ("event", event)
+            if pending_task is None:
+                pending_task = asyncio.ensure_future(agen.__anext__())
+            done, _ = await asyncio.wait({pending_task}, timeout=interval)
+            if done:
+                event = pending_task.result()
+                pending_task = None
+                yield ("event", event)
+            else:
+                yield ("heartbeat", None)
         except StopAsyncIteration:
             break
-        except asyncio.TimeoutError:
-            yield ("heartbeat", None)
 
 
 async def run_stem_tutor_stream(

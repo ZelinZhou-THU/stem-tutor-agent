@@ -42,6 +42,10 @@
                 <span class="nav-icon">📄</span>
                 <span class="nav-text">学习报告</span>
             </a>
+            <a href="#logs" class="nav-item" data-page="logs">
+                <span class="nav-icon">🔍</span>
+                <span class="nav-text">调试日志</span>
+            </a>
             <a href="#settings" class="nav-item" data-page="settings">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-text">设置</span>
@@ -690,6 +694,43 @@
                             <span>版本</span>
                             <span class="setting-desc">STEM 辅导系统 v1.0 · Powered by LangGraph & Pydantic & FastAPI</span>
                         </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== 调试日志页面 ==================== -->
+            <section id="page-logs" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">🔍 调试日志</h3>
+                        <p class="page-section-desc">查看分析过程的详细调试信息</p>
+                    </div>
+                </div>
+
+                <div class="card logs-selector">
+                    <div class="logs-selector-row">
+                        <select id="logs-run-select" class="filter-select" style="max-width:600px;">
+                            <option value="">选择一次分析记录...</option>
+                        </select>
+                        <button type="button" id="logs-refresh-btn" class="btn-secondary btn-sm">刷新列表</button>
+                    </div>
+                </div>
+
+                <div id="logs-content" style="display:none;">
+                    <div class="card logs-meta" id="logs-meta"></div>
+
+                    <div class="logs-tabs">
+                        <button type="button" class="logs-tab active" data-tab="state">结构化状态</button>
+                        <button type="button" class="logs-tab" data-tab="tools">工具调用</button>
+                        <button type="button" class="logs-tab" data-tab="trace">执行追踪</button>
+                        <button type="button" class="logs-tab" data-tab="raw">原始 JSON</button>
+                    </div>
+
+                    <div class="card logs-tab-content">
+                        <div id="logs-panel-state" class="logs-panel active"></div>
+                        <div id="logs-panel-tools" class="logs-panel"></div>
+                        <div id="logs-panel-trace" class="logs-panel"></div>
+                        <div id="logs-panel-raw" class="logs-panel"></div>
                     </div>
                 </div>
             </section>

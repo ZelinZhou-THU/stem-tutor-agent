@@ -492,8 +492,10 @@
                             fetch("/api/runs", {
                                 method: "DELETE",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify([runId])
-                            }).then(function () { self.load(); });
+                                body: JSON.stringify({"run_ids": [runId]})
+                            }).then(function (r) { return r.json(); })
+                            .then(function (data) { console.log("Delete response:", data); self.load(); })
+                            .catch(function (e) { console.error("Delete failed:", e); self.load(); });
                         }
                     );
                 });
@@ -517,6 +519,7 @@
                 });
                 container.querySelectorAll(".history-card.batch-mode").forEach(function (card) {
                     card.addEventListener("click", function (e) {
+                        if (e.target.tagName === "INPUT") return;
                         e.stopPropagation();
                         var rid = card.getAttribute("data-run-id");
                         self.toggleSelect(rid);
@@ -614,7 +617,7 @@
                     fetch("/api/runs", {
                         method: "DELETE",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(ids)
+                        body: JSON.stringify({"run_ids": ids})
                     })
                     .then(function (r) { return r.json(); })
                     .then(function () {
@@ -649,9 +652,9 @@
             _confirmCallback = onConfirm;
             $("confirm-overlay").style.display = "";
             $("confirm-ok").onclick = function () {
+                var cb = _confirmCallback;
                 HistoryModule.hideConfirm();
-                if (_confirmCallback) _confirmCallback();
-                _confirmCallback = null;
+                if (cb) cb();
             };
         },
 
@@ -2719,7 +2722,7 @@
         function renderPartial(nodeName, data) {
             resultsDiv.style.display = "";
             if (nodeName === "parse_student_solution") renderStepsPartial(data.steps);
-            else if (nodeName === "verify_steps") renderSteps(data.steps, (_streamRunId || null));
+            else if (nodeName === "verify_steps") renderSteps(data.steps, (currentRunId || null));
             else if (nodeName === "diagnose_error") renderDiagnoses(data.diagnoses);
             else if (nodeName === "generate_feedback") renderFeedback(data);
             else if (nodeName === "generate_review_problems") renderReview(data.review_problems);

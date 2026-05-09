@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+import subprocess
+import sys
 
 
 class ModelGroup(str, Enum):
@@ -357,3 +359,46 @@ def load_depth() -> str:
     if val2 in ("quick", "standard", "thorough"):
         return val2
     return DEFAULT_DEPTH
+
+
+def python_executable() -> str:
+    """获取用于执行 Python 代码的解释器路径。
+
+    优先级：
+    1. 环境变量 STEM_TUTOR_PYTHON_EXECUTABLE
+    2. 自动检测 conda LLM 环境
+    3. 当前 Python 解释器 (sys.executable)
+    """
+    env_path = os.environ.get("STEM_TUTOR_PYTHON_EXECUTABLE", "").strip()
+    if env_path:
+        p = Path(env_path)
+        if p.exists() and p.is_file():
+            return str(p)
+        import logging
+        logging.getLogger(__name__).warning(
+            "STEM_TUTOR_PYTHON_EXECUTABLE points to non-existent path: %s", env_path
+        )
+
+    try:
+        result = subprocess.run(
+            ["conda", "info", "--base"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            conda_base = result.stdout.strip()
+            if conda_base:
+                candidate = Path(conda_base) / "envs" / "LLM" / "python.exe"
+                if candidate.exists() and candidate.is_file():
+                    return str(candidate)
+    except Exception:
+        pass
+
+    import logging
+    logging.getLogger(__name__).warning(
+        "Falling back to sys.executable (%s). sympy/numpy/scipy may not be available. "
+        "Set STEM_TUTOR_PYTHON_EXECUTABLE to the correct Python path.",
+        sys.executable,
+    )
+    return sys.executable

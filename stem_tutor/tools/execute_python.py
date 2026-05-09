@@ -34,6 +34,14 @@ def _get_timeout() -> int:
         return _DEFAULT_TIMEOUT
 
 
+def _get_python() -> str:
+    try:
+        from stem_tutor.settings import python_executable
+        return python_executable()
+    except Exception:
+        return sys.executable
+
+
 def _check_blacklist(code: str) -> str | None:
     for pattern, suggestion in _BLACKLISTED_PATTERNS:
         if pattern in code:
@@ -87,8 +95,9 @@ def execute_python(code: str) -> str:
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUNBUFFERED"] = "1"
 
+    python_path = _get_python()
     proc = subprocess.Popen(
-        [sys.executable, "-u", "-c", code],
+        [python_path, "-u", "-c", code],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,

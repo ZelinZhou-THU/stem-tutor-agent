@@ -166,6 +166,45 @@ def _save_run_payload(run_id: str, payload: dict) -> None:
         json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
 
 
+def _save_running_placeholder(run_id: str, run_meta: dict) -> None:
+    path = RUNS_DIR / f"{run_id}.json"
+    if path.exists():
+        return
+    payload = {
+        "first_critical_step_id": None,
+        "concise_summary": "",
+        "likely_cause": None,
+        "next_action": "",
+        "caution_note": None,
+        "review_concepts": [],
+        "steps": [],
+        "diagnoses": [],
+        "review_problems": [],
+        "status": "running",
+        "user_status": "",
+        "user_message": "",
+        "fail_reason": None,
+        "uncertainty_flags": [],
+        "run_meta": {**run_meta, "failed": False},
+        "raw_output": {},
+        "tool_calls_log": [],
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+
+
+def _save_intermediate_state(run_id: str, accumulated_state: dict) -> None:
+    response = _shape_response(accumulated_state)
+    response["status"] = "running"
+    response["user_status"] = ""
+    meta = response.get("run_meta", {})
+    meta["failed"] = False
+    response["run_meta"] = meta
+    path = RUNS_DIR / f"{run_id}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(response, f, ensure_ascii=False, indent=2, default=str)
+
+
 def _save_run_state(run_id: str, state: dict):
     result = _shape_response(state)
     meta = result.get("run_meta", {})
@@ -224,6 +263,8 @@ def _get_run_status(run_id: str) -> dict:
         }
 
     status = data.get("status")
+    if status == "running":
+        return {"status": "running", "run_id": run_id}
     if status == "manual_review_required":
         return {
             "status": "needs_review",
@@ -901,6 +942,21 @@ def _serialize_partial(node_name: str, state: dict) -> dict | None:
     return None
 
 
+_SSE_HEARTBEAT_INTERVAL = 30
+
+
+async def _with_heartbeat(agen, interval=_SSE_HEARTBEAT_INTERVAL):
+    import asyncio
+    while True:
+        try:
+            event = await asyncio.wait_for(agen.__anext__(), timeout=interval)
+            yield ("event", event)
+        except StopAsyncIteration:
+            break
+        except asyncio.TimeoutError:
+            yield ("heartbeat", None)
+
+
 async def run_stem_tutor_stream(
     problem_text: str,
     raw_student_solution: str = "",
@@ -960,6 +1016,20 @@ async def run_stem_tutor_stream(
 
     yield f"data: {_json.dumps({'type': 'start', 'run_id': run_id, 'message': '开始分析', 'depth': depth, 'max_attempts': max_attempts}, ensure_ascii=False)}\n\n"
 
+    _save_running_placeholder(run_id, {
+        "run_id": run_id,
+        "started_at": started_at,
+        "provider": provider_info.get("provider_name", "unknown"),
+        "model": provider_info.get("model_name", "unknown"),
+        "ocr_model": ocr_model_name or "qwen/qwen3.6-plus",
+        "subject_id": subject_id,
+        "mode": mode,
+        "workflow_version": "v1",
+        "depth": depth,
+        "node_stats": {},
+        "provider_events": [],
+    })
+
     final_response: dict | None = None
     final_state: dict | None = None
     last_exc: Exception | None = None
@@ -1009,7 +1079,10 @@ async def run_stem_tutor_stream(
                     verify_provider.model_name = settings.verify_model_name
 
                 app = build_tutor_graph(provider, ocr_provider=ocr_provider, fast_provider=fast_provider, verify_provider=verify_provider)
-                async for event in app.astream(initial_state, stream_mode="updates"):
+                async for tag, event in _with_heartbeat(app.astream(initial_state, stream_mode="updates")):
+                    if tag == "heartbeat":
+                        yield ": keepalive\n\n"
+                        continue
                     for node_name, node_output in event.items():
                         if node_name in ("__end__", "__interrupt__"):
                             continue
@@ -1055,6 +1128,11 @@ async def run_stem_tutor_stream(
                         if partial is not None:
                             node_done_event["partial"] = partial
                         yield f"data: {_json.dumps(node_done_event, ensure_ascii=False)}\n\n"
+
+                        try:
+                            _save_intermediate_state(run_id, accumulated_state)
+                        except Exception:
+                            pass
 
                 response = _shape_response(accumulated_state)
         except Exception as exc:

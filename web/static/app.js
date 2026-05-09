@@ -2258,8 +2258,8 @@
 
         function showReconnectingUI(runId) {
             currentRunId = runId;
-            var pollInterval = 5000;
-            var maxPolls = 60;
+            var pollInterval = 3000;
+            var maxPolls = 120;
             var pollCount = 0;
             function pollStatus() {
                 if (pollCount >= maxPolls) { showError("\u67e5\u8be2\u7ed3\u679c\u8d85\u65f6\uff0c\u8bf7\u91cd\u8bd5\u3002"); hideLoading(); return; }

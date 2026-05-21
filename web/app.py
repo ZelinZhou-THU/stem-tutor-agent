@@ -17,7 +17,7 @@ from stem_tutor.subjects.detector import detect_subject
 from stem_tutor.subjects.loader import SubjectRegistry
 from stem_tutor.taxonomy.errors import lookup_error
 from web.service import ocr_problem_text, run_stem_tutor, run_stem_tutor_stream, _load_run_result, _get_run_status
-from web.service import _load_chat_history, chat_stream, list_runs, get_stats, reverify_step
+from web.service import _load_chat_history, chat_stream, list_runs, get_stats, reverify_step, cancel_run
 from web.service import delete_runs, cleanup_runs_before
 from web.service import get_report_data, report_stream, get_report_run_list
 from web.service import list_reports, _load_report, delete_reports
@@ -277,6 +277,12 @@ async def stats():
 async def delete_runs_endpoint(run_ids: list[str] = Body(..., embed=True)):
     result = delete_runs(run_ids)
     return JSONResponse(content=result)
+
+
+@app.post("/analyze/cancel/{run_id}")
+async def cancel_run_endpoint(run_id: str):
+    ok = cancel_run(run_id)
+    return JSONResponse(content={"cancelled": ok})
 
 
 @app.post("/api/runs/cleanup")

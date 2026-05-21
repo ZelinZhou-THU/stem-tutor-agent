@@ -950,13 +950,26 @@ def _serialize_partial(node_name: str, state: dict) -> dict | None:
 
 
 _SSE_HEARTBEAT_INTERVAL = 30
+_cancel_events: dict[str, "asyncio.Event"] = {}
 
 
-async def _with_heartbeat(agen, interval=_SSE_HEARTBEAT_INTERVAL):
+def cancel_run(run_id: str) -> bool:
+    evt = _cancel_events.get(run_id)
+    if evt is None:
+        return False
+    evt.set()
+    return True
+
+
+async def _with_heartbeat(agen, interval=_SSE_HEARTBEAT_INTERVAL, cancel_event=None):
     import asyncio
     pending_task = None
     while True:
         try:
+            if cancel_event is not None and cancel_event.is_set():
+                if pending_task is not None:
+                    pending_task.cancel()
+                return
             if pending_task is None:
                 pending_task = asyncio.ensure_future(agen.__anext__())
             done, _ = await asyncio.wait({pending_task}, timeout=interval)
@@ -965,6 +978,10 @@ async def _with_heartbeat(agen, interval=_SSE_HEARTBEAT_INTERVAL):
                 pending_task = None
                 yield ("event", event)
             else:
+                if cancel_event is not None and cancel_event.is_set():
+                    if pending_task is not None:
+                        pending_task.cancel()
+                    return
                 yield ("heartbeat", None)
         except StopAsyncIteration:
             break
@@ -989,6 +1006,9 @@ async def run_stem_tutor_stream(
 
     if run_id is None:
         run_id = str(uuid4())
+
+    cancel_event = asyncio.Event()
+    _cancel_events[run_id] = cancel_event
 
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
@@ -1092,7 +1112,7 @@ async def run_stem_tutor_stream(
                     verify_provider.model_name = settings.verify_model_name
 
                 app = build_tutor_graph(provider, ocr_provider=ocr_provider, fast_provider=fast_provider, verify_provider=verify_provider)
-                async for tag, event in _with_heartbeat(app.astream(initial_state, stream_mode="updates")):
+                async for tag, event in _with_heartbeat(app.astream(initial_state, stream_mode="updates"), cancel_event=cancel_event):
                     if tag == "heartbeat":
                         yield ": keepalive\n\n"
                         continue
@@ -1148,6 +1168,10 @@ async def run_stem_tutor_stream(
                             pass
 
                 response = _shape_response(accumulated_state)
+        except asyncio.CancelledError:
+            yield f"data: {_json.dumps({'type': 'cancelled', 'message': '分析已被用户取消'}, ensure_ascii=False)}\n\n"
+            _cancel_events.pop(run_id, None)
+            return
         except Exception as exc:
             last_exc = exc
             if attempt < max_attempts and _is_retryable_exception(exc):
@@ -1207,6 +1231,7 @@ async def run_stem_tutor_stream(
     _save_run_payload(run_id, final_response)
     yield f"data: {_json.dumps({'type': 'result', 'data': final_response}, ensure_ascii=False)}\n\n"
     yield f"data: {_json.dumps({'type': 'done', 'message': '分析完成'}, ensure_ascii=False)}\n\n"
+    _cancel_events.pop(run_id, None)
     return
 
 

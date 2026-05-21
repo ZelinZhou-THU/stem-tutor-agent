@@ -128,6 +128,7 @@
             if (page === "report") ReportModule.init();
             if (page === "settings") SettingsModule.loadValues();
             if (page === "logs") LogsModule.init();
+            if (page === "new") resetForm();
         },
 
         _closeMobileSidebar: function () {
@@ -2241,6 +2242,31 @@
         var cropperInstance = null;
         var cropCallback = null;
 
+        function resetForm() {
+            $("problem-text").value = "";
+            $("student-solution").value = "";
+            if (problemOcrText) problemOcrText.value = "";
+            if (solutionOcrText) solutionOcrText.value = "";
+            var psText = document.querySelector('input[name="problem_source"][value="text"]');
+            if (psText) psText.checked = true;
+            var stText = document.querySelector('input[name="source_type"][value="text"]');
+            if (stText) stText.checked = true;
+            var depthStd = document.querySelector('input[name="depth"][value="standard"]');
+            if (depthStd) depthStd.checked = true;
+            if (subjectSelect) subjectSelect.value = "auto_detect";
+            var modelSel = $("model-select");
+            if (modelSel) modelSel.value = "qwen/qwen3.6-plus";
+            var modeSel = $("mode-select");
+            if (modeSel) modeSel.value = "workflow_r1";
+            if (removeImageBtn) removeImageBtn.click();
+            if (removeProblemImageBtn) removeProblemImageBtn.click();
+            if (textMode) textMode.click();
+            if (problemTextMode) problemTextMode.click();
+            var outputArea = $("output-area");
+            if (outputArea) outputArea.style.display = "none";
+            errorMsg.style.display = "none";
+        }
+
         function openCropModal(file, callback) {
             cropCallback = callback;
             var reader = new FileReader();
@@ -2466,6 +2492,9 @@
             });
         }
 
+        var cancelAnalysisBtn = $("cancel-analysis-btn");
+        if (cancelAnalysisBtn) cancelAnalysisBtn.addEventListener("click", cancelAnalysis);
+
         form.addEventListener("submit", function (e) {
             e.preventDefault();
 
@@ -2502,11 +2531,23 @@
 
         var currentRunId = null;
         var reconnectTimer = null;
+        var abortController = null;
+
+        function cancelAnalysis() {
+            if (currentRunId) {
+                fetch("/analyze/cancel/" + currentRunId, { method: "POST" }).catch(function () {});
+            }
+            if (abortController) { abortController.abort(); abortController = null; }
+            if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+            hideLoading();
+            InputPanel.expand();
+        }
 
         function startStreamWithReconnect(formData) {
             currentRunId = null;
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-            fetch("/analyze/stream", { method: "POST", body: formData })
+            abortController = new AbortController();
+            fetch("/analyze/stream", { method: "POST", body: formData, signal: abortController.signal })
                 .then(function (resp) {
                     if (!resp.ok) {
                         return resp.json().catch(function () { return {}; }).then(function (err) {
@@ -2517,10 +2558,11 @@
                 })
                 .then(function (data) { renderResults(data); })
                 .catch(function (err) {
+                    if (err.name === "AbortError") return;
                     if (currentRunId) { showReconnectingUI(currentRunId); }
                     else { showError("\u8bf7\u6c42\u5931\u8d25\uff1a" + err.message); }
                 })
-                .finally(function () { hideLoading(); });
+                .finally(function () { hideLoading(); abortController = null; });
         }
 
         function loadResultAndRender(runId) {
@@ -2592,6 +2634,8 @@
                         try { var event = JSON.parse(jsonStr); } catch (e) { continue; }
                         if (event.type === "start") {
                             currentRunId = event.run_id || null;
+                            var cancelBtn = $("cancel-analysis-btn");
+                            if (cancelBtn) cancelBtn.style.display = "";
                         } else if (event.type === "retrying") {
                             var statusEl2 = loadingDiv.querySelector(".loading-status");
                             if (statusEl2) {
@@ -2712,6 +2756,8 @@
             btnText.style.display = "";
             btnLoading.style.display = "none";
             loadingDiv.style.display = "none";
+            var cancelBtn = $("cancel-analysis-btn");
+            if (cancelBtn) cancelBtn.style.display = "none";
         }
 
         function showError(msg) {

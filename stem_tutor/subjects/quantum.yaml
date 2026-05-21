@@ -88,11 +88,8 @@ rule_adjustments:
 
 mock:
   reference_solution:
-    reference_text: "Solve the time-independent Schrodinger equation. Set up the Hamiltonian, apply boundary conditions, and find eigenvalues and eigenfunctions."
-    key_assertions:
-      - "Write the correct Hamiltonian for the system."
-      - "Apply boundary conditions to constrain the solution."
-      - "Normalize the wave function."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "一维无限深势阱宽度为 a，求基态波函数和能量本征值。"
       related_weakness_code: "SCHRODINGER_EQUATION_MISAPPLICATION"

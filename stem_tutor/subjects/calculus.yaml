@@ -103,10 +103,8 @@ budget_overrides:
 
 mock:
   reference_solution:
-    reference_text: "Differentiate using chain rule and simplify carefully."
-    key_assertions:
-      - "Apply derivative rules with inner derivative."
-      - "Keep signs and constants consistent."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "Compute d/dx [sin(x^2 + 1)]."
       related_weakness_code: "CHAIN_RULE_MISUSE"

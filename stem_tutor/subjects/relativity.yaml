@@ -87,11 +87,8 @@ rule_adjustments:
 
 mock:
   reference_solution:
-    reference_text: "Apply the Lorentz transformation. Identify the rest frame and moving frame, compute gamma, then transform coordinates."
-    key_assertions:
-      - "Identify which frame is the rest frame (primed) and which is moving (unprimed)."
-      - "Compute gamma = 1/sqrt(1 - v^2/c^2) correctly."
-      - "Apply x' = gamma(x - vt) and t' = gamma(t - vx/c^2)."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "一艘飞船以 0.6c 的速度远离地球。飞船上测得某事件持续 10 秒。地球上测得该事件持续多久？"
       related_weakness_code: "PROPER_TIME_COORDINATE_TIME_CONFUSION"

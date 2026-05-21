@@ -86,11 +86,8 @@ rule_adjustments:
 
 mock:
   reference_solution:
-    reference_text: "Apply the thin lens equation 1/f = 1/u + 1/v. Determine sign conventions, solve for image distance, then compute magnification."
-    key_assertions:
-      - "Apply correct sign convention for object and image distances."
-      - "Use thin lens equation to find image position."
-      - "Compute magnification m = -v/u."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "一个凸透镜焦距为 10cm，物体放在距透镜 15cm 处。求像的位置、性质和放大率。"
       related_weakness_code: "IMAGE_LOCATION_ERROR"

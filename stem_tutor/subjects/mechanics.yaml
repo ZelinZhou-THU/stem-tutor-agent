@@ -95,11 +95,8 @@ budget_overrides:
 
 mock:
   reference_solution:
-    reference_text: "Apply Newton's second law. Draw free body diagram, resolve forces, and solve F_net = ma."
-    key_assertions:
-      - "Identify all forces acting on the object."
-      - "Choose appropriate coordinate system."
-      - "Write component equations and solve."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "一个质量为 2kg 的物体在水平面上受到 10N 的水平拉力，摩擦系数为 0.2。求加速度。"
       related_weakness_code: "FORCE_ANALYSIS_INCOMPLETE"

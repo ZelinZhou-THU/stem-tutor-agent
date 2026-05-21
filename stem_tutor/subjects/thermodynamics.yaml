@@ -87,11 +87,8 @@ rule_adjustments:
 
 mock:
   reference_solution:
-    reference_text: "Apply the first law of thermodynamics: delta U = Q - W. Identify the process type, compute work and heat, then find the change in internal energy."
-    key_assertions:
-      - "Identify the thermodynamic process (isothermal, adiabatic, etc.)."
-      - "Compute work done using the correct integral for the process."
-      - "Apply the first law with correct sign convention."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "1 mol 理想气体从状态 (p1, V1, T1) 等温膨胀到体积 V2 = 2*V1。求气体对外做的功和吸收的热量。"
       related_weakness_code: "PROCESS_PATH_CONFUSION"

@@ -87,11 +87,8 @@ rule_adjustments:
 
 mock:
   reference_solution:
-    reference_text: "Apply Gauss's law. Choose an appropriate Gaussian surface based on symmetry, compute the flux, and solve for the field."
-    key_assertions:
-      - "Identify the symmetry of the charge distribution."
-      - "Choose a Gaussian surface matching the symmetry."
-      - "Compute the enclosed charge and apply Q_enc/epsilon_0."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "求均匀带电球壳（总电荷 Q，半径 R）内外的电场分布。"
       related_weakness_code: "GAUSS_LAW_SURFACE_ERROR"

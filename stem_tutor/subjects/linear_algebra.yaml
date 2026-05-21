@@ -96,10 +96,8 @@ budget_overrides:
 
 mock:
   reference_solution:
-    reference_text: "Compute the matrix product AB by multiplying rows of A with columns of B."
-    key_assertions:
-      - "Check dimension compatibility before multiplication."
-      - "Compute each entry as the dot product of corresponding row and column."
+    reference_text: "由于分析资源限制，未能生成完整的参考解答。建议更换更快的模型（如 Mistral Small 3.2）或提高参考解答预算后重试。"
+    key_assertions: []
   review_problems:
     - problem_text: "Given A = [[1,2],[3,4]], compute A^2."
       related_weakness_code: "MATRIX_DIM_MISMATCH"

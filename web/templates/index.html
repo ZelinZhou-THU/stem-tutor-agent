@@ -305,11 +305,11 @@
 
                     <div id="results" style="display:none;">
                         <div class="export-dropdown">
-                            <button type="button" class="export-btn">导出 ▾</button>
-                            <div class="export-menu">
-                                <button type="button" data-action="print">🖨 打印 / PDF</button>
-                                <button type="button" data-action="markdown">📋 复制 Markdown</button>
-                                <button type="button" data-action="json">💾 下载 JSON</button>
+                            <button type="button" id="export-toggle" class="export-btn">导出 ▾</button>
+                            <div id="export-menu" class="export-menu">
+                                <button type="button" id="export-print" data-action="print">🖨 打印 / PDF</button>
+                                <button type="button" id="export-markdown" data-action="markdown">📋 复制 Markdown</button>
+                                <button type="button" id="export-json" data-action="json">💾 下载 JSON</button>
                             </div>
                         </div>
                         <div id="toast" class="toast"></div>

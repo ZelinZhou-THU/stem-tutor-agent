@@ -3818,10 +3818,16 @@
 
         init: function () {
             var tabs = document.querySelectorAll(".stats-tab");
+            var panels = document.querySelectorAll(".stats-panel");
             var self = this;
             tabs.forEach(function (tab) {
                 tab.addEventListener("click", function () {
-                    var target = this.getAttribute("data-tab");
+                    var target = this.getAttribute("data-stats-tab");
+                    tabs.forEach(function (t) { t.classList.remove("active"); });
+                    panels.forEach(function (p) { p.classList.remove("active"); p.style.display = "none"; });
+                    this.classList.add("active");
+                    var panel = $("stats-panel-" + target);
+                    if (panel) { panel.classList.add("active"); panel.style.display = ""; }
                     if (target === "profile") {
                         setTimeout(function () { self.renderProfile(); }, 100);
                     }

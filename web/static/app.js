@@ -3313,7 +3313,7 @@
             { target: "#problem-input-group", title: "输入题目", text: "在这里输入数学或物理题目的内容，也可以拍照自动识别。" },
             { target: "#student-solution", title: "输入解答", text: "在这里输入学生的解题过程，每行一步。" },
             { target: "#subject-select", title: "选择学科", text: "选择对应的学科，或使用自动识别功能。" },
-            { target: ".depth-cards", title: "推理深度", text: "标准模式适合大多数情况，快速模式适合简单题目。" },
+            { target: ".depth-control", title: "推理深度", text: "标准模式适合大多数情况，快速模式适合简单题目。" },
             { target: "#run-btn", title: "开始分析", text: "点击此按钮开始分析，系统会逐步验证每个解题步骤。" }
         ],
 

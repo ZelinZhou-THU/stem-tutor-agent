@@ -3574,9 +3574,10 @@ textarea {
 
 /* ===== Export Dropdown ===== */
 .export-dropdown {
+    display: flex;
+    justify-content: flex-end;
     position: relative;
-    float: right;
-    margin-bottom: 12px;
+    margin: 16px 0 8px;
     z-index: 20;
 }
 

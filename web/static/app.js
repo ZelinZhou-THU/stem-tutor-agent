@@ -2744,6 +2744,8 @@
             btnLoading.style.display = "";
             loadingDiv.style.display = "";
             resultsDiv.style.display = "none";
+            var exportArea = $("export-area");
+            if (exportArea) exportArea.style.display = "none";
             errorMsg.style.display = "none";
             resetLoadingSteps();
             resetPartialRenders();
@@ -2859,6 +2861,8 @@
             $("review-section").style.display = "none";
             renderAdvanced(data);
             resultsDiv.style.display = "";
+            var exportArea = $("export-area");
+            if (exportArea) exportArea.style.display = "";
             return;
         }
 
@@ -2878,6 +2882,8 @@
         renderAdvanced(data);
 
         resultsDiv.style.display = "";
+        var exportArea = $("export-area");
+        if (exportArea) exportArea.style.display = "";
         renderAllMath(resultsDiv);
         var meta = data.run_meta || {};
         if (meta.run_id) initChat(meta.run_id);
@@ -3127,6 +3133,9 @@
             btn.addEventListener("click", function () {
                 var idx = this.getAttribute("data-index");
                 $("practice-area-" + idx).style.display = "none";
+                var card = this.closest(".review-card");
+                var toggleBtn = card.querySelector(".btn-practice-toggle");
+                if (toggleBtn) { toggleBtn.disabled = false; toggleBtn.classList.remove("used"); }
             });
         });
 

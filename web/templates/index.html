@@ -304,15 +304,6 @@
                     </div>
 
                     <div id="results" style="display:none;">
-                        <div class="export-dropdown">
-                            <button type="button" id="export-toggle" class="export-btn">导出 ▾</button>
-                            <div id="export-menu" class="export-menu">
-                                <button type="button" id="export-print" data-action="print">🖨 打印 / PDF</button>
-                                <button type="button" id="export-markdown" data-action="markdown">📋 复制 Markdown</button>
-                                <button type="button" id="export-json" data-action="json">💾 下载 JSON</button>
-                            </div>
-                        </div>
-                        <div id="toast" class="toast"></div>
                         <div id="ocr-warning" class="alert alert-warning" style="display:none;"></div>
                         <div id="status-banner" class="alert" style="display:none;"></div>
 
@@ -342,6 +333,16 @@
                             <h2>复习练习</h2>
                             <div id="review-container"></div>
                         </div>
+
+                        <div class="export-dropdown" id="export-area" style="display:none;">
+                            <button type="button" id="export-toggle" class="export-btn">导出 ▾</button>
+                            <div id="export-menu" class="export-menu">
+                                <button type="button" id="export-print" data-action="print">🖨 打印 / PDF</button>
+                                <button type="button" id="export-markdown" data-action="markdown">📋 复制 Markdown</button>
+                                <button type="button" id="export-json" data-action="json">💾 下载 JSON</button>
+                            </div>
+                        </div>
+                        <div id="toast" class="toast"></div>
 
                     <section id="chat-section" class="card" style="display:none;">
                         <h2>

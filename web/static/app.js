@@ -3331,6 +3331,16 @@
         },
 
         startTour: function () {
+            if (window.location.hash !== "#new") {
+                window.location.hash = "#new";
+                var self = this;
+                setTimeout(function () {
+                    if (typeof InputPanel !== "undefined" && InputPanel.expand) InputPanel.expand();
+                    self._showStep(0);
+                }, 500);
+                return;
+            }
+            if (typeof InputPanel !== "undefined" && InputPanel.expand) InputPanel.expand();
             this._showStep(0);
         },
 

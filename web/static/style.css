@@ -251,6 +251,25 @@ body {
     color: var(--text-primary);
 }
 
+.btn-header-action {
+    margin-left: auto;
+    padding: 5px 14px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-header-action:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
 .page-container {
     flex: 1;
     padding: 24px 32px;
@@ -1586,6 +1605,7 @@ textarea {
 .status-complete { background: var(--success-bg); color: var(--success-text); }
 .status-failed { background: var(--error-bg); color: var(--error-text); }
 .status-running { background: var(--info-bg); color: var(--info-text); }
+.status-cancelled { background: var(--warning-bg, #fff3cd); color: var(--warning-text, #856404); }
 
 .history-empty {
     text-align: center;

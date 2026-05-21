@@ -265,6 +265,8 @@ def _get_run_status(run_id: str) -> dict:
     status = data.get("status")
     if status == "running":
         return {"status": "running", "run_id": run_id}
+    if status == "cancelled":
+        return {"status": "cancelled", "user_status": "cancelled", "run_id": run_id}
     if status == "manual_review_required":
         return {
             "status": "needs_review",
@@ -1167,9 +1169,26 @@ async def run_stem_tutor_stream(
                         except Exception:
                             pass
 
-                response = _shape_response(accumulated_state)
+            if cancel_event is not None and cancel_event.is_set():
+                yield f"data: {_json.dumps({'type': 'cancelled', 'message': '分析已被用户取消'}, ensure_ascii=False)}\n\n"
+                _cancel_events.pop(run_id, None)
+                cancelled_response = _shape_response(accumulated_state)
+                cancelled_response["status"] = "cancelled"
+                cancelled_response["user_status"] = "cancelled"
+                cancelled_response["user_message"] = "分析已被用户取消"
+                _save_run_payload(run_id, cancelled_response)
+                return
+
+            response = _shape_response(accumulated_state)
         except asyncio.CancelledError:
-            yield f"data: {_json.dumps({'type': 'cancelled', 'message': '分析已被用户取消'}, ensure_ascii=False)}\n\n"
+            try:
+                cancelled_response = _shape_response(accumulated_state)
+                cancelled_response["status"] = "cancelled"
+                cancelled_response["user_status"] = "cancelled"
+                cancelled_response["user_message"] = "分析已被用户取消"
+                _save_run_payload(run_id, cancelled_response)
+            except Exception:
+                pass
             _cancel_events.pop(run_id, None)
             return
         except Exception as exc:

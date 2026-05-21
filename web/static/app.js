@@ -65,6 +65,7 @@
         if (s === "needs_review") return { cls: "status-failed", text: "待人工复核" };
         if (s === "unavailable") return { cls: "status-failed", text: "结果暂不可用" };
         if (s === "running") return { cls: "status-running", text: "运行中" };
+        if (s === "cancelled") return { cls: "status-cancelled", text: "已取消" };
         return { cls: "status-running", text: "处理中" };
     }
 
@@ -109,7 +110,7 @@
             });
 
             var titles = {
-                new: "\u65b0\u5efa\u8bca\u65ad",
+                new: "\u5206\u6790\u8bca\u65ad",
                 history: "\u5386\u53f2\u8bb0\u5f55",
                 stats: "\u7edf\u8ba1\u6982\u89c8",
                 report: "\u5b66\u4e60\u62a5\u544a",
@@ -128,7 +129,8 @@
             if (page === "report") ReportModule.init();
             if (page === "settings") SettingsModule.loadValues();
             if (page === "logs") LogsModule.init();
-            if (page === "new") resetForm();
+            var newBtn = $("btn-new-diagnosis");
+            if (newBtn) newBtn.style.display = page === "new" ? "" : "none";
         },
 
         _closeMobileSidebar: function () {
@@ -2495,6 +2497,9 @@
         var cancelAnalysisBtn = $("cancel-analysis-btn");
         if (cancelAnalysisBtn) cancelAnalysisBtn.addEventListener("click", cancelAnalysis);
 
+        var newDiagBtn = $("btn-new-diagnosis");
+        if (newDiagBtn) newDiagBtn.addEventListener("click", function () { resetForm(); InputPanel.expand(); $("input-panel").scrollIntoView({ behavior: "smooth", block: "start" }); });
+
         form.addEventListener("submit", function (e) {
             e.preventDefault();
 
@@ -2593,7 +2598,7 @@
                     .then(function (resp) { return resp.json(); })
                     .then(function (data) {
                         var status = normalizeRunStatus(data.user_status || data.status);
-                        if (status === "complete" || status === "needs_review" || status === "unavailable") {
+                        if (status === "complete" || status === "needs_review" || status === "unavailable" || status === "cancelled") {
                             loadResultAndRender(runId).catch(function (err) {
                                 showError((err && err.message) || data.message || "\u83b7\u53d6\u7ed3\u679c\u5931\u8d25\u3002");
                                 hideLoading();
@@ -2655,6 +2660,11 @@
                                 statusEl3.style.display = "";
                                 statusEl3.textContent = event.message || "\u5206\u6790\u7ed3\u679c\u6682\u4e0d\u53ef\u7528\u3002";
                             }
+                        } else if (event.type === "cancelled") {
+                            currentRunId = null;
+                            hideLoading();
+                            InputPanel.expand();
+                            return;
                         } else if (event.type === "result") {
                             resultData = event.data;
                         } else if (event.type === "error") {
@@ -2724,6 +2734,7 @@
         }
 
         function showLoading() {
+            $("output-area").style.display = "";
             runBtn.disabled = true;
             btnText.style.display = "none";
             btnLoading.style.display = "";
@@ -2746,6 +2757,8 @@
             $("diagnosis-section").style.display = "none";
             $("feedback-section").style.display = "none";
             $("review-section").style.display = "none";
+            $("reference-section").style.display = "none";
+            $("reference-container").innerHTML = "";
             $("chat-section").style.display = "none";
             $("chat-messages").innerHTML = "";
             _chatRunId = null;

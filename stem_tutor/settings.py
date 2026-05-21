@@ -42,12 +42,12 @@ class ProviderSettings:
     api_key: str = ""
     base_url: str = ""
     model: str = ""  # backward-compatible alias to reasoning_model_name
-    reasoning_model_name: str = "Kimi-K2.5"
-    fast_model_name: str = "DeepSeek-V3.2"
-    ocr_model_name: str = "Kimi-K2.5"
-    baseline_glm5_model_name: str = "GLM-5-Turbo"
-    baseline_kimi_model_name: str = "Kimi-K2.5"
-    detection_model_name: str = "GLM-4-FlashX"
+    reasoning_model_name: str = "qwen/qwen3.6-plus"
+    fast_model_name: str = "deepseek/deepseek-v3.2"
+    ocr_model_name: str = "qwen/qwen3.6-plus"
+    baseline_glm5_model_name: str = "qwen/qwen3-30b-a3b-instruct-2507"
+    baseline_kimi_model_name: str = "qwen/qwen3-30b-a3b-instruct-2507"
+    detection_model_name: str = "qwen/qwen3-30b-a3b-instruct-2507"
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
     allow_mock_fallback: bool = True
@@ -109,21 +109,21 @@ def load_provider_settings() -> ProviderSettings:
     subject_id = os.environ.get("STEM_TUTOR_SUBJECT", env_data.get("STEM_TUTOR_SUBJECT", "calculus")).strip().lower()
     api_key = os.environ.get("PARATERA_API_KEY", env_data.get("PARATERA_API_KEY", "")).strip()
     base_url = os.environ.get("PARATERA_URL", env_data.get("PARATERA_URL", "")).strip().rstrip("/")
-    default_reasoning = os.environ.get("PARATERA_MODEL", env_data.get("PARATERA_MODEL", "Kimi-K2.5")).strip()
+    default_reasoning = os.environ.get("PARATERA_MODEL", env_data.get("PARATERA_MODEL", "qwen/qwen3.6-plus")).strip()
     reasoning_model_name = os.environ.get("STEM_TUTOR_REASONING_MODEL", env_data.get("STEM_TUTOR_REASONING_MODEL", default_reasoning)).strip()
-    fast_model_name = os.environ.get("STEM_TUTOR_FAST_MODEL", env_data.get("STEM_TUTOR_FAST_MODEL", "DeepSeek-V3.2")).strip()
-    ocr_model_name = os.environ.get("STEM_TUTOR_OCR_MODEL", env_data.get("STEM_TUTOR_OCR_MODEL", "Kimi-K2.5")).strip()
+    fast_model_name = os.environ.get("STEM_TUTOR_FAST_MODEL", env_data.get("STEM_TUTOR_FAST_MODEL", "deepseek/deepseek-v3.2")).strip()
+    ocr_model_name = os.environ.get("STEM_TUTOR_OCR_MODEL", env_data.get("STEM_TUTOR_OCR_MODEL", "qwen/qwen3.6-plus")).strip()
     baseline_glm5_model_name = os.environ.get(
         "STEM_TUTOR_BASELINE_GLM5_MODEL",
-        env_data.get("STEM_TUTOR_BASELINE_GLM5_MODEL", "GLM-5-Turbo"),
+        env_data.get("STEM_TUTOR_BASELINE_GLM5_MODEL", "qwen/qwen3-30b-a3b-instruct-2507"),
     ).strip()
     baseline_kimi_model_name = os.environ.get(
         "STEM_TUTOR_BASELINE_KIMI_MODEL",
-        env_data.get("STEM_TUTOR_BASELINE_KIMI_MODEL", "Kimi-K2.5"),
+        env_data.get("STEM_TUTOR_BASELINE_KIMI_MODEL", "qwen/qwen3-30b-a3b-instruct-2507"),
     ).strip()
     detection_model_name = os.environ.get(
         "STEM_TUTOR_DETECTION_MODEL",
-        env_data.get("STEM_TUTOR_DETECTION_MODEL", "GLM-4-FlashX"),
+        env_data.get("STEM_TUTOR_DETECTION_MODEL", "qwen/qwen3-30b-a3b-instruct-2507"),
     ).strip()
 
     timeout_seconds = int(os.environ.get("STEM_TUTOR_TIMEOUT", env_data.get("STEM_TUTOR_TIMEOUT", str(DEFAULT_TIMEOUT_SECONDS))))

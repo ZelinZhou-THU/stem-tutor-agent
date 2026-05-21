@@ -404,6 +404,7 @@ def _shape_response(state: dict) -> dict:
         "run_meta": run_meta_serialized,
         "raw_output": raw_output_serialized,
         "tool_calls_log": state.get("tool_calls_log", []),
+        "reference_solution": state.get("reference_solution"),
     }
 
     if ocr_meta:
@@ -938,6 +939,12 @@ def _serialize_partial(node_name: str, state: dict) -> dict | None:
     if node_name == "generate_review_problems":
         reviews = state.get("review_problems", [])
         return {"review_problems": [p.model_dump() for p in reviews]}
+
+    if node_name == "generate_reference_solution":
+        ref = state.get("reference_solution")
+        if ref and hasattr(ref, "model_dump"):
+            return {"reference_solution": ref.model_dump()}
+        return {"reference_solution": ref}
 
     return None
 

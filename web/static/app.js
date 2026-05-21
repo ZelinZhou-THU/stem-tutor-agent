@@ -3093,6 +3093,10 @@
             html += '<p class="review-text">(' + (i + 1) + ") " + esc(p.problem_text) + "</p>";
             html += '<p class="review-meta">' + (diff ? '<span class="difficulty-badge">' + esc(diff) + "</span> " : "") + esc(p.rationale) + "</p>";
             html += '<button type="button" class="btn-practice-toggle" data-index="' + i + '">试一试</button>';
+            html += '<button type="button" class="btn-secondary btn-sm btn-show-reference" data-index="' + i + '">查看解答</button>';
+            html += '<div class="reference-answer-area" id="reference-answer-' + i + '" style="display:none;">';
+            html += '<div class="reference-answer-content" id="reference-answer-content-' + i + '"></div>';
+            html += "</div>";
             html += '<div class="practice-area" id="practice-area-' + i + '" style="display:none;">';
             html += '<textarea class="practice-input" rows="3" placeholder="输入你的解答..."></textarea>';
             html += '<div class="practice-actions">';
@@ -3150,6 +3154,55 @@
             btn.addEventListener("click", function () {
                 var idx = parseInt(this.getAttribute("data-index"), 10);
                 PracticeModule.submit(idx);
+            });
+        });
+
+        container.querySelectorAll(".btn-show-reference").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var idx = parseInt(this.getAttribute("data-index"), 10);
+                var area = $("reference-answer-" + idx);
+                var contentEl = $("reference-answer-content-" + idx);
+                if (area.style.display !== "none" && contentEl.getAttribute("data-loaded")) {
+                    area.style.display = "none";
+                    this.textContent = "查看解答";
+                    return;
+                }
+                area.style.display = "";
+                this.textContent = "收起解答";
+                if (contentEl.getAttribute("data-loaded")) return;
+                contentEl.innerHTML = '<p class="reference-answer-spinner"><span class="spinner-small"></span> 正在生成参考解答（使用计算工具验证）...</p>';
+                var problem = problems[idx];
+                var subjectId = "calculus";
+                if (_lastResult && _lastResult.run_meta && _lastResult.run_meta.subject_id) subjectId = _lastResult.run_meta.subject_id;
+                var subjectSelect = $("subject-select");
+                if (subjectSelect && subjectSelect.value) subjectId = subjectSelect.value;
+                var formData = new FormData();
+                formData.append("problem_text", problem.problem_text);
+                formData.append("subject_id", subjectId);
+                fetch("/practice/reference", { method: "POST", body: formData })
+                    .then(function (resp) {
+                        if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
+                        return resp;
+                    })
+                    .then(function (resp) { return _readReferenceSSE(resp); })
+                    .then(function (result) {
+                        if (result.reference_text) {
+                            contentEl.innerHTML = '<div class="reference-answer-body">' + marked.parse(result.reference_text) + "</div>";
+                            if (result.key_assertions && result.key_assertions.length) {
+                                var ah = "<p class=\"reference-assertions-title\">关键断言：</p><ul>";
+                                result.key_assertions.forEach(function (a) { ah += "<li>" + esc(a) + "</li>"; });
+                                ah += "</ul>";
+                                contentEl.innerHTML += ah;
+                            }
+                            renderAllMath(contentEl);
+                        } else {
+                            contentEl.innerHTML = '<p class="reference-answer-error">生成失败，请重试。</p>';
+                        }
+                        contentEl.setAttribute("data-loaded", "1");
+                    })
+                    .catch(function (err) {
+                        contentEl.innerHTML = '<p class="reference-answer-error">' + esc(err.message || "请求失败") + "</p>";
+                    });
             });
         });
 
@@ -3702,6 +3755,42 @@
             });
         }
         return readNext();
+    }
+
+    function _readReferenceSSE(response) {
+        return new Promise(function (resolve, reject) {
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder("utf-8");
+            var buffer = "";
+            var resolved = false;
+
+            function readNext() {
+                return reader.read().then(function (chunk) {
+                    if (chunk.done) {
+                        if (!resolved) reject(new Error("连接中断"));
+                        return;
+                    }
+                    buffer += decoder.decode(chunk.value, { stream: true });
+                    var lines = buffer.split("\n");
+                    buffer = lines.pop();
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        if (line.indexOf("data: ") === 0) {
+                            try {
+                                var data = JSON.parse(line.substring(6));
+                                if (data.type === "result") {
+                                    resolved = true;
+                                    resolve(data);
+                                    return;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    return readNext();
+                });
+            }
+            readNext().catch(reject);
+        });
     }
 
     /* ===== Mastery Module ===== */

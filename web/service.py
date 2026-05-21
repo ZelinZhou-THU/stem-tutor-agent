@@ -2269,6 +2269,39 @@ async def practice_verify_stream(
     yield f"event: practice_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
 
 
+async def practice_reference_stream(problem_text: str, subject_id: str = "calculus"):
+    import asyncio
+    import json as _json
+
+    from stem_tutor.graph.agent_subgraph import parse_json_from_text
+    from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
+
+    yield f"event: reference_progress\ndata: {_json.dumps({'type': 'progress', 'message': '正在生成参考解答（使用工具验证）...'}, ensure_ascii=False)}\n\n"
+
+    loop = asyncio.get_event_loop()
+
+    try:
+        raw, tool_calls = await loop.run_in_executor(
+            None,
+            lambda: _generate_via_agent(problem_text),
+        )
+        result = {
+            "type": "result",
+            "reference_text": raw.get("reference_text", ""),
+            "key_assertions": raw.get("key_assertions", []),
+            "tool_call_count": len(tool_calls),
+        }
+    except Exception as exc:
+        result = {
+            "type": "result",
+            "reference_text": "生成参考解答失败：" + str(exc),
+            "key_assertions": [],
+            "tool_call_count": 0,
+        }
+
+    yield f"event: reference_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
+
+
 async def report_stream(data: dict, model_name: str = "qwen/qwen3.6-plus"):
     import asyncio
     import json as _json

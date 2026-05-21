@@ -22,6 +22,7 @@ from web.service import delete_runs, cleanup_runs_before
 from web.service import get_report_data, report_stream, get_report_run_list
 from web.service import list_reports, _load_report, delete_reports
 from web.service import practice_verify_stream
+from web.service import practice_reference_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -335,6 +336,32 @@ async def practice_verify_endpoint(
             student_solution=student_solution.strip(),
             subject_id=resolved_subject_id,
             related_weakness_code=related_weakness_code,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/practice/reference")
+async def practice_reference_endpoint(
+    problem_text: str = Form(""),
+    subject_id: str = Form("calculus"),
+):
+    if not problem_text.strip():
+        return JSONResponse(status_code=400, content={"error": "请输入题目"})
+
+    async def event_generator():
+        async for chunk in practice_reference_stream(
+            problem_text=problem_text.strip(),
+            subject_id=subject_id,
         ):
             yield chunk
 

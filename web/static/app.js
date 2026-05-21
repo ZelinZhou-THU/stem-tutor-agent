@@ -2696,6 +2696,7 @@
             $("feedback-container").innerHTML = "";
             $("review-container").innerHTML = "";
             $("summary-card").innerHTML = "";
+            $("summary-card").style.display = "none";
             $("run-info").innerHTML = "";
             $("raw-json").textContent = "";
             $("diagnosis-section").style.display = "none";
@@ -2722,6 +2723,7 @@
         function renderPartial(nodeName, data) {
             resultsDiv.style.display = "";
             if (nodeName === "parse_student_solution") renderStepsPartial(data.steps);
+            else if (nodeName === "generate_reference_solution") renderReference(data);
             else if (nodeName === "verify_steps") renderSteps(data.steps, (currentRunId || null));
             else if (nodeName === "diagnose_error") renderDiagnoses(data.diagnoses);
             else if (nodeName === "generate_feedback") renderFeedback(data);
@@ -2804,6 +2806,7 @@
         }
 
         renderSummary(data);
+        renderReference(data);
         renderSteps(data.steps, (data.run_meta || {}).run_id);
         renderDiagnoses(data.diagnoses);
         renderFeedback(data);
@@ -2833,6 +2836,7 @@
 
     function renderSummary(data) {
         var el = $("summary-card");
+        el.style.display = "";
         var hasError = data.first_critical_step_id;
         var userStatus = normalizeRunStatus(data.user_status || data.status);
         if (userStatus === "unavailable") {
@@ -2850,6 +2854,32 @@
         if (data.next_action) html += '<p class="summary-text"><span class="summary-label">\u5efa\u8bae\u884c\u52a8\uff1a</span>' + esc(data.next_action) + "</p>";
         if (data.caution_note) html += '<p class="summary-text" style="color:var(--warning-text);"><span class="summary-label">\u6ce8\u610f\u4e8b\u9879\uff1a</span>' + esc(data.caution_note) + "</p>";
         el.innerHTML = html;
+    }
+
+    function renderReference(data) {
+        var el = $("reference-section");
+        var container = $("reference-container");
+        var ref = data.reference_solution;
+        if (!ref || (!ref.reference_text && !ref.key_assertions)) {
+            el.style.display = "none";
+            return;
+        }
+        el.style.display = "";
+        var html = "";
+        if (ref.reference_text) {
+            var processed = preprocessLatex(ref.reference_text);
+            var rendered = window.marked ? marked.parse(processed) : esc(processed);
+            html += '<div class="reference-text">参考解答：</div>';
+            html += '<div class="reference-content">' + rendered + '</div>';
+        }
+        if (ref.key_assertions && ref.key_assertions.length) {
+            html += '<div class="reference-assertions"><strong>关键断言：</strong><ul>';
+            ref.key_assertions.forEach(function (a) {
+                html += '<li>' + esc(a) + '</li>';
+            });
+            html += '</ul></div>';
+        }
+        container.innerHTML = html;
     }
 
     function renderSteps(steps, runId) {

@@ -848,6 +848,37 @@ textarea {
     margin-right: 4px;
 }
 
+/* ===== Reference Solution ===== */
+.reference-text {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+.reference-content {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+    padding: 12px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent);
+}
+.reference-content p {
+    margin: 6px 0;
+}
+.reference-assertions {
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+.reference-assertions ul {
+    padding-left: 20px;
+    margin: 6px 0;
+}
+.reference-assertions li {
+    margin-bottom: 4px;
+}
+
 /* ===== Steps Table ===== */
 .steps-table {
     width: 100%;

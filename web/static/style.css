@@ -3491,6 +3491,16 @@ textarea {
     color: #fff;
 }
 
+.onboarding-btn-prev {
+    background: var(--bg-main);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.onboarding-btn-prev:hover {
+    background: var(--border);
+}
+
 .onboarding-btn-next:hover {
     background: var(--accent-hover);
 }

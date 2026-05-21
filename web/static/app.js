@@ -3318,15 +3318,15 @@
         ],
 
         init: function () {
-            if (localStorage.getItem("stem_tutor_onboarding_done")) return;
             var helpBtn = $("btn-onboarding-help");
             if (helpBtn) helpBtn.addEventListener("click", function () { OnboardingModule.startTour(); });
-            document.querySelectorAll(".info-icon-trigger").forEach(function (icon) {
+            document.querySelectorAll(".info-icon").forEach(function (icon) {
                 icon.addEventListener("click", function (e) {
                     e.stopPropagation();
                     OnboardingModule._toggleInfoPopup(this);
                 });
             });
+            if (localStorage.getItem("stem_tutor_onboarding_done")) return;
             setTimeout(function () { OnboardingModule.startTour(); }, 800);
         },
 
@@ -3359,13 +3359,13 @@
             var tooltip = document.createElement("div");
             tooltip.className = "onboarding-tooltip";
             tooltip.innerHTML = '<p class="onboarding-step-indicator">步骤 ' + (index + 1) + '/' + this._steps.length + '</p>' +
-                '<h3>' + step.title + '</h3>' +
-                '<p>' + step.text + '</p>' +
-                '<div class="onboarding-btns">' +
-                (index > 0 ? '<button type="button" class="onboarding-btn-prev" data-step="' + (index - 1) + '">上一步</button>' : '') +
+                '<div class="onboarding-tooltip-title">' + step.title + '</div>' +
+                '<div class="onboarding-tooltip-text">' + step.text + '</div>' +
+                '<div class="onboarding-tooltip-actions">' +
+                (index > 0 ? '<button type="button" class="onboarding-btn onboarding-btn-prev" data-step="' + (index - 1) + '">上一步</button>' : '<span></span>') +
                 (index < this._steps.length - 1
-                    ? '<button type="button" class="onboarding-btn-next" data-step="' + (index + 1) + '">下一步</button>'
-                    : '<button type="button" class="onboarding-btn-done">完成</button>') +
+                    ? '<button type="button" class="onboarding-btn onboarding-btn-next" data-step="' + (index + 1) + '">下一步</button>'
+                    : '<button type="button" class="onboarding-btn onboarding-btn-done">完成</button>') +
                 '</div>';
             document.body.appendChild(tooltip);
 

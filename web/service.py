@@ -2236,15 +2236,16 @@ async def practice_verify_stream(
 
     try:
         import re as _re
+        from stem_tutor.providers.openai_compatible_provider import _fix_json_escapes, _fix_json_control_chars
         resp = requests.post(url, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         body = resp.json()
         content = body["choices"][0]["message"]["content"].strip()
         json_match = _re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            parsed = _json.loads(json_match.group())
-        else:
-            parsed = _json.loads(content)
+        raw = json_match.group() if json_match else content
+        raw = _fix_json_control_chars(raw)
+        raw = _fix_json_escapes(raw)
+        parsed = _json.loads(raw)
 
         result = {
             "type": "result",

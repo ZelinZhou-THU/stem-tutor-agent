@@ -3132,10 +3132,17 @@
         container.querySelectorAll(".btn-practice-cancel").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 var idx = this.getAttribute("data-index");
-                $("practice-area-" + idx).style.display = "none";
+                var area = $("practice-area-" + idx);
+                if (area) area.style.display = "none";
                 var card = this.closest(".review-card");
                 var toggleBtn = card.querySelector(".btn-practice-toggle");
                 if (toggleBtn) { toggleBtn.disabled = false; toggleBtn.classList.remove("used"); }
+                var ta = card.querySelector(".practice-input");
+                if (ta) { ta.disabled = false; ta.value = ""; ta.placeholder = "输入你的解答..."; }
+                var resultEl = $("practice-result-" + idx);
+                if (resultEl) { resultEl.style.display = "none"; resultEl.innerHTML = ""; }
+                var submitBtn = card.querySelector(".btn-practice-submit");
+                if (submitBtn) submitBtn.disabled = true;
             });
         });
 
@@ -3602,9 +3609,16 @@
                         function (result) {
                             spinnerEl.style.display = "none";
                             self._showResult(index, result);
-                            self._submitted[index] = true;
-                            submitBtn.disabled = true;
-                            textarea.disabled = true;
+                            if (result.all_correct) {
+                                self._submitted[index] = true;
+                                submitBtn.disabled = true;
+                                textarea.disabled = true;
+                            } else {
+                                textarea.disabled = false;
+                                textarea.value = "";
+                                textarea.placeholder = "修改后重新提交...";
+                                submitBtn.disabled = true;
+                            }
                             if (typeof MasteryModule !== "undefined" && MasteryModule.recordPractice) {
                                 MasteryModule.recordPractice(weaknessCode, result.all_correct);
                             }

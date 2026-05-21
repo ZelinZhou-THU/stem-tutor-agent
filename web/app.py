@@ -21,6 +21,7 @@ from web.service import _load_chat_history, chat_stream, list_runs, get_stats, r
 from web.service import delete_runs, cleanup_runs_before
 from web.service import get_report_data, report_stream, get_report_run_list
 from web.service import list_reports, _load_report, delete_reports
+from web.service import practice_verify_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -301,6 +302,51 @@ async def reverify_step_endpoint(
         return JSONResponse(content=result)
     except Exception as exc:
         return JSONResponse(status_code=500, content={"success": False, "error": str(exc)})
+
+
+@app.post("/practice/verify")
+async def practice_verify_endpoint(
+    problem_text: str = Form(""),
+    student_solution: str = Form(""),
+    subject_id: str = Form("calculus"),
+    related_weakness_code: str = Form(""),
+):
+    if not problem_text.strip():
+        return JSONResponse(status_code=400, content={"error": "请输入题目"})
+    if not student_solution.strip():
+        return JSONResponse(status_code=400, content={"error": "请输入解题步骤"})
+
+    resolved_subject_id = subject_id
+    if resolved_subject_id == "auto_detect":
+        try:
+            settings = load_provider_settings()
+            resolved_subject_id = detect_subject(
+                problem_text.strip(),
+                base_url=settings.base_url,
+                api_key=settings.api_key,
+                model=settings.detection_model_name,
+            )
+        except Exception:
+            resolved_subject_id = "calculus"
+
+    async def event_generator():
+        async for chunk in practice_verify_stream(
+            problem_text=problem_text.strip(),
+            student_solution=student_solution.strip(),
+            subject_id=resolved_subject_id,
+            related_weakness_code=related_weakness_code,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/report/runs")

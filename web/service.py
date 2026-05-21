@@ -2197,6 +2197,181 @@ def delete_reports(report_ids: list[str]) -> dict:
     return {"deleted": deleted, "not_found": not_found}
 
 
+async def practice_verify_stream(
+    problem_text: str,
+    student_solution: str,
+    subject_id: str = "calculus",
+    related_weakness_code: str = "",
+):
+    import asyncio
+    import json as _json
+    from stem_tutor.graph.workflow import build_tutor_graph
+
+    settings = load_provider_settings()
+
+    depth = "quick"
+    os.environ["STEM_TUTOR_DEPTH"] = depth
+    os.environ["STEM_TUTOR_BUDGET_ENABLED"] = "true"
+
+    if subject_id == "auto_detect":
+        subject_id = detect_subject(
+            problem_text,
+            base_url=settings.base_url,
+            api_key=settings.api_key,
+            model=settings.detection_model_name,
+        )
+    elif subject_id and subject_id not in VALID_SUBJECTS:
+        subject_id = "calculus"
+
+    if subject_id:
+        os.environ["STEM_TUTOR_SUBJECT"] = subject_id
+        get_subject_context(subject_id)
+
+    problem_input = ProblemInput(
+        problem_id=f"practice-{uuid4().hex[:8]}",
+        problem_text=problem_text,
+        source_type="text",
+        ocr_payload=None,
+    )
+
+    yield f"event: practice_progress\ndata: {_json.dumps({'type': 'progress', 'node': 'start', 'message': '开始验证'}, ensure_ascii=False)}\n\n"
+
+    try:
+        provider = create_provider("openai-compatible", settings, model_group="reasoning")
+        ocr_provider = create_provider("openai-compatible", settings, model_group="ocr")
+        fast_provider = create_provider("openai-compatible", settings, model_group="fast")
+        verify_group = settings.verify_model_group
+        verify_provider = create_provider("openai-compatible", settings, model_group=verify_group)
+        if settings.verify_model_name:
+            verify_provider.model_name = settings.verify_model_name
+
+        initial_state = {
+            "problem_input": problem_input,
+            "raw_student_solution": student_solution,
+            "trace": [],
+            "run_meta": {
+                "run_id": str(uuid4()),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "provider": "openai-compatible",
+                "model": settings.reasoning_model_name,
+                "ocr_model": getattr(settings, "ocr_model_name", "qwen/qwen3.6-plus"),
+                "subject_id": subject_id,
+                "workflow_version": "v1",
+                "depth": depth,
+                "node_stats": {},
+                "provider_events": [],
+            },
+            "budget_metadata": {"depth": depth},
+        }
+
+        accumulated_state = dict(initial_state)
+
+        app = build_tutor_graph(
+            provider,
+            ocr_provider=ocr_provider,
+            fast_provider=fast_provider,
+            verify_provider=verify_provider,
+        )
+
+        _PRACTICE_NODE_MAP = {
+            "parse_student_solution": "parse",
+            "generate_reference_solution": "reference",
+            "verify_steps": "verify",
+            "diagnose_error": "diagnose",
+            "generate_feedback": "feedback",
+            "generate_review_problems": "review",
+            "finalize_report": "finalize",
+            "ocr_preprocess": "ocr",
+        }
+
+        async for tag, event in _with_heartbeat(
+            app.astream(initial_state, stream_mode="updates")
+        ):
+            if tag == "heartbeat":
+                yield ": keepalive\n\n"
+                continue
+            for node_name, node_output in event.items():
+                if node_name in ("__end__", "__interrupt__"):
+                    continue
+                for key, value in node_output.items():
+                    accumulated_state[key] = value
+                progress_node = _PRACTICE_NODE_MAP.get(node_name, node_name)
+                yield f"event: practice_progress\ndata: {_json.dumps({'type': 'progress', 'node': progress_node}, ensure_ascii=False)}\n\n"
+
+    except Exception as exc:
+        yield f"event: practice_progress\ndata: {_json.dumps({'type': 'error', 'message': f'验证失败：{exc}'}, ensure_ascii=False)}\n\n"
+        return
+
+    steps_raw = accumulated_state.get("normalized_steps", [])
+    verifications = accumulated_state.get("verification_results", [])
+    diagnoses = accumulated_state.get("diagnosis_results", [])
+
+    vmap = {}
+    for v in verifications:
+        vid = _get_attr(v, "step_id")
+        vmap[vid] = v
+
+    step_results = []
+    all_correct = True
+
+    for s in steps_raw:
+        step_id = _get_attr(s, "step_id")
+        raw_text = _get_attr(s, "raw_text", "")
+        v = vmap.get(step_id)
+        if v is None:
+            label = "unverified"
+            all_correct = False
+        else:
+            label_val = _get_attr(v, "label", "unclear")
+            label = label_val.value if hasattr(label_val, "value") else str(label_val)
+            if label != "correct":
+                all_correct = False
+        step_results.append({"text": raw_text, "label": label})
+
+    if all_correct:
+        overall_label = "correct"
+        summary = "所有步骤均正确，做得好！"
+        hint = None
+    else:
+        overall_label = "incorrect_math"
+        for sr in step_results:
+            if sr["label"] != "correct":
+                overall_label = sr["label"]
+                break
+
+        if diagnoses:
+            d = diagnoses[0]
+            hint = _get_attr(d, "root_cause_hypothesis", "")
+            if not hint:
+                hint = _get_attr(d, "supporting_evidence", "")
+        else:
+            feedback = accumulated_state.get("final_feedback")
+            if feedback:
+                hint = _get_attr(feedback, "next_action", "")
+            else:
+                hint = None
+
+        correct_count = sum(1 for sr in step_results if sr["label"] == "correct")
+        total_count = len(step_results)
+        summary = f"{correct_count}/{total_count} 个步骤正确。"
+        if diagnoses:
+            d = diagnoses[0]
+            cat = _get_attr(d, "category", "")
+            if cat:
+                summary += f" 主要问题：{cat}。"
+
+    result = {
+        "type": "result",
+        "label": overall_label,
+        "summary": summary,
+        "step_results": step_results,
+        "hint": hint,
+        "all_correct": all_correct,
+    }
+
+    yield f"event: practice_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
+
+
 async def report_stream(data: dict, model_name: str = "qwen/qwen3.6-plus"):
     import asyncio
     import json as _json

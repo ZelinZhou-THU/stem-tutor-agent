@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数理基础课程学习辅导系统</title>
-    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/style.css?v=6">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -62,6 +62,7 @@
             <button id="mobile-menu-toggle" class="mobile-menu-toggle">☰</button>
             <h2 id="page-title" class="top-bar-title">新建诊断</h2>
             <button type="button" id="btn-new-diagnosis" class="btn-header-action" style="display:none;">+ 新建诊断</button>
+            <button type="button" id="btn-onboarding-help" class="btn-header-action">帮助</button>
         </header>
 
         <div class="page-container">
@@ -78,7 +79,7 @@
                     <div class="panel-body" id="input-panel-body">
                         <form id="analysis-form">
                             <div class="form-group">
-                                <label id="problem-label">题目</label>
+                                <label id="problem-label">题目 <span class="info-icon" data-info="在此输入数学或物理题目的完整文字，系统会据此分析学生的解题过程。">?</span></label>
                                 <div class="mode-switch" style="margin-bottom:8px;">
                                     <label class="radio-label">
                                         <input type="radio" name="problem_source" value="text" checked>
@@ -143,7 +144,7 @@
 
                             <div id="text-mode" class="mode-panel">
                                 <div class="form-group">
-                                    <label for="student-solution">学生解答</label>
+                                    <label for="student-solution">学生解答 <span class="info-icon" data-info="逐行输入学生的解题步骤，系统会对每一步进行验证和诊断。">?</span></label>
                                     <textarea id="student-solution" name="student_solution" rows="6"
                                               placeholder="输入学生的解题过程，每行一步（也支持整段粘贴）"></textarea>
                                 </div>
@@ -214,7 +215,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>推理深度</label>
+                                <label>推理深度 <span class="info-icon" data-info="快速模式适合简单验证；标准模式适合大多数情况；深度模式适合复杂多步问题。">?</span></label>
                                 <div class="depth-control">
                                     <label class="depth-option" data-depth="quick">
                                         <input type="radio" name="depth" value="quick">
@@ -303,6 +304,15 @@
                     </div>
 
                     <div id="results" style="display:none;">
+                        <div class="export-dropdown">
+                            <button type="button" class="export-btn">导出 ▾</button>
+                            <div class="export-menu">
+                                <button type="button" data-action="print">🖨 打印 / PDF</button>
+                                <button type="button" data-action="markdown">📋 复制 Markdown</button>
+                                <button type="button" data-action="json">💾 下载 JSON</button>
+                            </div>
+                        </div>
+                        <div id="toast" class="toast"></div>
                         <div id="ocr-warning" class="alert alert-warning" style="display:none;"></div>
                         <div id="status-banner" class="alert" style="display:none;"></div>
 
@@ -458,44 +468,73 @@
                     </div>
                 </div>
 
-                <div class="stats-grid" id="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-total">--</div>
-                        <div class="stat-label">总诊断次数</div>
+                <div class="stats-tabs">
+                    <button class="stats-tab active" data-stats-tab="overview">统计概览</button>
+                    <button class="stats-tab" data-stats-tab="profile">学习画像</button>
+                </div>
+
+                <div id="stats-panel-overview" class="stats-panel active">
+                    <div class="stats-grid" id="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-total">--</div>
+                            <div class="stat-label">总诊断次数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-success-rate">--</div>
+                            <div class="stat-label">成功率</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-avg-duration">--</div>
+                            <div class="stat-label">平均用时</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-streak">--</div>
+                            <div class="stat-label">连续使用天数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-today">--</div>
+                            <div class="stat-label">今日诊断</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-week">--</div>
+                            <div class="stat-label">本周诊断</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-success-rate">--</div>
-                        <div class="stat-label">成功率</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-avg-duration">--</div>
-                        <div class="stat-label">平均用时</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-streak">--</div>
-                        <div class="stat-label">连续使用天数</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-today">--</div>
-                        <div class="stat-label">今日诊断</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-week">--</div>
-                        <div class="stat-label">本周诊断</div>
+
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <h3>学科分布</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="subject-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3>使用趋势</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="trend-chart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="charts-grid">
-                    <div class="chart-card">
-                        <h3>学科分布</h3>
-                        <div class="chart-wrapper">
-                            <canvas id="subject-chart"></canvas>
-                        </div>
+                <div id="stats-panel-profile" class="stats-panel" style="display:none;">
+                    <div class="profile-empty" id="profile-empty" style="display:none;">
+                        <p>还没有学习画像数据。完成诊断并标记已掌握的概念后，你的学习画像将在这里展示。</p>
                     </div>
-                    <div class="chart-card">
-                        <h3>使用趋势</h3>
-                        <div class="chart-wrapper">
-                            <canvas id="trend-chart"></canvas>
+                    <div class="profile-content" id="profile-content" style="display:none;">
+                        <div class="chart-card">
+                            <h3>概念掌握雷达图</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="mastery-radar-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="profile-section">
+                            <h3>概念掌握进度</h3>
+                            <div id="mastery-progress-list" class="mastery-progress-list"></div>
+                        </div>
+                        <div class="profile-section">
+                            <h3>成就</h3>
+                            <div id="milestones-list" class="milestones-list"></div>
                         </div>
                     </div>
                 </div>
@@ -764,7 +803,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=7"></script>
+    <script src="/static/app.js?v=8"></script>
 
     <div id="confirm-overlay" class="confirm-overlay" style="display:none;">
         <div class="confirm-dialog">

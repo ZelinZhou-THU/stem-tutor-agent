@@ -2,6 +2,7 @@
     "use strict";
 
     var SITE_TITLE = "\u6570\u7406\u57fa\u7840\u8bfe\u7a0b\u5b66\u4e60\u8f85\u5bfc\u7cfb\u7edf";
+    var _lastResult = null;
 
     var LABEL_MAP = {
         correct: { text: "\u6b63\u786e", cls: "label-correct" },
@@ -2151,6 +2152,9 @@
         SettingsModule.init();
         InputPanel.init();
         initMobileSidebar();
+        OnboardingModule.init();
+        ExportModule.init();
+        MasteryModule.init();
 
         // Bind history filters
         ["history-filter-subject", "history-filter-status"].forEach(function (id) {
@@ -2835,6 +2839,7 @@
     }
 
     function renderResults(data) {
+        _lastResult = data;
         var resultsDiv = $("results");
         $("ocr-warning").style.display = "none";
         $("status-banner").style.display = "none";
@@ -3029,17 +3034,31 @@
         var html = "";
         diagnoses.forEach(function (d) {
             html += '<div class="diagnosis-card">';
-            html += '<p class="diagnosis-step">\u6b65\u9aa4 ' + esc(d.step_id) + "</p>";
+            html += '<p class="diagnosis-step">步骤 ' + esc(d.step_id) + "</p>";
             html += '<span class="diagnosis-code">' + esc(d.error_code) + "</span>";
             if (d.short_desc) html += " " + esc(d.short_desc);
-            html += '<p><span class="field-label">\u7c7b\u522b\uff1a</span>' + esc(d.category) + "</p>";
-            html += '<p><span class="field-label">\u5047\u8bbe\u6839\u56e0\uff1a</span>' + esc(d.root_cause_hypothesis) + "</p>";
-            html += '<p><span class="field-label">\u652f\u6301\u8bc1\u636e\uff1a</span>' + esc(d.supporting_evidence) + "</p>";
-            html += '<p><span class="field-label">\u7f6e\u4fe1\u5ea6\uff1a</span>' + (d.confidence * 100).toFixed(0) + "%</p>";
+            html += '<p><span class="field-label">类别：</span>' + esc(d.category) + "</p>";
+            html += '<p><span class="field-label">假设根因：</span>' + esc(d.root_cause_hypothesis) + "</p>";
+            html += '<p><span class="field-label">支持证据：</span>' + esc(d.supporting_evidence) + "</p>";
+            html += '<p><span class="field-label">置信度：</span>' + (d.confidence * 100).toFixed(0) + "%</p>";
+            html += '<button type="button" class="btn-mastered-toggle" data-error-code="' + esc(d.error_code) + '">标记已掌握</button>';
             html += "</div>";
+            if (typeof MasteryModule !== "undefined" && MasteryModule.recordEncounter) {
+                MasteryModule.recordEncounter(d.error_code);
+            }
         });
         container.innerHTML = html;
         section.style.display = "";
+
+        container.querySelectorAll(".btn-mastered-toggle").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                if (typeof MasteryModule !== "undefined" && MasteryModule.toggleMastered) {
+                    MasteryModule.toggleMastered(this.getAttribute("data-error-code"));
+                    this.classList.toggle("mastered");
+                    this.textContent = this.classList.contains("mastered") ? "已掌握" : "标记已掌握";
+                }
+            });
+        });
     }
 
     function renderFeedback(data) {
@@ -3064,13 +3083,61 @@
         var html = "";
         problems.forEach(function (p, i) {
             var diff = DIFFICULTY_MAP[p.difficulty_label] || p.difficulty_label || "";
-            html += '<div class="review-card">';
+            html += '<div class="review-card" data-review-index="' + i + '">';
             html += '<p class="review-text">(' + (i + 1) + ") " + esc(p.problem_text) + "</p>";
             html += '<p class="review-meta">' + (diff ? '<span class="difficulty-badge">' + esc(diff) + "</span> " : "") + esc(p.rationale) + "</p>";
+            html += '<button type="button" class="btn-practice-toggle" data-index="' + i + '">试一试</button>';
+            html += '<div class="practice-area" id="practice-area-' + i + '" style="display:none;">';
+            html += '<textarea class="practice-input" rows="3" placeholder="输入你的解答..."></textarea>';
+            html += '<div class="practice-actions">';
+            html += '<button type="button" class="btn-primary btn-sm btn-practice-submit" data-index="' + i + '" disabled>提交验证</button>';
+            html += '<button type="button" class="btn-secondary btn-sm btn-practice-cancel" data-index="' + i + '">取消</button>';
+            html += '<span class="practice-spinner" style="display:none;"><span class="spinner-small"></span> 验证中...</span>';
+            html += "</div>";
+            html += '<div class="practice-result" id="practice-result-' + i + '" style="display:none;"></div>';
+            html += "</div>";
             html += "</div>";
         });
         container.innerHTML = html;
         section.style.display = "";
+
+        container.querySelectorAll(".btn-practice-toggle").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var idx = this.getAttribute("data-index");
+                var area = $("practice-area-" + idx);
+                if (area.style.display === "none") {
+                    area.style.display = "";
+                    this.classList.add("used");
+                    this.disabled = true;
+                } else {
+                    area.style.display = "none";
+                }
+            });
+        });
+
+        container.querySelectorAll(".practice-input").forEach(function (ta) {
+            ta.addEventListener("input", function () {
+                var card = this.closest(".review-card");
+                var submitBtn = card.querySelector(".btn-practice-submit");
+                submitBtn.disabled = !this.value.trim();
+            });
+        });
+
+        container.querySelectorAll(".btn-practice-cancel").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var idx = this.getAttribute("data-index");
+                $("practice-area-" + idx).style.display = "none";
+            });
+        });
+
+        container.querySelectorAll(".btn-practice-submit").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var idx = parseInt(this.getAttribute("data-index"), 10);
+                PracticeModule.submit(idx);
+            });
+        });
+
+        PracticeModule.init(problems);
     }
 
     function renderAdvanced(data) {
@@ -3239,6 +3306,529 @@
         var container = $("chat-messages");
         container.scrollTop = container.scrollHeight;
     }
+
+    /* ===== Onboarding Module ===== */
+    var OnboardingModule = {
+        _steps: [
+            { target: "#problem-input-group", title: "输入题目", text: "在这里输入数学或物理题目的内容，也可以拍照自动识别。" },
+            { target: "#student-solution", title: "输入解答", text: "在这里输入学生的解题过程，每行一步。" },
+            { target: "#subject-select", title: "选择学科", text: "选择对应的学科，或使用自动识别功能。" },
+            { target: ".depth-cards", title: "推理深度", text: "标准模式适合大多数情况，快速模式适合简单题目。" },
+            { target: "#run-btn", title: "开始分析", text: "点击此按钮开始分析，系统会逐步验证每个解题步骤。" }
+        ],
+
+        init: function () {
+            if (localStorage.getItem("stem_tutor_onboarding_done")) return;
+            var helpBtn = $("btn-onboarding-help");
+            if (helpBtn) helpBtn.addEventListener("click", function () { OnboardingModule.startTour(); });
+            document.querySelectorAll(".info-icon-trigger").forEach(function (icon) {
+                icon.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    OnboardingModule._toggleInfoPopup(this);
+                });
+            });
+            setTimeout(function () { OnboardingModule.startTour(); }, 800);
+        },
+
+        startTour: function () {
+            this._showStep(0);
+        },
+
+        _showStep: function (index) {
+            var self = this;
+            if (index >= this._steps.length) {
+                this._removeOverlay();
+                localStorage.setItem("stem_tutor_onboarding_done", "1");
+                return;
+            }
+            this._removeOverlay();
+            var step = this._steps[index];
+            var target = document.querySelector(step.target);
+            if (!target) { self._showStep(index + 1); return; }
+            if (window.AppRouter && AppRouter.navigate) AppRouter.navigate("new");
+            if (typeof InputPanel !== "undefined" && InputPanel.expand) InputPanel.expand();
+
+            var overlay = document.createElement("div");
+            overlay.className = "onboarding-overlay";
+            overlay.id = "onboarding-overlay";
+            document.body.appendChild(overlay);
+
+            target.classList.add("onboarding-highlight");
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+            var tooltip = document.createElement("div");
+            tooltip.className = "onboarding-tooltip";
+            tooltip.innerHTML = '<p class="onboarding-step-indicator">步骤 ' + (index + 1) + '/' + this._steps.length + '</p>' +
+                '<h3>' + step.title + '</h3>' +
+                '<p>' + step.text + '</p>' +
+                '<div class="onboarding-btns">' +
+                (index > 0 ? '<button type="button" class="onboarding-btn-prev" data-step="' + (index - 1) + '">上一步</button>' : '') +
+                (index < this._steps.length - 1
+                    ? '<button type="button" class="onboarding-btn-next" data-step="' + (index + 1) + '">下一步</button>'
+                    : '<button type="button" class="onboarding-btn-done">完成</button>') +
+                '</div>';
+            document.body.appendChild(tooltip);
+
+            var rect = target.getBoundingClientRect();
+            tooltip.style.top = (rect.bottom + window.scrollY + 12) + "px";
+            tooltip.style.left = Math.max(10, rect.left + window.scrollX) + "px";
+
+            tooltip.querySelector(index < this._steps.length - 1 ? ".onboarding-btn-next" : ".onboarding-btn-done").addEventListener("click", function () {
+                var nextIdx = parseInt(this.getAttribute("data-step"), 10);
+                if (isNaN(nextIdx)) nextIdx = self._steps.length;
+                target.classList.remove("onboarding-highlight");
+                self._showStep(nextIdx);
+            });
+            var prevBtn = tooltip.querySelector(".onboarding-btn-prev");
+            if (prevBtn) {
+                prevBtn.addEventListener("click", function () {
+                    target.classList.remove("onboarding-highlight");
+                    self._showStep(parseInt(this.getAttribute("data-step"), 10));
+                });
+            }
+        },
+
+        _removeOverlay: function () {
+            var overlay = $("onboarding-overlay");
+            if (overlay) overlay.remove();
+            document.querySelectorAll(".onboarding-highlight").forEach(function (el) { el.classList.remove("onboarding-highlight"); });
+            document.querySelectorAll(".onboarding-tooltip").forEach(function (el) { el.remove(); });
+        },
+
+        _toggleInfoPopup: function (icon) {
+            var existing = icon.parentElement.querySelector(".info-popup");
+            if (existing) { existing.remove(); return; }
+            document.querySelectorAll(".info-popup").forEach(function (p) { p.remove(); });
+            var text = icon.getAttribute("data-info") || "";
+            if (!text) return;
+            var popup = document.createElement("div");
+            popup.className = "info-popup";
+            popup.textContent = text;
+            icon.parentElement.appendChild(popup);
+            setTimeout(function () {
+                document.addEventListener("click", function handler(e) {
+                    if (!popup.contains(e.target) && e.target !== icon) { popup.remove(); document.removeEventListener("click", handler); }
+                });
+            }, 10);
+        }
+    };
+
+    /* ===== Export Module ===== */
+    var ExportModule = {
+        init: function () {
+            var toggle = $("export-toggle");
+            var menu = $("export-menu");
+            if (!toggle || !menu) return;
+
+            toggle.addEventListener("click", function (e) {
+                e.stopPropagation();
+                menu.classList.toggle("open");
+            });
+            document.addEventListener("click", function () { menu.classList.remove("open"); });
+
+            var printBtn = $("export-print");
+            if (printBtn) printBtn.addEventListener("click", function () { ExportModule._printResult(); });
+
+            var mdBtn = $("export-markdown");
+            if (mdBtn) mdBtn.addEventListener("click", function () { ExportModule._copyMarkdown(); });
+
+            var jsonBtn = $("export-json");
+            if (jsonBtn) jsonBtn.addEventListener("click", function () { ExportModule._downloadJson(); });
+        },
+
+        _printResult: function () {
+            $("export-menu").classList.remove("open");
+            document.body.classList.add("print-mode");
+            setTimeout(function () { window.print(); }, 200);
+            setTimeout(function () { document.body.classList.remove("print-mode"); }, 500);
+        },
+
+        _copyMarkdown: function () {
+            $("export-menu").classList.remove("open");
+            if (!_lastResult) return;
+            var md = ExportModule._generateMarkdown(_lastResult);
+            navigator.clipboard.writeText(md).then(function () {
+                ExportModule._showToast("Markdown 已复制到剪贴板");
+            }).catch(function () {
+                ExportModule._showToast("复制失败，请手动复制");
+            });
+        },
+
+        _downloadJson: function () {
+            $("export-menu").classList.remove("open");
+            if (!_lastResult) return;
+            var json = JSON.stringify(_lastResult, null, 2);
+            var blob = new Blob([json], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            var runId = (_lastResult.run_meta || {}).run_id || "unknown";
+            a.href = url;
+            a.download = "analysis-" + runId + ".json";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        },
+
+        _generateMarkdown: function (data) {
+            var lines = [];
+            lines.push("# 分析结果");
+            lines.push("");
+            if (data.problem_text) { lines.push("## 题目"); lines.push(data.problem_text); lines.push(""); }
+            var summary = data.concise_summary;
+            if (summary) { lines.push("## 概要"); lines.push(summary); lines.push(""); }
+            var ref = data.reference_solution;
+            if (ref && ref.reference_text) { lines.push("## 参考解答"); lines.push(ref.reference_text); lines.push(""); }
+            if (data.steps && data.steps.length) {
+                lines.push("## 步骤验证");
+                lines.push("| 步骤 | 内容 | 结果 | 置信度 |");
+                lines.push("|------|------|------|--------|");
+                data.steps.forEach(function (s) {
+                    var label = s.label || "-";
+                    var text = (s.raw_text || s.normalized_text || "").replace(/\n/g, " ");
+                    lines.push("| " + (s.step_id || "-") + " | " + text + " | " + label + " | " + ((s.confidence || 0) * 100).toFixed(0) + "% |");
+                });
+                lines.push("");
+            }
+            if (data.diagnoses && data.diagnoses.length) {
+                lines.push("## 错误诊断");
+                data.diagnoses.forEach(function (d) {
+                    lines.push("- 步骤 " + d.step_id + ": " + (d.error_code || "") + " — " + (d.root_cause_hypothesis || ""));
+                });
+                lines.push("");
+            }
+            var feedback = data.final_feedback;
+            if (feedback) {
+                lines.push("## 学习反馈");
+                if (feedback.review_concepts) lines.push("- 复习概念: " + feedback.review_concepts.join(", "));
+                if (feedback.next_action) lines.push("- 下一步: " + feedback.next_action);
+                lines.push("");
+            }
+            if (data.review_problems && data.review_problems.length) {
+                lines.push("## 复习练习");
+                data.review_problems.forEach(function (p, i) {
+                    lines.push((i + 1) + ". " + p.problem_text);
+                });
+            }
+            return lines.join("\n");
+        },
+
+        _showToast: function (msg) {
+            var toast = $("toast");
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.classList.add("show");
+            setTimeout(function () { toast.classList.remove("show"); }, 2500);
+        }
+    };
+
+    /* ===== Practice Module ===== */
+    var PracticeModule = {
+        _problems: [],
+        _submitted: {},
+
+        init: function (problems) {
+            this._problems = problems || [];
+            this._submitted = {};
+        },
+
+        submit: function (index) {
+            if (this._submitted[index]) return;
+            var problem = this._problems[index];
+            if (!problem) return;
+
+            var card = document.querySelector('.review-card[data-review-index="' + index + '"]');
+            var textarea = card.querySelector(".practice-input");
+            var submitBtn = card.querySelector(".btn-practice-submit");
+            var spinnerEl = card.querySelector(".practice-spinner");
+            var resultEl = $("practice-result-" + index);
+
+            var studentSolution = textarea.value.trim();
+            if (!studentSolution) return;
+
+            submitBtn.disabled = true;
+            textarea.disabled = true;
+            spinnerEl.style.display = "";
+
+            var subjectId = "calculus";
+            if (_lastResult && _lastResult.run_meta && _lastResult.run_meta.subject_id) {
+                subjectId = _lastResult.run_meta.subject_id;
+            }
+            var subjectSelect = $("subject-select");
+            if (subjectSelect && subjectSelect.value) {
+                subjectId = subjectSelect.value;
+            }
+
+            var weaknessCode = problem.weakness_code || problem.difficulty_label || "";
+
+            var formData = new FormData();
+            formData.append("problem_text", problem.problem_text);
+            formData.append("student_solution", studentSolution);
+            formData.append("subject_id", subjectId);
+            formData.append("related_weakness_code", weaknessCode);
+
+            var self = this;
+
+            fetch("/practice/verify", { method: "POST", body: formData })
+                .then(function (resp) {
+                    if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
+                    return resp;
+                })
+                .then(function (resp) {
+                    return _readPracticeSSE(
+                        resp,
+                        function (progress) {
+                            var detail = progress.detail || progress.message || "";
+                            if (detail) spinnerEl.innerHTML = '<span class="spinner-small"></span> ' + esc(detail);
+                        },
+                        function (result) {
+                            spinnerEl.style.display = "none";
+                            self._showResult(index, result);
+                            self._submitted[index] = true;
+                            submitBtn.disabled = true;
+                            textarea.disabled = true;
+                            if (typeof MasteryModule !== "undefined" && MasteryModule.recordPractice) {
+                                MasteryModule.recordPractice(weaknessCode, result.all_correct);
+                            }
+                        },
+                        function (errMsg) {
+                            spinnerEl.style.display = "none";
+                            resultEl.innerHTML = '<p class="practice-error-text">' + esc(errMsg || "验证失败，请重试。") + "</p>";
+                            resultEl.style.display = "";
+                            textarea.disabled = false;
+                            submitBtn.disabled = false;
+                            delete self._submitted[index];
+                        }
+                    );
+                })
+                .catch(function (err) {
+                    spinnerEl.style.display = "none";
+                    resultEl.innerHTML = '<p class="practice-error-text">' + esc(err.message || "网络错误，请重试。") + "</p>";
+                    resultEl.style.display = "";
+                    textarea.disabled = false;
+                    submitBtn.disabled = false;
+                    delete self._submitted[index];
+                });
+        },
+
+        _showResult: function (index, result) {
+            var resultEl = $("practice-result-" + index);
+            var html = "";
+
+            if (result.all_correct) {
+                resultEl.className = "practice-result correct";
+                html += '<p class="practice-result-summary">所有步骤正确！做得好！</p>';
+            } else {
+                resultEl.className = "practice-result incorrect";
+                if (result.summary) html += '<p class="practice-result-summary">' + esc(result.summary) + "</p>";
+                if (result.hint) html += '<p class="practice-hint">' + esc(result.hint) + "</p>";
+                var steps = result.step_results || result.steps;
+                if (steps && steps.length) {
+                    html += '<div class="practice-steps">';
+                    steps.forEach(function (step, si) {
+                        var isCorrect = step.label === "correct";
+                        var stepClass = isCorrect ? "step-correct" : "step-incorrect";
+                        var stepLabel = isCorrect ? "正确" : "有误";
+                        html += '<div class="practice-step-result ' + stepClass + '">';
+                        html += '<span class="step-label">' + (si + 1) + ". " + stepLabel + "</span>";
+                        if (step.text) html += '<span class="step-text">' + esc(step.text) + "</span>";
+                        html += "</div>";
+                    });
+                    html += "</div>";
+                }
+            }
+
+            resultEl.innerHTML = html;
+            resultEl.style.display = "";
+            renderAllMath(resultEl);
+        }
+    };
+
+    function _readPracticeSSE(response, onProgress, onResult, onError) {
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder("utf-8");
+        var buffer = "";
+
+        function readNext() {
+            return reader.read().then(function (chunk) {
+                if (chunk.done) { onError("连接中断，请重试。"); return; }
+                buffer += decoder.decode(chunk.value, { stream: true });
+                var lines = buffer.split("\n");
+                buffer = lines.pop();
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line.indexOf("data: ") === 0) {
+                        try {
+                            var data = JSON.parse(line.substring(6));
+                            if (data.type === "progress") onProgress(data);
+                            else if (data.type === "result") { onResult(data); return; }
+                            else if (data.type === "error") { onError(data.message); return; }
+                        } catch (e) {}
+                    }
+                }
+                return readNext();
+            });
+        }
+        return readNext();
+    }
+
+    /* ===== Mastery Module ===== */
+    var _humanizeErrorCode = function (code) {
+        var map = {
+            CHAIN_RULE_MISUSE: "链式法则误用",
+            SUBSTITUTION_MAPPING_MISMATCH: "换元映射错误",
+            SIGN_ARITHMETIC_ERROR: "符号/算术错误",
+            COEFFICIENT_OMISSION: "系数遗漏",
+            FINAL_CALCULATION_ERROR: "最终计算错误",
+            DOMAIN_CONDITION_IGNORED: "定义域/条件忽略",
+            OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL: "导数/积分混淆",
+            UNSUPPORTED_JUMP: "无依据跳跃",
+            NOTATION_UNCLEAR: "符号不清晰"
+        };
+        return map[code] || code;
+    };
+
+    var MasteryModule = {
+        STORAGE_KEY: "stem_tutor_mastery",
+
+        getData: function () {
+            try { return JSON.parse(localStorage.getItem(this.STORAGE_KEY)) || { errors: {}, practice_history: [] }; }
+            catch (e) { return { errors: {}, practice_history: [] }; }
+        },
+
+        saveData: function (data) {
+            try { localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data)); }
+            catch (e) {}
+        },
+
+        recordEncounter: function (errorCode) {
+            if (!errorCode) return;
+            var data = this.getData();
+            if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
+            data.errors[errorCode].total++;
+            data.errors[errorCode].timestamps.push(Date.now());
+            this.saveData(data);
+        },
+
+        toggleMastered: function (errorCode) {
+            if (!errorCode) return;
+            var data = this.getData();
+            if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
+            data.errors[errorCode].mastered = !data.errors[errorCode].mastered;
+            this.saveData(data);
+        },
+
+        recordPractice: function (weaknessCode, correct) {
+            if (!weaknessCode) return;
+            var data = this.getData();
+            data.practice_history = data.practice_history || [];
+            data.practice_history.push({ code: weaknessCode, correct: correct, ts: Date.now() });
+            if (data.practice_history.length > 200) data.practice_history = data.practice_history.slice(-200);
+            if (correct) {
+                if (!data.errors[weaknessCode]) data.errors[weaknessCode] = { total: 0, mastered: false, timestamps: [] };
+                data.errors[weaknessCode].mastered = true;
+            }
+            this.saveData(data);
+        },
+
+        renderProfile: function () {
+            var container = $("stats-panel-profile");
+            if (!container) return;
+            var data = this.getData();
+            var errorKeys = Object.keys(data.errors);
+            var emptyEl = container.querySelector(".profile-empty");
+            var contentEl = container.querySelector(".profile-content");
+            if (!errorKeys.length) {
+                if (emptyEl) emptyEl.style.display = "";
+                if (contentEl) contentEl.style.display = "none";
+                return;
+            }
+            if (emptyEl) emptyEl.style.display = "none";
+            if (contentEl) contentEl.style.display = "";
+
+            var radarCanvas = $("mastery-radar-chart");
+            if (radarCanvas && window.Chart) {
+                var labels = errorKeys.map(function (k) { return _humanizeErrorCode(k); });
+                var totalData = errorKeys.map(function (k) { return data.errors[k].total; });
+                var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered; }).length;
+
+                if (radarCanvas._chart) radarCanvas._chart.destroy();
+                radarCanvas._chart = new Chart(radarCanvas.getContext("2d"), {
+                    type: "radar",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "出现次数",
+                            data: totalData,
+                            backgroundColor: "rgba(37,99,235,0.15)",
+                            borderColor: "rgba(37,99,235,0.8)",
+                            borderWidth: 2,
+                            pointBackgroundColor: "rgba(37,99,235,1)"
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            var progressList = container.querySelector(".mastery-progress-list");
+            if (progressList) {
+                var phtml = "";
+                errorKeys.forEach(function (code) {
+                    var e = data.errors[code];
+                    var human = _humanizeErrorCode(code);
+                    var statusText = e.mastered ? "已掌握" : "学习中";
+                    var statusClass = e.mastered ? "mastered" : "learning";
+                    phtml += '<div class="mastery-item">';
+                    phtml += '<div class="mastery-label">' + esc(human) + '</div>';
+                    phtml += '<div class="mastery-bar-bg"><div class="mastery-bar-fill ' + statusClass + '" style="width:' + (e.mastered ? 100 : Math.min(e.total * 20, 80)) + '%;"></div></div>';
+                    phtml += '<div class="mastery-status ' + statusClass + '">' + statusText + ' (' + e.total + '次)</div>';
+                    phtml += "</div>";
+                });
+                progressList.innerHTML = phtml;
+            }
+
+            var milestonesList = container.querySelector(".milestones-list");
+            if (milestonesList) {
+                var totalEncounters = 0;
+                errorKeys.forEach(function (k) { totalEncounters += data.errors[k].total; });
+                var totalMastered = masteredCount;
+                var totalPractice = (data.practice_history || []).length;
+                var correctPractice = (data.practice_history || []).filter(function (p) { return p.correct; }).length;
+                var milestones = [
+                    { title: "初次诊断", desc: "完成第一次错误诊断", achieved: totalEncounters >= 1 },
+                    { title: "五次诊断", desc: "累计 5 次错误诊断", achieved: totalEncounters >= 5 },
+                    { title: "首次掌握", desc: "标记第一个概念为已掌握", achieved: totalMastered >= 1 },
+                    { title: "练习达人", desc: "完成 10 次练习", achieved: totalPractice >= 10 },
+                    { title: "正确率 80%", desc: "练习正确率达到 80%", achieved: totalPractice >= 5 && (correctPractice / totalPractice) >= 0.8 }
+                ];
+                var mhtml = "";
+                milestones.forEach(function (m) {
+                    mhtml += '<div class="milestone-item ' + (m.achieved ? "milestone-achieved" : "milestone-locked") + '">';
+                    mhtml += '<div class="milestone-icon">' + (m.achieved ? "&#10003;" : "&#128274;") + '</div>';
+                    mhtml += '<div class="milestone-info"><div class="milestone-title">' + esc(m.title) + '</div><div class="milestone-desc">' + esc(m.desc) + '</div></div>';
+                    mhtml += "</div>";
+                });
+                milestonesList.innerHTML = mhtml;
+            }
+        },
+
+        init: function () {
+            var tabs = document.querySelectorAll(".stats-tab");
+            var self = this;
+            tabs.forEach(function (tab) {
+                tab.addEventListener("click", function () {
+                    var target = this.getAttribute("data-tab");
+                    if (target === "profile") {
+                        setTimeout(function () { self.renderProfile(); }, 100);
+                    }
+                });
+            });
+        }
+    };
 
     document.addEventListener("DOMContentLoaded", init);
 })();

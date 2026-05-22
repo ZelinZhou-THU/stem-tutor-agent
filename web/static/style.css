@@ -4384,7 +4384,7 @@ textarea {
     border-radius: var(--radius-lg);
     width: 90vw;
     max-width: 900px;
-    max-height: 85vh;
+    height: 85vh;
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow-lg);
@@ -4396,6 +4396,7 @@ textarea {
     align-items: center;
     padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .admin-run-detail-header h4 {
@@ -4406,6 +4407,7 @@ textarea {
     padding: 20px;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
 }
 
 .admin-detail-loading {
@@ -4463,7 +4465,7 @@ textarea {
 
     .admin-run-detail-content {
         width: 95vw;
-        max-height: 90vh;
+        height: 90vh;
     }
 }
 

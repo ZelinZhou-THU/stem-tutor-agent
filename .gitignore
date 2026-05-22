@@ -44,3 +44,8 @@ key.env
 acc_plan.md
 web/static/layout_plan.md
 docs/
+
+.opencode/
+
+# Runtime data (SQLite database)
+data/

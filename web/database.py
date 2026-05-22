@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import aiosqlite
 
@@ -66,6 +67,37 @@ CREATE TABLE IF NOT EXISTS user_mastery (
 CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS batches (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    total_count INTEGER NOT NULL DEFAULT 0,
+    completed_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    settings TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS batch_items (
+    id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    problem_text TEXT NOT NULL DEFAULT '',
+    student_solution TEXT NOT NULL DEFAULT '',
+    source_type TEXT NOT NULL DEFAULT 'text',
+    run_id TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON batch_items(batch_id, seq);
+CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id, created_at DESC);
 """
 
 _initialized = False
@@ -428,5 +460,165 @@ async def save_mastery(user_id: int, data: dict) -> None:
             (user_id, json.dumps(data, ensure_ascii=False), _now_iso()),
         )
         await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Batch CRUD ──────────────────────────────────────────────────────────
+
+async def create_batch(user_id: int, settings: dict, total_count: int) -> str:
+    batch_id = str(uuid4())
+    now = _now_iso()
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT INTO batches (id, user_id, status, total_count, completed_count, failed_count, settings, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (batch_id, user_id, "pending", total_count, 0, 0, json.dumps(settings, ensure_ascii=False), now, now),
+        )
+        await db.commit()
+        return batch_id
+    finally:
+        await db.close()
+
+
+async def load_batch(batch_id: str, user_id: int) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT * FROM batches WHERE id=? AND user_id=?", (batch_id, user_id))
+        row = await cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def update_batch_status(batch_id: str, status: str) -> None:
+    now = _now_iso()
+    db = await get_db()
+    try:
+        await db.execute("UPDATE batches SET status=?, updated_at=? WHERE id=?", (status, now, batch_id))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def add_batch_items(batch_id: str, items: list[dict]) -> None:
+    db = await get_db()
+    now = _now_iso()
+    try:
+        for i, item in enumerate(items):
+            item_id = str(uuid4())
+            await db.execute(
+                "INSERT INTO batch_items (id, batch_id, seq, status, problem_text, student_solution, source_type, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (item_id, batch_id, i, "pending", item["problem_text"], item.get("student_solution", ""), item.get("source_type", "text"), now, now),
+            )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def list_batch_items(batch_id: str) -> list[dict]:
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT * FROM batch_items WHERE batch_id=? ORDER BY seq", (batch_id,))
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def update_batch_item(batch_id: str, seq: int, status: str, run_id: str | None = None, error_message: str | None = None) -> None:
+    now = _now_iso()
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE batch_items SET status=?, run_id=?, error_message=?, updated_at=? WHERE batch_id=? AND seq=?",
+            (status, run_id, error_message, now, batch_id, seq),
+        )
+        if status == "completed":
+            await db.execute("UPDATE batches SET completed_count = completed_count + 1, updated_at=? WHERE id=?", (now, batch_id))
+        elif status == "failed":
+            await db.execute("UPDATE batches SET failed_count = failed_count + 1, updated_at=? WHERE id=?", (now, batch_id))
+        done_row = await (await db.execute("SELECT completed_count + failed_count FROM batches WHERE id=?", (batch_id,))).fetchone()
+        total_row = await (await db.execute("SELECT total_count FROM batches WHERE id=?", (batch_id,))).fetchone()
+        if done_row and total_row and done_row[0] >= total_row[0]:
+            await db.execute("UPDATE batches SET status='completed', updated_at=? WHERE id=?", (now, batch_id))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def claim_next_pending_item(batch_id: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM batch_items WHERE batch_id=? AND status='pending' ORDER BY seq LIMIT 1",
+            (batch_id,),
+        )
+        row = await cur.fetchone()
+        if not row:
+            return None
+        now = _now_iso()
+        await db.execute(
+            "UPDATE batch_items SET status='running', updated_at=? WHERE batch_id=? AND seq=?",
+            (now, batch_id, row["seq"]),
+        )
+        await db.commit()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def list_batches(user_id: int, status: str | None = None, page: int = 1, per_page: int = 20) -> dict:
+    db = await get_db()
+    try:
+        where = "WHERE user_id=?"
+        params: list[Any] = [user_id]
+        if status:
+            where += " AND status=?"
+            params.append(status)
+        count_cur = await db.execute(f"SELECT COUNT(*) FROM batches {where}", params)
+        total = (await count_cur.fetchone())[0]
+        params.extend([per_page, (page - 1) * per_page])
+        cur = await db.execute(
+            f"SELECT * FROM batches {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params,
+        )
+        rows = await cur.fetchall()
+        return {"batches": [dict(r) for r in rows], "total": total, "page": page, "per_page": per_page}
+    finally:
+        await db.close()
+
+
+async def delete_batch(batch_id: str, user_id: int) -> None:
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM batch_items WHERE batch_id=?", (batch_id,))
+        await db.execute("DELETE FROM batches WHERE id=? AND user_id=?", (batch_id, user_id))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def recover_stale_running_items() -> int:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "UPDATE batch_items SET status='pending', updated_at=? WHERE status='running'",
+            (_now_iso(),),
+        )
+        await db.commit()
+        return cur.rowcount
+    finally:
+        await db.close()
+
+
+async def get_running_batches() -> list[dict]:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT * FROM batches WHERE status='running' AND completed_count + failed_count < total_count ORDER BY created_at"
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
     finally:
         await db.close()

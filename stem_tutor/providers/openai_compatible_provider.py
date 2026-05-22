@@ -26,7 +26,7 @@ def _log(msg: str) -> None:
 
 
 def _fix_json_escapes(text: str) -> str:
-    valid_escapes = set('"\\/bfnrt')
+    valid_escapes = set('"\\/bnrt')
     result = []
     i = 0
     while i < len(text):

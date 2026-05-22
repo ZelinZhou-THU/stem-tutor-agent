@@ -512,7 +512,7 @@ def _strip_markdown_fences(text: str) -> str:
 
 
 def _fix_json_escapes(text: str) -> str:
-    valid_escapes = set('"\\/bfnrt')
+    valid_escapes = set('"\\/bnrt')
     result = []
     i = 0
     while i < len(text):

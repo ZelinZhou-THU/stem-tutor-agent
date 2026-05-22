@@ -72,7 +72,7 @@
 
     /* ===== Router ===== */
     var AppRouter = {
-        pages: ["new", "history", "stats", "report", "logs", "settings"],
+        pages: ["new", "history", "stats", "report", "logs", "settings", "admin"],
         currentPage: "new",
 
         init: function () {
@@ -85,19 +85,44 @@
                 });
             });
             window.addEventListener("hashchange", function () {
-                var page = location.hash.replace("#", "") || "new";
+                var hash = location.hash.replace("#", "");
+                if (hash.startsWith("admin/user/")) {
+                    var parts = hash.split("/");
+                    var userId = parseInt(parts[2], 10);
+                    if (!isNaN(userId) && typeof AdminPanel !== "undefined") {
+                        AppRouter._showAdminPage();
+                        AdminPanel.loadUserDetail(userId);
+                    }
+                    return;
+                }
+                var page = hash || "new";
                 if (self.pages.indexOf(page) >= 0 && page !== self.currentPage) {
                     self.navigate(page, true);
                 }
             });
             var hashPage = location.hash.replace("#", "");
-            if (hashPage && this.pages.indexOf(hashPage) >= 0) {
+            if (hashPage.startsWith("admin/user/")) {
+                var parts = hashPage.split("/");
+                var userId = parseInt(parts[2], 10);
+                if (!isNaN(userId) && typeof AdminPanel !== "undefined") {
+                    this._showAdminPage();
+                    setTimeout(function () { AdminPanel.loadUserDetail(userId); }, 0);
+                }
+            } else if (hashPage && this.pages.indexOf(hashPage) >= 0) {
                 this.navigate(hashPage, true);
             }
         },
 
         navigate: function (page, skipHash) {
             if (!page || this.pages.indexOf(page) < 0) page = "new";
+            if (page === "admin") {
+                try {
+                    var currentUser = JSON.parse(localStorage.getItem("stem_tutor_user") || "null");
+                    if (!currentUser || !currentUser.is_admin) page = "new";
+                } catch (e) {
+                    page = "new";
+                }
+            }
 
             document.querySelectorAll(".page").forEach(function (el) {
                 el.classList.remove("active");
@@ -116,7 +141,8 @@
                 stats: "\u7edf\u8ba1\u6982\u89c8",
                 report: "\u5b66\u4e60\u62a5\u544a",
                 logs: "\u8c03\u8bd5\u65e5\u5fd7",
-                settings: "\u8bbe\u7f6e"
+                settings: "\u8bbe\u7f6e",
+                admin: "\u7ba1\u7406\u5458\u9762\u677f"
             };
             var titleEl = $("page-title");
             if (titleEl) titleEl.textContent = titles[page] || page;
@@ -130,6 +156,7 @@
             if (page === "report") ReportModule.init();
             if (page === "settings") SettingsModule.loadValues();
             if (page === "logs") LogsModule.init();
+            if (page === "admin" && typeof AdminPanel !== "undefined") AdminPanel.load();
             var newBtn = $("btn-new-diagnosis");
             if (newBtn) newBtn.style.display = page === "new" ? "" : "none";
         },
@@ -139,6 +166,21 @@
             var overlay = $("overlay");
             if (sidebar) sidebar.classList.remove("open");
             if (overlay) overlay.classList.remove("active");
+        },
+
+        _showAdminPage: function () {
+            document.querySelectorAll(".page").forEach(function (el) {
+                el.classList.remove("active");
+            });
+            var target = $("page-admin");
+            if (target) target.classList.add("active");
+            document.querySelectorAll(".nav-item").forEach(function (el) {
+                el.classList.toggle("active", el.getAttribute("data-page") === "admin");
+            });
+            var titleEl = $("page-title");
+            if (titleEl) titleEl.textContent = "管理员面板";
+            document.title = "管理员面板 - " + SITE_TITLE;
+            this.currentPage = "admin";
         }
     };
 
@@ -2208,8 +2250,10 @@
         updateUserDisplay: function (user) {
             var nameEl = $("user-display-name");
             var infoEl = $("user-info");
+            var adminNav = $("nav-admin");
             if (nameEl && user) nameEl.textContent = user.username || "";
             if (infoEl) infoEl.style.display = "flex";
+            if (adminNav) adminNav.style.display = user && user.is_admin ? "" : "none";
         },
 
         _bindEvents: function () {
@@ -2314,7 +2358,9 @@
             localStorage.removeItem(this.TOKEN_KEY);
             localStorage.removeItem(this.USER_KEY);
             var infoEl = $("user-info");
+            var adminNav = $("nav-admin");
             if (infoEl) infoEl.style.display = "none";
+            if (adminNav) adminNav.style.display = "none";
             this.showAuthScreen();
         },
 
@@ -2353,6 +2399,598 @@
     /* ===== Main Init ===== */
     var _authReady = false;
 
+    var AdminPanel = {
+        _loaded: false,
+        _users: [],
+        _pendingDelete: null,
+        _detailUserId: null,
+        _detailData: null,
+        _detailRunsPage: 1,
+        _detailTabsBound: false,
+
+        init: function () {
+            var self = this;
+            var refreshBtn = $("admin-refresh-btn");
+            if (refreshBtn && !refreshBtn._bound) {
+                refreshBtn._bound = true;
+                refreshBtn.addEventListener("click", function () { self.load(); });
+            }
+        },
+
+        navigateToUser: function (userId) {
+            location.hash = "admin/user/" + userId;
+        },
+
+        load: function () {
+            var self = this;
+            this.init();
+            var page = $("page-admin");
+            var loading = $("admin-loading");
+            var empty = $("admin-empty");
+            var content = $("admin-content");
+            if (page) page.style.display = "";
+            if (loading) loading.style.display = "";
+            if (empty) empty.style.display = "none";
+            if (content) content.style.display = "none";
+
+            Promise.all([
+                fetch("/api/admin/stats", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (data) {
+                        if (!r.ok) throw new Error(data.detail || data.error || "加载失败");
+                        return data;
+                    });
+                }),
+                fetch("/api/admin/users", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (data) {
+                        if (!r.ok) throw new Error(data.detail || data.error || "加载失败");
+                        return data;
+                    });
+                })
+            ]).then(function (results) {
+                var stats = results[0] || {};
+                var users = results[1] || [];
+                self._users = users;
+                self.renderStats(stats, users);
+                self.renderUsers(users);
+                if (loading) loading.style.display = "none";
+                if (content) content.style.display = "";
+                if (!users.length && empty) empty.style.display = "";
+            }).catch(function (err) {
+                if (loading) loading.style.display = "none";
+                if (empty) {
+                    empty.style.display = "";
+                    empty.innerHTML = '<p>加载失败：' + esc((err && err.message) || "未知错误") + '</p>';
+                }
+            });
+        },
+
+        loadUserDetail: function (userId) {
+            var self = this;
+            this._detailUserId = userId;
+            this._detailData = null;
+            this._detailRunsPage = 1;
+
+            $("admin-user-list").style.display = "none";
+            $("admin-user-detail").style.display = "";
+            $("admin-detail-loading").style.display = "";
+            $("admin-detail-runs").style.display = "none";
+            $("admin-detail-reports").style.display = "none";
+            $("admin-detail-chats").style.display = "none";
+            $("admin-detail-settings").style.display = "none";
+            $("admin-detail-info").style.display = "none";
+            document.querySelectorAll(".admin-detail-tab").forEach(function (t) { t.style.display = "none"; });
+
+            Promise.all([
+                fetch("/api/admin/users/" + userId, { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || d.error || "加载失败"); return d; });
+                }),
+                fetch("/api/admin/users/" + userId + "/runs?per_page=20", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || d.error || "加载失败"); return d; });
+                }),
+                fetch("/api/admin/users/" + userId + "/reports", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || d.error || "加载失败"); return d; });
+                }),
+                fetch("/api/admin/users/" + userId + "/chats", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || d.error || "加载失败"); return d; });
+                })
+            ]).then(function (results) {
+                self._detailData = {
+                    info: results[0],
+                    runs: results[1],
+                    reports: results[2],
+                    chats: results[3]
+                };
+                self._renderUserDetail(self._detailData);
+            }).catch(function (err) {
+                $("admin-detail-loading").style.display = "none";
+                $("admin-detail-runs").style.display = "";
+                $("admin-detail-runs").innerHTML = '<div class="admin-empty-hint">加载失败：' + esc(err.message || "未知错误") + '</div>';
+            });
+        },
+
+        _renderUserDetail: function (data) {
+            var user = data.info.user;
+            $("admin-detail-username").textContent = user.username + " - 用户详情";
+            $("admin-detail-id").textContent = user.id;
+            $("admin-detail-role").textContent = user.is_admin ? "管理员" : "普通用户";
+            $("admin-detail-created").textContent = formatTimestamp(user.created_at);
+            $("admin-detail-info").style.display = "";
+            $("admin-detail-loading").style.display = "none";
+            document.querySelectorAll(".admin-detail-tab").forEach(function (t) { t.style.display = ""; });
+
+            this._renderDetailRuns(data.runs);
+            this._renderDetailReports(data.reports);
+            this._renderDetailChats(data.chats);
+            this._renderDetailSettings(data.info.settings, data.info.mastery);
+
+            this._bindDetailTabs();
+            $("admin-detail-runs").style.display = "";
+            $("admin-detail-runs").classList.add("active");
+        },
+
+        _renderDetailRuns: function (runsData) {
+            var container = $("admin-runs-list");
+            var runs = runsData.runs || [];
+            if (!runs.length) {
+                container.innerHTML = '<div class="admin-empty-hint">该用户暂无运行记录</div>';
+                return;
+            }
+            var html = "";
+            runs.forEach(function (run) {
+                var badge = getStatusBadge(run.user_status || run.status);
+                html += '<div class="admin-run-card" data-run-id="' + esc(run.run_id) + '">';
+                html += '<div class="admin-run-card-header">' + esc(run.problem_preview || "无题目") + '</div>';
+                html += '<div class="admin-run-card-meta">';
+                if (run.subject_display) html += '<span>📚 ' + esc(run.subject_display) + '</span>';
+                if (run.timestamp) html += '<span>🕒 ' + esc(formatTimestamp(run.timestamp)) + '</span>';
+                html += '<span><span class="status-badge ' + badge.cls + '">' + badge.text + '</span></span>';
+                if (run.duration_seconds) html += '<span>⏱ ' + formatDuration(run.duration_seconds) + '</span>';
+                html += '</div>';
+                html += '</div>';
+            });
+            container.innerHTML = html;
+
+            var self = this;
+            container.querySelectorAll(".admin-run-card").forEach(function (card) {
+                card.addEventListener("click", function () {
+                    self._showRunDetail(card.getAttribute("data-run-id"));
+                });
+            });
+
+            this._renderDetailRunsPagination(runsData);
+        },
+
+        _renderDetailRunsPagination: function (runsData) {
+            var paginationEl = $("admin-runs-pagination");
+            if (!paginationEl) return;
+            var total = runsData.total || 0;
+            var page = runsData.page || 1;
+            var perPage = runsData.per_page || 20;
+            var totalPages = Math.ceil(total / perPage);
+
+            if (totalPages <= 1) {
+                paginationEl.style.display = "none";
+                return;
+            }
+
+            var html = '<div class="pagination-info"><span>第 ' + ((page - 1) * perPage + 1) + '-' + Math.min(page * perPage, total) + ' 条，共 ' + total + ' 条</span></div>';
+            html += '<div class="pagination-controls">';
+            html += '<button type="button" class="btn-secondary btn-sm" data-page="prev"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+            html += '<span class="pagination-pages">' + page + ' / ' + totalPages + '</span>';
+            html += '<button type="button" class="btn-secondary btn-sm" data-page="next"' + (page >= totalPages ? ' disabled' : '') + '>下一页</button>';
+            html += '</div>';
+            paginationEl.innerHTML = html;
+            paginationEl.style.display = "";
+
+            var self = this;
+            paginationEl.querySelectorAll("button[data-page]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var action = btn.getAttribute("data-page");
+                    var newPage = self._detailRunsPage;
+                    if (action === "prev") newPage = Math.max(1, page - 1);
+                    if (action === "next") newPage = Math.min(totalPages, page + 1);
+                    if (newPage !== self._detailRunsPage) {
+                        self._detailRunsPage = newPage;
+                        self._loadMoreRuns();
+                    }
+                });
+            });
+        },
+
+        _loadMoreRuns: function () {
+            var self = this;
+            var userId = this._detailUserId;
+            var page = this._detailRunsPage;
+            fetch("/api/admin/users/" + userId + "/runs?page=" + page + "&per_page=20", { headers: AuthModule.getAuthHeader() })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    self._renderDetailRuns(data);
+                });
+        },
+
+        _renderDetailReports: function (reports) {
+            var container = $("admin-reports-list");
+            if (!reports || !reports.length) {
+                container.innerHTML = '<div class="admin-empty-hint">该用户暂无学习报告</div>';
+                return;
+            }
+            var html = "";
+            reports.forEach(function (rep) {
+                var title = (rep.data && rep.data.title) || rep.title || "无标题报告";
+                var createdAt = rep.created_at || "";
+                html += '<div class="admin-report-card">';
+                html += '<div class="admin-report-card-title">' + esc(title) + '</div>';
+                html += '<div class="admin-report-card-meta">生成时间：' + esc(formatTimestamp(createdAt)) + '</div>';
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        },
+
+        _renderDetailChats: function (chats) {
+            var container = $("admin-chats-list");
+            if (!chats || !chats.length) {
+                container.innerHTML = '<div class="admin-empty-hint">该用户暂无聊天记录</div>';
+                return;
+            }
+            var html = "";
+            chats.forEach(function (chat) {
+                var messages = chat.messages || [];
+                html += '<div class="admin-chat-card" data-run-id="' + esc(chat.run_id) + '">';
+                html += '<div class="admin-chat-card-header">';
+                html += '<span class="admin-chat-run-id">Run: ' + esc(chat.run_id) + '</span>';
+                html += '<span class="admin-chat-count">' + messages.length + ' 条消息</span>';
+                html += '</div>';
+                if (messages.length) {
+                    html += '<div class="admin-chat-messages">';
+                    var displayMessages = messages.slice(-5);
+                    displayMessages.forEach(function (msg) {
+                        var role = msg.role || "user";
+                        var content = msg.content || "";
+                        var roleLabel = role === "user" ? "用户" : "AI";
+                        html += '<div class="admin-chat-bubble ' + role + '">';
+                        html += '<span class="chat-role-label">' + esc(roleLabel) + '</span>';
+                        html += esc(content.length > 200 ? content.substring(0, 200) + "..." : content);
+                        html += '</div>';
+                    });
+                    if (messages.length > 5) {
+                        html += '<div class="admin-empty-hint" style="padding:8px;">... 还有 ' + (messages.length - 5) + ' 条消息</div>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        },
+
+        _renderDetailSettings: function (settings, mastery) {
+            var settingsEl = $("admin-user-settings-content");
+            var masteryEl = $("admin-user-mastery-content");
+
+            if (settings && Object.keys(settings).length > 0) {
+                var sHtml = '<table class="admin-kv-table">';
+                Object.keys(settings).forEach(function (key) {
+                    sHtml += '<tr><td>' + esc(key) + '</td><td>' + esc(JSON.stringify(settings[key], null, 2)) + '</td></tr>';
+                });
+                sHtml += '</table>';
+                settingsEl.innerHTML = sHtml;
+            } else {
+                settingsEl.innerHTML = '<div class="admin-empty-hint">暂无设置数据</div>';
+            }
+
+            if (mastery && Object.keys(mastery).length > 0 && (Object.keys(mastery.errors || {}).length > 0 || (mastery.practice_history || []).length > 0)) {
+                var mHtml = '';
+                if (mastery.errors && Object.keys(mastery.errors).length > 0) {
+                    mHtml += '<h5 style="margin:0 0 8px;font-size:0.92rem;">错误分布</h5>';
+                    mHtml += '<table class="admin-kv-table">';
+                    Object.keys(mastery.errors).forEach(function (key) {
+                        mHtml += '<tr><td>' + esc(key) + '</td><td>' + esc(String(mastery.errors[key])) + '</td></tr>';
+                    });
+                    mHtml += '</table>';
+                }
+                if (mastery.practice_history && mastery.practice_history.length > 0) {
+                    mHtml += '<h5 style="margin:12px 0 8px;font-size:0.92rem;">练习历史 (' + mastery.practice_history.length + ' 条)</h5>';
+                    mHtml += '<table class="admin-kv-table">';
+                    var showItems = mastery.practice_history.slice(-10);
+                    showItems.forEach(function (item) {
+                        mHtml += '<tr><td colspan="2">' + esc(JSON.stringify(item)) + '</td></tr>';
+                    });
+                    if (mastery.practice_history.length > 10) {
+                        mHtml += '<tr><td colspan="2" class="admin-empty-hint">... 还有 ' + (mastery.practice_history.length - 10) + ' 条</td></tr>';
+                    }
+                    mHtml += '</table>';
+                }
+                masteryEl.innerHTML = mHtml;
+            } else {
+                masteryEl.innerHTML = '<div class="admin-empty-hint">暂无掌握度数据</div>';
+            }
+        },
+
+        _bindDetailTabs: function () {
+            if (this._detailTabsBound) return;
+            this._detailTabsBound = true;
+            var tabs = document.querySelectorAll(".admin-detail-tab");
+            var panels = ["admin-detail-runs", "admin-detail-reports", "admin-detail-chats", "admin-detail-settings"];
+            for (var i = 0; i < tabs.length; i++) {
+                (function (tab) {
+                    tab.addEventListener("click", function () {
+                        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
+                        for (var k = 0; k < panels.length; k++) $(panels[k]).classList.remove("active");
+                        tab.classList.add("active");
+                        var target = $("admin-detail-" + tab.getAttribute("data-tab"));
+                        if (target) target.classList.add("active");
+                    });
+                })(tabs[i]);
+            }
+
+            var backBtn = $("admin-detail-back");
+            if (backBtn && !backBtn._bound) {
+                backBtn._bound = true;
+                backBtn.addEventListener("click", function () {
+                    AdminPanel.showList();
+                });
+            }
+        },
+
+        showList: function () {
+            $("admin-user-detail").style.display = "none";
+            $("admin-user-list").style.display = "";
+            $("admin-run-detail-modal").style.display = "none";
+            location.hash = "admin";
+            this._detailUserId = null;
+            this._detailData = null;
+        },
+
+        _showRunDetail: function (runId) {
+            var self = this;
+            var userId = this._detailUserId;
+            if (!userId) return;
+
+            var modal = $("admin-run-detail-modal");
+            var body = $("admin-run-detail-body");
+            modal.style.display = "";
+            body.innerHTML = '<div class="admin-detail-loading">正在加载运行详情...</div>';
+
+            fetch("/api/admin/users/" + userId + "/run/" + runId, { headers: AuthModule.getAuthHeader() })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    self._renderRunDetailBody(data);
+                })
+                .catch(function (err) {
+                    body.innerHTML = '<div class="alert alert-error">加载失败: ' + esc(err.message) + '</div>';
+                });
+
+            var closeBtn = $("admin-run-detail-close");
+            if (closeBtn && !closeBtn._bound) {
+                closeBtn._bound = true;
+                closeBtn.addEventListener("click", function () {
+                    $("admin-run-detail-modal").style.display = "none";
+                });
+            }
+            modal.onclick = function (e) {
+                if (e.target === modal) modal.style.display = "none";
+            };
+        },
+
+        _renderRunDetailBody: function (data) {
+            var body = $("admin-run-detail-body");
+            var meta = data.run_meta || {};
+            var html = '';
+
+            html += '<div class="logs-meta-grid">';
+            html += '<span><b>Run ID</b>: ' + esc(meta.run_id || "-") + '</span>';
+            html += '<span><b>模式</b>: ' + esc(meta.mode || "-") + '</span>';
+            html += '<span><b>模型</b>: ' + esc(meta.model || "-") + '</span>';
+            html += '<span><b>状态</b>: ' + esc(data.user_status || data.status || "-") + '</span>';
+            if (meta.started_at) html += '<span><b>开始</b>: ' + esc(formatTimestamp(meta.started_at)) + '</span>';
+            if (meta.completed_at) html += '<span><b>完成</b>: ' + esc(formatTimestamp(meta.completed_at)) + '</span>';
+            if (meta.subject_id) html += '<span><b>学科</b>: ' + esc(meta.subject_id) + '</span>';
+            if (data.fail_reason) html += '<span><b>失败原因</b>: ' + esc(data.fail_reason) + '</span>';
+            html += '</div>';
+
+            var raw = data.raw_output || {};
+
+            if (raw.problem_input) {
+                var problemText = "";
+                if (typeof raw.problem_input === "object" && raw.problem_input.problem_text) {
+                    problemText = raw.problem_input.problem_text;
+                } else if (typeof raw.problem_input === "string") {
+                    problemText = raw.problem_input;
+                }
+                if (problemText) {
+                    html += '<div class="admin-section" style="margin-top:12px;">';
+                    html += '<h4>题目</h4>';
+                    html += '<div style="padding:8px;">' + esc(problemText) + '</div>';
+                    html += '</div>';
+                }
+            }
+
+            var steps = raw.normalized_steps || [];
+            if (steps.length) {
+                html += '<div class="admin-section" style="margin-top:12px;">';
+                html += '<h4>解题步骤 (' + steps.length + ' 步)</h4>';
+                html += '<table class="admin-table" style="margin-top:8px;">';
+                html += '<thead><tr><th>步骤</th><th>内容</th><th>标签</th><th>置信度</th></tr></thead>';
+                html += '<tbody>';
+                steps.forEach(function (s) {
+                    var label = s.label || "unverified";
+                    var labelInfo = LABEL_MAP[label] || LABEL_MAP.unverified;
+                    html += '<tr>';
+                    html += '<td>' + esc(s.step_id || "?") + '</td>';
+                    html += '<td style="max-width:400px;word-break:break-word;">' + esc(s.raw_text || s.normalized_text || "") + '</td>';
+                    html += '<td><span class="label-badge ' + labelInfo.cls + '">' + labelInfo.text + '</span></td>';
+                    html += '<td>' + (s.confidence != null ? (s.confidence * 100).toFixed(0) + "%" : "--") + '</td>';
+                    html += '</tr>';
+                    if (s.evidence && label !== "correct") {
+                        html += '<tr><td></td><td colspan="3" style="color:var(--text-secondary);font-size:0.85rem;">证据：' + esc(s.evidence) + '</td></tr>';
+                    }
+                });
+                html += '</tbody></table>';
+                html += '</div>';
+            }
+
+            var diagnoses = raw.diagnosis_results || [];
+            if (diagnoses.length) {
+                html += '<div class="admin-section" style="margin-top:12px;">';
+                html += '<h4>错误诊断</h4>';
+                diagnoses.forEach(function (d) {
+                    html += '<div class="diagnosis-card">';
+                    html += '<p class="diagnosis-step">步骤 ' + esc(d.step_id || "?") + '</p>';
+                    html += '<span class="diagnosis-code">' + esc(d.error_code || "?") + '</span> ' + esc(d.short_desc || "");
+                    if (d.category) html += '<p><span class="field-label">类别：</span>' + esc(d.category) + '</p>';
+                    if (d.root_cause_hypothesis) html += '<p><span class="field-label">根因：</span>' + esc(d.root_cause_hypothesis) + '</p>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            if (raw.final_feedback) {
+                var fb = raw.final_feedback;
+                html += '<div class="admin-section" style="margin-top:12px;">';
+                html += '<h4>学习反馈</h4>';
+                html += '<div style="padding:8px;">';
+                if (fb.concise_summary) html += '<p>' + esc(fb.concise_summary) + '</p>';
+                if (fb.next_action) html += '<p><span class="field-label">建议：</span>' + esc(fb.next_action) + '</p>';
+                html += '</div>';
+                html += '</div>';
+            }
+
+            html += '<details class="card" style="margin-top:12px;">';
+            html += '<summary>原始 JSON</summary>';
+            html += '<pre style="max-height:400px;overflow:auto;font-size:0.82rem;">' + esc(JSON.stringify(raw, null, 2)) + '</pre>';
+            html += '</details>';
+
+            body.innerHTML = html;
+
+            if (window.renderMathInElement) {
+                renderMathInElement(body, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    throwOnError: false, strict: false, trust: true
+                });
+            }
+        },
+
+        renderStats: function (stats, users) {
+            var totalUsers = users.length || stats.user_count || 0;
+            var adminCount = (users || []).filter(function (u) { return u.is_admin; }).length;
+            var runCount = stats.run_count || 0;
+            var usersEl = $("admin-stat-users");
+            var runsEl = $("admin-stat-runs");
+            var adminsEl = $("admin-stat-admins");
+            if (usersEl) usersEl.textContent = totalUsers;
+            if (runsEl) runsEl.textContent = runCount;
+            if (adminsEl) adminsEl.textContent = adminCount;
+        },
+
+        renderUsers: function (users) {
+            var body = $("admin-users-body");
+            if (!body) return;
+            if (!users || !users.length) {
+                body.innerHTML = '';
+                return;
+            }
+            var html = '';
+            users.forEach(function (user) {
+                var role = user.is_admin ? '管理员' : '用户';
+                var badge = user.is_admin ? 'status-complete' : 'status-running';
+                html += '<tr>';
+                html += '<td>' + esc(String(user.id)) + '</td>';
+                html += '<td>' + esc(user.username || '') + '</td>';
+                html += '<td><span class="status-badge ' + badge + '">' + role + '</span></td>';
+                html += '<td>' + esc(formatTimestamp(user.created_at)) + '</td>';
+                html += '<td>';
+                html += '<button type="button" class="btn-secondary btn-sm admin-view-btn" data-user-id="' + esc(String(user.id)) + '">查看</button>';
+                html += '<button type="button" class="btn-danger btn-sm admin-delete-btn" data-user-id="' + esc(String(user.id)) + '" data-username="' + esc(user.username || '') + '">删除</button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            body.innerHTML = html;
+            var self = this;
+            body.querySelectorAll('.admin-delete-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    self._openDeleteDialog({
+                        id: parseInt(this.getAttribute('data-user-id'), 10),
+                        username: this.getAttribute('data-username') || ''
+                    });
+                });
+            });
+            body.querySelectorAll('.admin-view-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var userId = parseInt(this.getAttribute('data-user-id'), 10);
+                    if (!isNaN(userId)) self.navigateToUser(userId);
+                });
+            });
+        },
+
+        _openDeleteDialog: function (user) {
+            var self = this;
+            this._pendingDelete = user;
+            var overlay = $("confirm-overlay");
+            var title = $("confirm-title");
+            var msg = $("confirm-message");
+            var ok = $("confirm-ok");
+            var cancel = $("confirm-cancel");
+            if (ok) ok.onclick = null;
+            if (cancel) cancel.onclick = null;
+            if (overlay) overlay.onclick = null;
+            if (overlay) overlay.style.display = "flex";
+            if (title) title.textContent = "删除用户";
+            if (msg) {
+                msg.innerHTML = '<div class="admin-confirm-body"><p>确定删除用户 <b>' + esc(user.username || '') + '</b> 吗？</p><label class="admin-cascade-toggle"><input type="checkbox" id="admin-cascade-checkbox" checked> 同时删除该用户的所有运行记录、聊天记录、报告、设置和 mastery 数据</label><p class="admin-confirm-note">关闭级联后只删除用户账号本身，关联数据会保留。</p></div>';
+            }
+            if (ok) ok.textContent = "确认删除";
+            if (ok) ok.onclick = function () { if (self._pendingDelete) self._confirmDelete(); };
+            if (cancel) cancel.onclick = function () { self._hideDeleteDialog(); };
+            if (overlay) overlay.onclick = function (e) { if (e && e.target === overlay) self._hideDeleteDialog(); };
+        },
+
+        _hideDeleteDialog: function () {
+            this._pendingDelete = null;
+            var overlay = $("confirm-overlay");
+            var ok = $("confirm-ok");
+            var cancel = $("confirm-cancel");
+            if (overlay) overlay.style.display = "none";
+            var msg = $("confirm-message");
+            if (msg) msg.innerHTML = '';
+            if (ok) ok.textContent = "确认删除";
+            if (ok) ok.onclick = null;
+            if (cancel) cancel.onclick = null;
+            if (overlay) overlay.onclick = null;
+        },
+
+        _confirmDelete: function () {
+            var self = this;
+            if (!this._pendingDelete) return;
+            var user = this._pendingDelete;
+            var cb = $("admin-cascade-checkbox");
+            var cascade = cb ? cb.checked : true;
+            fetch("/api/admin/users/" + user.id + "?cascade=" + (cascade ? "true" : "false"), {
+                method: "DELETE",
+                headers: AuthModule.getAuthHeader()
+            }).then(function (r) {
+                return r.json().then(function (data) {
+                    if (!r.ok) throw new Error(data.detail || data.error || "删除失败");
+                    return data;
+                });
+            }).then(function () {
+                self._hideDeleteDialog();
+                self.load();
+            }).catch(function (err) {
+                var msg = $("confirm-message");
+                if (msg) msg.innerHTML = '<div class="alert alert-error">' + esc(err.message || '删除失败') + '</div>';
+            });
+        }
+    };
+
+    window.AdminPanel = AdminPanel;
+
     function _onAuthReady() {
         if (_authReady) return;
         _authReady = true;
@@ -2363,6 +3001,7 @@
         OnboardingModule.init();
         ExportModule.init();
         MasteryModule.init();
+        AdminPanel.init();
 
         // Bind history filters
         ["history-filter-subject", "history-filter-status"].forEach(function (id) {

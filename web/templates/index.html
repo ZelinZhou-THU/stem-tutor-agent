@@ -73,6 +73,10 @@
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-text">设置</span>
             </a>
+            <a href="#admin" id="nav-admin" class="nav-item" data-page="admin" style="display:none;">
+                <span class="nav-icon">🛡️</span>
+                <span class="nav-text">管理员面板</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -809,6 +813,129 @@
                 </div>
             </section>
 
+            <!-- ==================== 管理员面板页面 ==================== -->
+            <section id="page-admin" class="page">
+                <div class="page-header-bar">
+                    <div>
+                        <h3 class="page-section-title">🛡️ 管理员面板</h3>
+                        <p class="page-section-desc">查看系统统计、用户列表并管理账户</p>
+                    </div>
+                </div>
+
+                <!-- 用户列表视图 -->
+                <div id="admin-user-list">
+                    <div id="admin-loading" class="admin-loading" style="display:none;">
+                        <div class="loading-spinner"></div>
+                        <p>正在加载管理员数据...</p>
+                    </div>
+
+                    <div id="admin-empty" class="admin-empty" style="display:none;">
+                        <p>暂无用户数据。</p>
+                    </div>
+
+                    <div id="admin-content" style="display:none;">
+                        <div class="admin-stats-grid">
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">用户总数</div>
+                                <div class="admin-stat-value" id="admin-stat-users">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">运行总数</div>
+                                <div class="admin-stat-value" id="admin-stat-runs">0</div>
+                            </div>
+                            <div class="admin-stat-card">
+                                <div class="admin-stat-label">管理员数</div>
+                                <div class="admin-stat-value" id="admin-stat-admins">0</div>
+                            </div>
+                        </div>
+
+                        <div class="admin-section">
+                            <div class="admin-section-header">
+                                <h4>用户列表</h4>
+                                <button type="button" class="btn-secondary btn-sm" id="admin-refresh-btn">刷新</button>
+                            </div>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>用户名</th>
+                                            <th>角色</th>
+                                            <th>创建时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-users-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 用户详情视图 -->
+                <div id="admin-user-detail" style="display:none;">
+                    <div class="admin-detail-header">
+                        <button type="button" class="btn-secondary" id="admin-detail-back">← 返回用户列表</button>
+                        <h3 id="admin-detail-username" class="page-section-title">用户详情</h3>
+                    </div>
+
+                    <div class="admin-detail-info" id="admin-detail-info" style="display:none;">
+                        <span class="admin-detail-info-item">ID: <b id="admin-detail-id"></b></span>
+                        <span class="admin-detail-info-item">角色: <b id="admin-detail-role"></b></span>
+                        <span class="admin-detail-info-item">注册时间: <b id="admin-detail-created"></b></span>
+                    </div>
+
+                    <div class="admin-detail-tabs">
+                        <button type="button" class="admin-detail-tab active" data-tab="runs">运行记录</button>
+                        <button type="button" class="admin-detail-tab" data-tab="reports">学习报告</button>
+                        <button type="button" class="admin-detail-tab" data-tab="chats">聊天记录</button>
+                        <button type="button" class="admin-detail-tab" data-tab="settings">设置与掌握度</button>
+                    </div>
+
+                    <div id="admin-detail-loading" class="admin-loading" style="display:none;">
+                        <div class="loading-spinner"></div>
+                        <p>正在加载用户数据...</p>
+                    </div>
+
+                    <div id="admin-detail-runs" class="admin-detail-panel active">
+                        <div id="admin-runs-list" class="admin-runs-list"></div>
+                        <div id="admin-runs-pagination" class="history-pagination" style="display:none;"></div>
+                    </div>
+
+                    <div id="admin-detail-reports" class="admin-detail-panel" style="display:none;">
+                        <div id="admin-reports-list" class="admin-reports-list"></div>
+                    </div>
+
+                    <div id="admin-detail-chats" class="admin-detail-panel" style="display:none;">
+                        <div id="admin-chats-list" class="admin-chats-list"></div>
+                    </div>
+
+                    <div id="admin-detail-settings" class="admin-detail-panel" style="display:none;">
+                        <div class="admin-settings-grid">
+                            <div class="admin-section">
+                                <h4>用户设置</h4>
+                                <div id="admin-user-settings-content"></div>
+                            </div>
+                            <div class="admin-section">
+                                <h4>掌握度数据</h4>
+                                <div id="admin-user-mastery-content"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 运行详情弹层 -->
+                    <div id="admin-run-detail-modal" class="admin-run-detail-modal" style="display:none;">
+                        <div class="admin-run-detail-content">
+                            <div class="admin-run-detail-header">
+                                <h4>运行详情</h4>
+                                <button type="button" class="btn-secondary btn-sm" id="admin-run-detail-close">关闭</button>
+                            </div>
+                            <div id="admin-run-detail-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </div>
 
         <footer class="main-footer">
@@ -831,7 +958,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=9"></script>
+    <script src="/static/app.js?v=10"></script>
 
     <div id="confirm-overlay" class="confirm-overlay" style="display:none;">
         <div class="confirm-dialog">

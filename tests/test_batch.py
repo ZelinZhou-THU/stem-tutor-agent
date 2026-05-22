@@ -7,6 +7,7 @@ import os
 import pytest
 
 import web.database as db
+import web.database as db_mod
 
 _test_db = os.path.join(os.path.dirname(__file__), "_test_batch.db")
 
@@ -129,3 +130,33 @@ async def test_recover_stale_running_items():
     assert n >= 1
     rows = await db.list_batch_items(batch_id)
     assert rows[0]["status"] == "pending"
+
+
+async def _mock_stream(**kwargs):
+    import json as _json
+    yield f'data: {_json.dumps({"type": "start", "run_id": "mock-run-id"}, ensure_ascii=False)}\n\n'
+    yield f'data: {_json.dumps({"type": "result", "data": {"run_id": "mock-run-id", "status": "success"}}, ensure_ascii=False)}\n\n'
+    yield f'data: {_json.dumps({"type": "done", "message": "done"}, ensure_ascii=False)}\n\n'
+
+
+@pytest.mark.asyncio
+async def test_worker_processes_batch(tmp_path, monkeypatch):
+    import web.batch_worker
+    monkeypatch.setattr(web.batch_worker, "run_stem_tutor_stream", _mock_stream)
+    from web.batch_worker import BatchWorker
+
+    db_path = tmp_path / "test_worker.db"
+    monkeypatch.setattr(db, "DB_PATH", db_path)
+    db._initialized = False
+    await db._ensure_db()
+
+    worker = BatchWorker()
+    batch_id = await db_mod.create_batch(user_id=1, settings={"model": "qwen/qwen3.6-plus", "subject_id": "calculus", "mode": "workflow_r1", "depth": "standard"}, total_count=1)
+    await db_mod.add_batch_items(batch_id, [{"problem_text": "1+1=?", "student_solution": "1+1=2", "source_type": "text"}])
+    await db_mod.update_batch_status(batch_id, status="running")
+    await worker._process_one_cycle()
+    items = await db_mod.list_batch_items(batch_id)
+    assert items[0]["status"] == "completed"
+    assert items[0]["run_id"] == "mock-run-id"
+    batch = await db_mod.load_batch(batch_id, user_id=1)
+    assert batch["status"] == "completed"

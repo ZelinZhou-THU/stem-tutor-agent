@@ -4851,7 +4851,8 @@
         }
 
         function _api(method, path, body) {
-            var opts = { method: method, headers: { "Authorization": "Bearer " + App.auth.token } };
+            var token = localStorage.getItem(AuthModule.TOKEN_KEY);
+            var opts = { method: method, headers: token ? { "Authorization": "Bearer " + token } : {} };
             if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
             return fetch(path, opts).then(function(r) { return r.json(); });
         }

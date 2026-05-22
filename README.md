@@ -1,6 +1,8 @@
 # 🔬 STEM Tutor Agent
 
-> AI-powered STEM tutoring system — automatically verifies student solutions, diagnoses errors, and generates personalized learning feedback
+> **Your math is wrong. Here's exactly where and why.**
+
+AI agent that verifies every step of a student solution, pinpoints the root cause of errors with SymPy symbolic math, and generates targeted practice — covering 8 STEM subjects with a full-featured web UI.
 
 **English** | [中文](README.zh-CN.md)
 
@@ -10,36 +12,54 @@
 [![SymPy](https://img.shields.io/badge/SymPy-Symbolic_Math-7744AA)](https://sympy.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-F0C802?logo=apache&logoColor=white)](LICENSE)
 
-An intelligent STEM tutoring agent built with **LangGraph** multi-strategy workflows and **SymPy** symbolic computation. Given a problem and a student's step-by-step solution, the system automatically:
+## How It Works
 
-1. **Verifies** each step with a multi-strategy chain (SymPy → numerical sampling → Agent tools → LLM → rule fallback)
-2. **Diagnoses** the root cause of errors using a structured error taxonomy with evidence chains
-3. **Generates** personalized feedback with review concepts and targeted practice problems
+```mermaid
+flowchart TD
+    A["📷 OCR / 📝 Text Input"] --> B["🔧 Parse &<br/>Normalize Steps"]
+    B -->|Parse failure| EXIT1["❌ Early Exit<br/>with failure reason"]
+    B --> C["🧠 Generate Reference<br/>Solution + Agent Tools"]
+    C --> D["✅ Verify Steps<br/>Multi-strategy Chain"]
+    D -->|All correct ✅| F["💬 Generate<br/>Learning Feedback"]
+    D -->|Errors found ❌| E["🔍 Diagnose Errors<br/>Root Cause + Taxonomy"]
+    D -->|High uncertainty ⚠️| WARN["📋 Mark as<br/>manual_review_required"]
+    E --> F
+    WARN --> F
+    F --> G["📝 Generate Review<br/>Problems"]
+    G --> H["📊 Finalize Report"]
 
-Supports **8 subjects**: Calculus, Linear Algebra, Mechanics, Electromagnetism, Optics, Quantum Mechanics, Relativity, Thermodynamics.
+    subgraph "Multi-strategy Verification Chain"
+        D
+        S1["SymPy Symbolic"] --> S2["Numerical Sampling"]
+        S2 --> S3["Agent Tools (21)"]
+        S3 --> S4["LLM Text Reasoning"]
+        S4 --> S5["Rule Fallback"]
+    end
+```
 
-## Features
+## Why STEM Tutor Agent?
 
-| Feature | Description |
-|---------|-------------|
-| Step-by-step Verification | Labels each step as `correct` / `incorrect_math` / `inconsistent_or_unsupported` / `unclear` |
-| Multi-strategy Verification Chain | SymPy symbolic → Numerical sampling → Agent tool calls → LLM text → Rule fallback |
-| Error Diagnosis | Structured error taxonomy with error codes, categories, and evidence chains |
-| Learning Feedback | Concise student-facing feedback with review concepts and next-step suggestions |
-| Review Problem Generation | Auto-generates 1–3 targeted practice problems based on weak points |
-| 8 Subjects | Calculus, Linear Algebra, Mechanics, Electromagnetism, Optics, Quantum Mechanics, Relativity, Thermodynamics |
-| Agent Tool Chain | LangGraph Agent subgraph with 21 tools (8 calculus + 11 linear algebra + 1 Python sandbox + 1 batch pipeline) |
-| OCR Recognition | Upload images for automatic transcription via vision models |
-| Crop OCR | Cropper.js image cropping before OCR, with drag-and-drop upload and camera support |
-| LaTeX Preview | Real-time KaTeX rendering of OCR results, syncs with manual edits |
-| Streaming Output | Server-Sent Events for real-time analysis progress |
-| Follow-up Chat | Continue the conversation after analysis to ask about solution details |
-| Learning Reports | Aggregate multiple diagnoses into cross-problem reports identifying knowledge gaps |
-| Batch Analysis Queue | Submit multiple problems at once; background serial processing with pause/resume/cancel |
-| Budget Management | Global budget pool + per-node time quotas; `quick` / `standard` / `thorough` depth levels |
-| User Accounts | Registration/login/session management with JWT authentication and persistent user data |
-| Admin Panel | System user management, view any user's runs/reports/chats/settings/mastery data |
-| Auto Admin Creation | First startup creates an admin account (`admin` / `admin123`) |
+Paste your solution into ChatGPT and it says *"This is incorrect."* STEM Tutor Agent says:
+
+> **Step 3 has a chain rule misuse** — you applied $\frac{d}{dx}f(g(x))$ as $f'(g(x))$ instead of $f'(g(x)) \cdot g'(x)$. This is error code `CHAIN_RULE_MISUSE`.
+
+| Generic LLM Chat | STEM Tutor Agent |
+|---|---|
+| "Your answer is wrong" | Pinpoints **exact step** with error code |
+| No structured verification | **Multi-strategy chain**: SymPy → numerical → agent tools → LLM → rules |
+| One-shot feedback | **Follow-up chat** to drill into any step |
+| No practice problems | Auto-generates **targeted review problems** based on weak points |
+| Text-only input | **OCR + image crop + LaTeX preview** |
+| No progress tracking | **Learning reports** aggregating knowledge gaps across problems |
+
+## Key Features
+
+- 🔢 **Multi-strategy Verification** — 5-layer chain (SymPy symbolic → numerical sampling → 21 agent tools → LLM reasoning → rule fallback) verifies every step with mathematical rigor
+- 🎯 **Structured Error Diagnosis** — 9 error codes across 4 categories (rule application, algebraic manipulation, theorem misuse, conceptual confusion) with evidence chains and confidence scores
+- 📝 **Targeted Practice Generation** — Auto-generates 1–3 review problems targeting identified weak points, not random exercises
+- 🧪 **8 STEM Subjects** — Calculus, Linear Algebra, Mechanics, Electromagnetism, Optics, Quantum Mechanics, Relativity, Thermodynamics with per-subject YAML configs and error taxonomy
+- 🖥️ **Full Web UI** — FastAPI + vanilla JS SPA with OCR upload (crop + drag-and-drop), KaTeX preview, SSE streaming, follow-up chat, batch queue, user accounts, and admin panel
+- ⚡ **Budget-Aware Agent** — Global budget pool + per-node time quotas; 3 depth levels (`quick` / `standard` / `thorough`) with automatic fallback to lightweight strategies
 
 ## Quick Start
 
@@ -47,27 +67,23 @@ Supports **8 subjects**: Calculus, Linear Algebra, Mechanics, Electromagnetism, 
 
 - Python 3.10+ (3.11 recommended)
 
-### Installation
+### Install & Run
 
 ```bash
 pip install -e .
-```
-
-### Run Web UI (Recommended)
-
-```bash
 python -m web.app
 ```
 
-Visit http://localhost:8000. Features: text input, OCR image upload (crop + drag-and-drop), real-time streaming analysis, auto subject detection, follow-up chat, learning reports, and batch analysis queue.
+Visit http://localhost:8000. First startup auto-creates admin account: `admin / admin123`.
 
-An admin account is auto-created on first startup: `admin / admin123`. Regular users register via the login page.
+<details>
+<summary>📖 More ways to run</summary>
 
-### One-Click Public Access
+**One-Click Public Access (Windows)**
 
-On Windows, double-click `start.bat` to launch both the local server and a Cloudflare Tunnel for automatic public URL generation (requires [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)).
+Double-click `start.bat` to launch local server + Cloudflare Tunnel for automatic public URL (requires [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)).
 
-### CLI
+**CLI**
 
 ```bash
 # Mock mode (no API key needed)
@@ -77,66 +93,15 @@ python -m cli.main --input fixtures/sample_case.json --provider mock
 python -m cli.main --input fixtures/sample_case.json --provider real --health-check
 ```
 
-### Run Tests
+**Run Tests**
 
 ```bash
 pytest -q
 ```
 
-All tests (24 files) use `tmp_path` + `monkeypatch` for database isolation and do not depend on real LLM services.
+All 24 test files use `tmp_path` + `monkeypatch` for database isolation — no real LLM services needed.
 
-## Configuration
-
-The project reads `key.env` from the workspace root (see `key.env.example`), with environment variable overrides.
-
-### Basic
-
-| Variable | Description | Default |
-|---|---|---|
-| `STEM_TUTOR_PROVIDER` | Provider type (`mock` / `openai-compatible`) | `mock` |
-| `STEM_TUTOR_SUBJECT` | Default subject | `calculus` |
-| `PARATERA_API_KEY` | LLM API key | (empty) |
-| `PARATERA_URL` | LLM API URL | (empty) |
-
-### Models
-
-| Variable | Description | Default |
-|---|---|---|
-| `STEM_TUTOR_REASONING_MODEL` | Reasoning model (reference solution generation, etc.) | `qwen/qwen3.6-plus` |
-| `STEM_TUTOR_FAST_MODEL` | Fast model (verification, diagnosis, feedback, etc.) | `deepseek/deepseek-v3.2` |
-| `STEM_TUTOR_OCR_MODEL` | OCR vision model | `qwen/qwen3.6-plus` |
-| `STEM_TUTOR_BASELINE_GLM5_MODEL` | Baseline comparison model (GLM5) | `qwen/qwen3-30b-a3b-instruct-2507` |
-| `STEM_TUTOR_BASELINE_KIMI_MODEL` | Baseline comparison model (Kimi) | `qwen/qwen3-30b-a3b-instruct-2507` |
-| `STEM_TUTOR_DETECTION_MODEL` | Subject detection model | `qwen/qwen3-30b-a3b-instruct-2507` |
-| `STEM_TUTOR_VERIFY_MODEL_GROUP` | Model group for verification | `fast` |
-| `STEM_TUTOR_VERIFY_MODEL` | Override verification model (empty = use model group) | (empty) |
-
-### Feature Flags & Parameters
-
-| Variable | Description | Default |
-|---|---|---|
-| `STEM_TUTOR_SYMPY_ENABLED` | Enable SymPy symbolic verification | `true` |
-| `STEM_TUTOR_SYMPY_TIMEOUT` | SymPy computation timeout (seconds) | `3.0` |
-| `STEM_TUTOR_TOOL_CALLING` | Enable Agent tool calling | `false` |
-| `STEM_TUTOR_DUAL_MODEL` | Enable dual-model Agent mode (separate tool-calling model) | `false` |
-| `STEM_TUTOR_BUDGET_ENABLED` | Enable global budget management | `false` |
-| `STEM_TUTOR_LOAD_LEGACY_TOOLS` | Load full tool set | `false` |
-| `STEM_TUTOR_PYTHON_EXECUTABLE` | Python sandbox interpreter path (auto-detected if empty) | (empty) |
-| `STEM_TUTOR_PYTHON_TIMEOUT` | Python sandbox timeout (seconds) | `10.0` |
-| `STEM_TUTOR_TIMEOUT` | Request timeout (seconds) | `300` |
-| `STEM_TUTOR_MAX_RETRIES` | Maximum retries | `1` |
-| `STEM_TUTOR_ALLOW_MOCK_FALLBACK` | Allow fallback to mock | `true` |
-| `STEM_TUTOR_DEPTH` | Analysis depth (`quick` / `standard` / `thorough`) | `standard` |
-| `STEM_TUTOR_SIMPLE_FASTPATH` | Enable simple question fast path | `true` |
-| `STEM_TUTOR_DETERMINISTIC_VERIFY` | Enable deterministic verification priority | `true` |
-| `STEM_TUTOR_REFERENCE_MAX_TOOL_ROUNDS` | Max tool rounds for reference solution | `1` |
-| `STEM_TUTOR_AGENT_REQUEST_TIMEOUT` | Agent request timeout (seconds) | `45` |
-| `STEM_TUTOR_AGENT_MAX_DURATION` | Agent max duration (seconds) | `90` |
-| `STEM_TUTOR_HINT_MAX_CHARS` | Max characters for computation hints | `1200` |
-| `STEM_TUTOR_INCLUDE_FAILED_HINTS` | Include failed tool results in hints | `false` |
-| `STEM_TUTOR_TOOL_RESULT_MAX_CHARS` | Tool result truncation characters | `200` |
-| `STEM_TUTOR_NODE_TIMING` | Enable node-level timing | `true` |
-| `STEM_TUTOR_PARALLEL_REVIEW` | Enable parallel review problem generation | `true` |
+</details>
 
 ## Architecture
 
@@ -155,84 +120,43 @@ stem-tutor-agent/
 │   │   ├── strategy.py      #   Multi-strategy verification chain
 │   │   └── observability.py #   Provider call tracing & uncertainty flags
 │   ├── nodes/               # Business node implementations
-│   │   ├── ocr_preprocess.py          # OCR image preprocessing
-│   │   ├── parse_student_solution.py  # Student solution step splitting
-│   │   ├── generate_reference_solution.py # LLM reference solution generation
-│   │   ├── verify_steps.py            # Step-by-step verification (core node)
-│   │   ├── diagnose_error.py          # Error root cause diagnosis
-│   │   ├── generate_feedback.py       # Learning feedback generation
-│   │   ├── generate_review_problems.py# Review problem generation
-│   │   ├── complexity_gate.py         # Problem complexity classification
-│   │   └── finalize_report.py         # Final report assembly
 │   ├── prompts/             # Prompt templates
 │   ├── providers/           # LLM provider abstraction layer
-│   │   ├── base.py          #   LLMProvider abstract base class
-│   │   ├── factory.py       #   create_provider() factory
-│   │   ├── mock_provider.py #   Deterministic mock provider
-│   │   └── openai_compatible_provider.py # OpenAI-compatible API provider
 │   ├── subjects/            # Subject configs (8 YAMLs) & auto-detection
 │   ├── taxonomy/            # Error taxonomy
-│   ├── tools/               # Agent computation tools
-│   │   ├── execute_python.py  #  General Python sandbox execution
-│   │   ├── calculus_tools.py  #  Calculus tools (deriv/integral/limit/series/eq/ODE)
-│   │   ├── matrix_tools.py    #  Linear algebra tools (matrices/eigenvalues/solve)
-│   │   └── tool_utils.py      #  Shared tool utilities
+│   ├── tools/               # Agent computation tools (21 tools)
 │   ├── evaluation/          # Evaluation framework
 │   ├── settings.py          # Config loading (env vars + key.env)
 │   └── sympy_verify.py      # SymPy symbolic verification engine
 ├── web/
-│   ├── app.py               # FastAPI route definitions (~650 LOC)
-│   ├── service.py           # Business service layer
-│   ├── models.py            # Request/response Pydantic models
-│   ├── database.py          # SQLite database CRUD (8 tables)
-│   ├── batch_worker.py      # Batch analysis background queue worker
-│   ├── auth.py              # JWT authentication (bcrypt + python-jose)
-│   ├── templates/           # Frontend HTML templates
-│   └── static/              # CSS / JS static assets
-├── cli/
-│   ├── main.py              # CLI entry point
-│   └── evaluate.py          # Evaluation CLI
-├── fixtures/                # Test samples
-├── tests/                   # Unit & integration tests (24 test files)
-└── logs/                    # Runtime logs & reports (gitignored)
+│   ├── app.py               # FastAPI routes (35+ endpoints)
+│   ├── database.py          # SQLite CRUD (8 tables)
+│   ├── auth.py              # JWT authentication
+│   ├── batch_worker.py      # Background queue worker
+│   ├── templates/           # HTML templates
+│   └── static/              # CSS / JS (vanilla SPA)
+├── cli/                     # CLI entry points
+├── tests/                   # 24 test files
+└── fixtures/                # Test samples
 ```
 
 ### Core Workflow
 
-The system is orchestrated via a LangGraph StateGraph with 8 core nodes:
+8-node LangGraph StateGraph with conditional routing:
 
-```
-OCR Preprocess → Parse Steps → Generate Reference → Verify Steps → Diagnose Errors → Generate Feedback → Generate Review → Finalize
-    (optional)    step split    +Agent tool calls    multi-strategy   root cause        learning advice      practice probs    report assembly
-                  & normalize   +key assertions      +SymPy verify    +taxonomy         +review concepts     +weak points
-```
+| Node | Role |
+|------|------|
+| `ocr_preprocess` | Image OCR preprocessing (optional) |
+| `parse_student_solution` | Split & normalize student steps |
+| `generate_reference_solution` | LLM reference + Agent tool calls |
+| `verify_steps` | Multi-strategy verification (core) |
+| `diagnose_error` | Root cause diagnosis + taxonomy |
+| `generate_feedback` | Student-facing learning feedback |
+| `generate_review_problems` | Targeted practice generation |
+| `finalize_report` | Report assembly |
 
-**Routing:**
-- **Parse failure** → early exit with failure reason
-- **All correct** → skip diagnosis, go directly to feedback
-- **Errors found** → enter diagnosis node
-- **High uncertainty** → mark as `manual_review_required` to avoid misleading
-
-**Agent Subgraph:** Reference solution generation and verification nodes can enable a LangGraph Agent subgraph that executes SymPy / Python computations via tool-calling chains, with optional dual-model mode (separate tool-calling model + reasoning model).
-
-### Database Schema
-
-SQLite database (`data/stem_tutor.db`) with 8 tables:
-
-| Table | Description |
-|-------|-------------|
-| `users` | User accounts (id, username, password_hash, is_admin, created_at) |
-| `runs` | Analysis run records (JSON data, status, subject, problem_text) |
-| `chats` | Chat history (linked by run_id, messages as JSON array) |
-| `reports` | Learning reports (JSON data, title) |
-| `user_settings` | User preferences (JSON) |
-| `user_mastery` | User mastery data (JSON) |
-| `batches` | Batch analysis batches (status, settings_json, count stats) |
-| `batch_items` | Batch items (problem_text, student_solution, status, run_id) |
-
-### Agent Tool Chain
-
-The Agent subgraph can invoke the following computation tools:
+<details>
+<summary>🔧 Agent Tool Chain (21 tools)</summary>
 
 | Module | Tool | Description |
 |--------|------|-------------|
@@ -257,9 +181,41 @@ The Agent subgraph can invoke the following computation tools:
 | | `matrix_trace` | Trace |
 | | `solve_linear_system` | Linear system solving |
 
+</details>
+
+<details>
+<summary>🗄️ Database Schema (8 tables)</summary>
+
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts (id, username, password_hash, is_admin, created_at) |
+| `runs` | Analysis run records (JSON data, status, subject, problem_text) |
+| `chats` | Chat history (linked by run_id, messages as JSON array) |
+| `reports` | Learning reports (JSON data, title) |
+| `user_settings` | User preferences (JSON) |
+| `user_mastery` | User mastery data (JSON) |
+| `batches` | Batch analysis batches (status, settings_json, count stats) |
+| `batch_items` | Batch items (problem_text, student_solution, status, run_id) |
+
+</details>
+
 ## Web API
 
-### Analysis
+### Core Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/analyze/stream` | Streaming analysis via SSE |
+| `POST` | `/analyze` | Synchronous analysis |
+| `POST` | `/chat/stream` | Streaming follow-up chat |
+| `POST` | `/ocr` | Image OCR recognition |
+| `POST` | `/detect-subject` | Auto-detect problem subject |
+| `POST` | `/report/generate` | Generate learning report |
+
+<details>
+<summary>📋 Full API Reference (35+ endpoints)</summary>
+
+**Analysis**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -268,16 +224,16 @@ The Agent subgraph can invoke the following computation tools:
 | `GET` | `/analyze/status/{run_id}` | Query run status |
 | `GET` | `/analyze/result/{run_id}` | Get run result |
 | `POST` | `/analyze/cancel/{run_id}` | Cancel running analysis |
-| `POST` | `/api/verify-step` | Single-step re-verification (for low-confidence steps) |
+| `POST` | `/api/verify-step` | Single-step re-verification |
 
-### Follow-up Chat
+**Follow-up Chat**
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/chat/stream` | Streaming follow-up chat (SSE) |
 | `GET` | `/chat/history/{run_id}` | Get chat history |
 
-### Learning Reports
+**Learning Reports**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -288,7 +244,7 @@ The Agent subgraph can invoke the following computation tools:
 | `GET` | `/report/{report_id}` | Get report details |
 | `DELETE` | `/report/{report_id}` | Delete a report |
 
-### Run Management
+**Run Management**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -297,18 +253,11 @@ The Agent subgraph can invoke the following computation tools:
 | `DELETE` | `/api/runs` | Batch delete runs |
 | `POST` | `/api/runs/cleanup` | Cleanup runs older than N days |
 
-### Utilities
+**Batch Analysis Queue**
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/ocr` | Image OCR recognition |
-| `POST` | `/detect-subject` | Auto-detect problem subject |
-
-### Batch Analysis Queue
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/batch/create` | Create batch analysis (with problem list & settings) |
+| `POST` | `/batch/create` | Create batch analysis |
 | `GET` | `/batch/list` | List current user's batches |
 | `GET` | `/batch/{batch_id}/status` | Query batch status & progress |
 | `POST` | `/batch/{batch_id}/pause` | Pause a batch |
@@ -316,7 +265,7 @@ The Agent subgraph can invoke the following computation tools:
 | `POST` | `/batch/{batch_id}/cancel` | Cancel a batch |
 | `DELETE` | `/batch/{batch_id}` | Delete a batch |
 
-### Authentication
+**Authentication**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -324,7 +273,7 @@ The Agent subgraph can invoke the following computation tools:
 | `POST` | `/api/auth/login` | Login and get JWT token |
 | `GET` | `/api/auth/me` | Get current user info |
 
-### User Settings & Mastery
+**User Settings & Mastery**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -333,22 +282,22 @@ The Agent subgraph can invoke the following computation tools:
 | `GET` | `/api/user/mastery` | Get user mastery data |
 | `POST` | `/api/user/mastery` | Update user mastery data |
 
-### Admin Endpoints (requires admin role)
+**Admin Endpoints** (requires admin role)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | List all users |
 | `GET` | `/api/admin/stats` | System statistics overview |
-| `DELETE` | `/api/admin/users/{user_id}` | Delete user (with cascade option) |
-| `GET` | `/api/admin/users/{user_id}` | User basic info + settings + mastery |
-| `GET` | `/api/admin/users/{user_id}/runs` | User's run records (paginated) |
+| `DELETE` | `/api/admin/users/{user_id}` | Delete user |
+| `GET` | `/api/admin/users/{user_id}` | User info + settings + mastery |
+| `GET` | `/api/admin/users/{user_id}/runs` | User's run records |
 | `GET` | `/api/admin/users/{user_id}/reports` | User's learning reports |
 | `GET` | `/api/admin/users/{user_id}/chats` | User's chat records |
 | `GET` | `/api/admin/users/{user_id}/settings` | User settings detail |
 | `GET` | `/api/admin/users/{user_id}/mastery` | User mastery detail |
-| `GET` | `/api/admin/users/{user_id}/run/{run_id}` | Run detail (with raw output) |
+| `GET` | `/api/admin/users/{user_id}/run/{run_id}` | Run detail with raw output |
 
-### Streaming Response Example
+**Streaming Response Example**
 
 `/analyze/stream` returns Server-Sent Events:
 
@@ -360,12 +309,70 @@ data: {"type": "node_done", "node": "parse_student_solution", "label": "Parsing 
 ...
 data: {"type": "result", "data": {...}}
 data: {"type": "done", "message": "Analysis complete"}
-
-# On user cancellation:
-data: {"type": "cancelled", "message": "Analysis cancelled"}
 ```
 
-## Data Models
+</details>
+
+## Configuration
+
+The project reads `key.env` from the workspace root (see `key.env.example`), with environment variable overrides.
+
+### Basic
+
+| Variable | Description | Default |
+|---|---|---|
+| `STEM_TUTOR_PROVIDER` | Provider type (`mock` / `openai-compatible`) | `mock` |
+| `STEM_TUTOR_SUBJECT` | Default subject | `calculus` |
+| `PARATERA_API_KEY` | LLM API key | (empty) |
+| `PARATERA_URL` | LLM API URL | (empty) |
+
+<details>
+<summary>⚙️ All Configuration Options</summary>
+
+### Models
+
+| Variable | Description | Default |
+|---|---|---|
+| `STEM_TUTOR_REASONING_MODEL` | Reasoning model (reference solution generation, etc.) | `qwen/qwen3.6-plus` |
+| `STEM_TUTOR_FAST_MODEL` | Fast model (verification, diagnosis, feedback, etc.) | `deepseek/deepseek-v3.2` |
+| `STEM_TUTOR_OCR_MODEL` | OCR vision model | `qwen/qwen3.6-plus` |
+| `STEM_TUTOR_BASELINE_GLM5_MODEL` | Baseline comparison model (GLM5) | `qwen/qwen3-30b-a3b-instruct-2507` |
+| `STEM_TUTOR_BASELINE_KIMI_MODEL` | Baseline comparison model (Kimi) | `qwen/qwen3-30b-a3b-instruct-2507` |
+| `STEM_TUTOR_DETECTION_MODEL` | Subject detection model | `qwen/qwen3-30b-a3b-instruct-2507` |
+| `STEM_TUTOR_VERIFY_MODEL_GROUP` | Model group for verification | `fast` |
+| `STEM_TUTOR_VERIFY_MODEL` | Override verification model (empty = use model group) | (empty) |
+
+### Feature Flags & Parameters
+
+| Variable | Description | Default |
+|---|---|---|
+| `STEM_TUTOR_SYMPY_ENABLED` | Enable SymPy symbolic verification | `true` |
+| `STEM_TUTOR_SYMPY_TIMEOUT` | SymPy computation timeout (seconds) | `3.0` |
+| `STEM_TUTOR_TOOL_CALLING` | Enable Agent tool calling | `false` |
+| `STEM_TUTOR_DUAL_MODEL` | Enable dual-model Agent mode | `false` |
+| `STEM_TUTOR_BUDGET_ENABLED` | Enable global budget management | `false` |
+| `STEM_TUTOR_LOAD_LEGACY_TOOLS` | Load full tool set | `false` |
+| `STEM_TUTOR_PYTHON_EXECUTABLE` | Python sandbox interpreter path | (empty) |
+| `STEM_TUTOR_PYTHON_TIMEOUT` | Python sandbox timeout (seconds) | `10.0` |
+| `STEM_TUTOR_TIMEOUT` | Request timeout (seconds) | `300` |
+| `STEM_TUTOR_MAX_RETRIES` | Maximum retries | `1` |
+| `STEM_TUTOR_ALLOW_MOCK_FALLBACK` | Allow fallback to mock | `true` |
+| `STEM_TUTOR_DEPTH` | Analysis depth (`quick` / `standard` / `thorough`) | `standard` |
+| `STEM_TUTOR_SIMPLE_FASTPATH` | Enable simple question fast path | `true` |
+| `STEM_TUTOR_DETERMINISTIC_VERIFY` | Enable deterministic verification priority | `true` |
+| `STEM_TUTOR_REFERENCE_MAX_TOOL_ROUNDS` | Max tool rounds for reference solution | `1` |
+| `STEM_TUTOR_AGENT_REQUEST_TIMEOUT` | Agent request timeout (seconds) | `45` |
+| `STEM_TUTOR_AGENT_MAX_DURATION` | Agent max duration (seconds) | `90` |
+| `STEM_TUTOR_HINT_MAX_CHARS` | Max characters for computation hints | `1200` |
+| `STEM_TUTOR_INCLUDE_FAILED_HINTS` | Include failed tool results in hints | `false` |
+| `STEM_TUTOR_TOOL_RESULT_MAX_CHARS` | Tool result truncation characters | `200` |
+| `STEM_TUTOR_NODE_TIMING` | Enable node-level timing | `true` |
+| `STEM_TUTOR_PARALLEL_REVIEW` | Enable parallel review problem generation | `true` |
+
+</details>
+
+<details>
+<summary>📊 Data Models</summary>
 
 | Model | Purpose |
 |-------|---------|
@@ -382,7 +389,10 @@ data: {"type": "cancelled", "message": "Analysis cancelled"}
 | `FeedbackPayload` | Lightweight feedback payload |
 | `ReviewProblemsPayload` | Review problems list payload |
 
-## Error Taxonomy
+</details>
+
+<details>
+<summary>🏷️ Error Taxonomy</summary>
 
 Built-in extensible error classification. Each subject can extend or override via YAML config:
 
@@ -398,25 +408,20 @@ Built-in extensible error classification. Each subject can extend or override vi
 | `UNSUPPORTED_JUMP` | Reasoning Quality Issues | Step lacks sufficient reasoning basis |
 | `NOTATION_UNCLEAR` | Reasoning Quality Issues | Ambiguous or unclear notation |
 
-## Provider Architecture
+</details>
 
-```
-LLMProvider (abstract base class)
-├── MockProvider                — Deterministic mock output for debugging & testing
-└── OpenAICompatibleProvider    — OpenAI-compatible API calls
-```
+## Evaluation
 
-Supports 4 model groups: `reasoning` / `fast` / `ocr` / `baseline`. Each node can independently configure which model group to use. The verification node additionally supports `verify` model group override.
+<details>
+<summary>📈 Evaluation Framework</summary>
 
-## Evaluation Framework
-
-### Evaluation Commands
+### Commands
 
 ```bash
 # Workflow mode evaluation
 python -m cli.evaluate --cases fixtures/eval_cases.json --provider mock --mode workflow_r1
 
-# Save evaluation results
+# Save results
 python -m cli.evaluate --cases fixtures/eval_cases.json --provider mock --mode workflow_r1 --output logs/eval/latest.json
 
 # Real model evaluation
@@ -427,7 +432,7 @@ python -m cli.evaluate --cases fixtures/eval_cases.json --provider real --mode b
 python -m cli.evaluate --cases fixtures/eval_cases.json --provider real --mode baseline_kimi
 ```
 
-### Evaluation Metrics
+### Metrics
 
 | Metric | Description |
 |--------|-------------|
@@ -441,6 +446,18 @@ python -m cli.evaluate --cases fixtures/eval_cases.json --provider real --mode b
 | `avg_low_conf_trigger_rate` | Low-confidence trigger rate |
 | `avg_real_provider_failure_rate` | Real provider failure rate |
 | `avg_uncertainty_flags` | Uncertainty flag count |
+
+</details>
+
+## Provider Architecture
+
+```
+LLMProvider (abstract base class)
+├── MockProvider                — Deterministic mock output for debugging & testing
+└── OpenAICompatibleProvider    — OpenAI-compatible API calls
+```
+
+Supports 4 model groups: `reasoning` / `fast` / `ocr` / `baseline`. Each node can independently configure which model group to use. The verification node additionally supports `verify` model group override.
 
 ## Design Principles
 

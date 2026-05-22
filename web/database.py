@@ -309,6 +309,24 @@ async def load_chat(run_id: str, user_id: int) -> list:
         await db.close()
 
 
+async def list_chats_by_user(user_id: int) -> list[dict]:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT run_id, user_id, messages, updated_at FROM chats WHERE user_id=? ORDER BY updated_at DESC",
+            (user_id,),
+        )
+        rows = await cur.fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["messages"] = json.loads(d["messages"])
+            result.append(d)
+        return result
+    finally:
+        await db.close()
+
+
 # ── Report CRUD ────────────────────────────────────────────────────────
 
 async def save_report(report_id: str, user_id: int, data: dict) -> None:

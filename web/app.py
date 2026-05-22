@@ -127,7 +127,9 @@ async def analyze(
     depth: str = Form("standard"),
     image: UploadFile | None = File(None),
     problem_image: UploadFile | None = File(None),
+    user: dict = Depends(get_current_user),
 ):
+    uid = user["id"]
     resolved_problem_text = problem_text.strip()
     ocr_model_name = None
 
@@ -154,7 +156,7 @@ async def analyze(
         image_bytes = await image.read()
 
     try:
-        result = run_stem_tutor(
+        result = await run_stem_tutor(
             problem_text=resolved_problem_text,
             raw_student_solution=student_solution,
             source_type=source_type,
@@ -165,6 +167,7 @@ async def analyze(
             subject_id=subject_id,
             mode=mode,
             depth=depth,
+            user_id=uid,
         )
         return JSONResponse(content=result)
     except Exception as exc:
@@ -182,6 +185,7 @@ async def analyze_stream(
     depth: str = Form("standard"),
     image: UploadFile | None = File(None),
     problem_image: UploadFile | None = File(None),
+    user: dict = Depends(get_current_user),
 ):
     resolved_problem_text = problem_text.strip()
     ocr_model_name = None
@@ -220,6 +224,7 @@ async def analyze_stream(
             subject_id=subject_id,
             mode=mode,
             depth=depth,
+            user_id=user["id"],
         ):
             yield chunk
 
@@ -256,24 +261,24 @@ async def detect_subject_endpoint(
 
 
 @app.get("/analyze/status/{run_id}")
-async def analyze_status(run_id: str):
-    status = _get_run_status(run_id)
+async def analyze_status(run_id: str, user: dict = Depends(get_current_user)):
+    status = await _get_run_status(run_id, user["id"])
     if status["status"] == "not_found":
         return JSONResponse(status_code=404, content=status)
     return JSONResponse(content=status)
 
 
 @app.get("/analyze/result/{run_id}")
-async def analyze_result(run_id: str):
-    result = _load_run_result(run_id)
+async def analyze_result(run_id: str, user: dict = Depends(get_current_user)):
+    result = await _load_run_result(run_id, user["id"])
     if result is None:
         return JSONResponse(status_code=404, content={"error": "结果不存在", "run_id": run_id})
     return JSONResponse(content=result)
 
 
 @app.get("/chat/history/{run_id}")
-async def chat_history(run_id: str):
-    history = _load_chat_history(run_id)
+async def chat_history(run_id: str, user: dict = Depends(get_current_user)):
+    history = await _load_chat_history(run_id, user["id"])
     return JSONResponse(content={"run_id": run_id, "messages": history})
 
 
@@ -282,13 +287,14 @@ async def chat_stream_endpoint(
     run_id: str = Form(...),
     message: str = Form(...),
     model: str = Form("DeepSeek-V3.2"),
+    user: dict = Depends(get_current_user),
 ):
-    result = _load_run_result(run_id)
+    result = await _load_run_result(run_id, user["id"])
     if result is None:
         return JSONResponse(status_code=404, content={"error": "分析结果不存在"})
 
     async def event_generator():
-        async for chunk in chat_stream(run_id, message, model_name=model):
+        async for chunk in chat_stream(run_id, message, model_name=model, user_id=user["id"]):
             yield chunk
 
     return StreamingResponse(
@@ -309,30 +315,31 @@ async def history(
     search: str | None = None,
     page: int = 1,
     per_page: int = 20,
+    user: dict = Depends(get_current_user),
 ):
-    return JSONResponse(content=list_runs(subject=subject, status=status, search=search, page=page, per_page=per_page))
+    return JSONResponse(content=await list_runs(user["id"], subject=subject, status=status, search=search, page=page, per_page=per_page))
 
 
 @app.get("/stats")
-async def stats():
-    return JSONResponse(content=get_stats())
+async def stats(user: dict = Depends(get_current_user)):
+    return JSONResponse(content=await get_stats(user["id"]))
 
 
 @app.delete("/api/runs")
-async def delete_runs_endpoint(run_ids: list[str] = Body(..., embed=True)):
-    result = delete_runs(run_ids)
+async def delete_runs_endpoint(run_ids: list[str] = Body(..., embed=True), user: dict = Depends(get_current_user)):
+    result = await delete_runs(user["id"], run_ids)
     return JSONResponse(content=result)
 
 
 @app.post("/analyze/cancel/{run_id}")
-async def cancel_run_endpoint(run_id: str):
-    ok = cancel_run(run_id)
+async def cancel_run_endpoint(run_id: str, user: dict = Depends(get_current_user)):
+    ok = await cancel_run(run_id, user["id"])
     return JSONResponse(content={"cancelled": ok})
 
 
 @app.post("/api/runs/cleanup")
-async def cleanup_runs_endpoint(before_days: int = 30):
-    result = cleanup_runs_before(before_days)
+async def cleanup_runs_endpoint(before_days: int = 30, user: dict = Depends(get_current_user)):
+    result = await cleanup_runs_before(user["id"], before_days)
     return JSONResponse(content=result)
 
 
@@ -340,9 +347,10 @@ async def cleanup_runs_endpoint(before_days: int = 30):
 async def reverify_step_endpoint(
     run_id: str = Form(...),
     step_id: str = Form(...),
+    user: dict = Depends(get_current_user),
 ):
     try:
-        result = reverify_step(run_id, step_id)
+        result = await reverify_step(run_id, step_id, user_id=user["id"])
         return JSONResponse(content=result)
     except Exception as exc:
         return JSONResponse(status_code=500, content={"success": False, "error": str(exc)})
@@ -420,8 +428,8 @@ async def practice_reference_endpoint(
 
 
 @app.get("/report/runs")
-async def report_runs_endpoint():
-    return JSONResponse(content=get_report_run_list())
+async def report_runs_endpoint(user: dict = Depends(get_current_user)):
+    return JSONResponse(content=await get_report_run_list(user["id"]))
 
 
 @app.get("/report/data")
@@ -430,9 +438,10 @@ async def report_data_endpoint(
     start_date: str | None = None,
     end_date: str | None = None,
     run_ids: str | None = None,
+    user: dict = Depends(get_current_user),
 ):
     ids = run_ids.split(",") if run_ids else None
-    return JSONResponse(content=get_report_data(days, start_date=start_date, end_date=end_date, run_ids=ids))
+    return JSONResponse(content=await get_report_data(user["id"], days, start_date=start_date, end_date=end_date, run_ids=ids))
 
 
 @app.post("/report/generate")
@@ -442,6 +451,7 @@ async def report_generate_endpoint(
     start_date: str = Form(""),
     end_date: str = Form(""),
     run_ids: str = Form(""),
+    user: dict = Depends(get_current_user),
 ):
     import logging
     logger = logging.getLogger(__name__)
@@ -451,7 +461,7 @@ async def report_generate_endpoint(
     ed = end_date or None
     logger.info("[Report] Generate request: model=%s, days=%s, start=%s, end=%s, run_ids=%s", model, days, sd, ed, ids)
 
-    data = get_report_data(days, start_date=sd, end_date=ed, run_ids=ids)
+    data = await get_report_data(user["id"], days, start_date=sd, end_date=ed, run_ids=ids)
     if data["total_runs"] < 1:
         logger.warning("[Report] No runs found for the given filter")
         return JSONResponse(status_code=400, content={"error": "暂无诊断记录，无法生成报告"})
@@ -460,7 +470,7 @@ async def report_generate_endpoint(
 
     async def event_generator():
         try:
-            async for chunk in report_stream(data, model_name=model):
+            async for chunk in report_stream(data, model_name=model, user_id=user["id"]):
                 yield chunk
         except Exception as exc:
             logger.error("[Report] event_generator error: %s", exc, exc_info=True)
@@ -479,24 +489,93 @@ async def report_generate_endpoint(
 
 
 @app.get("/report/list")
-async def report_list_endpoint(page: int = 1, per_page: int = 20):
-    return JSONResponse(content=list_reports(page, per_page))
+async def report_list_endpoint(page: int = 1, per_page: int = 20, user: dict = Depends(get_current_user)):
+    return JSONResponse(content=await list_reports(user["id"], page, per_page))
 
 
 @app.get("/report/{report_id}")
-async def report_detail_endpoint(report_id: str):
-    report = _load_report(report_id)
+async def report_detail_endpoint(report_id: str, user: dict = Depends(get_current_user)):
+    report = await _load_report(report_id, user["id"])
     if not report:
         return JSONResponse(status_code=404, content={"error": "报告不存在"})
     return JSONResponse(content=report)
 
 
 @app.delete("/report/{report_id}")
-async def report_delete_endpoint(report_id: str):
-    result = delete_reports([report_id])
+async def report_delete_endpoint(report_id: str, user: dict = Depends(get_current_user)):
+    result = await delete_reports(user["id"], [report_id])
     if result["deleted"] > 0:
         return JSONResponse(content={"ok": True})
     return JSONResponse(status_code=404, content={"error": "报告不存在"})
+
+
+@app.get("/api/user/settings")
+async def get_user_settings(user: dict = Depends(get_current_user)):
+    from web.database import get_settings as db_get_settings
+    return await db_get_settings(user["id"])
+
+
+@app.post("/api/user/settings")
+async def save_user_settings(data: dict = Body(...), user: dict = Depends(get_current_user)):
+    from web.database import save_settings as db_save_settings
+    await db_save_settings(user["id"], data)
+    return {"ok": True}
+
+
+@app.get("/api/user/mastery")
+async def get_user_mastery(user: dict = Depends(get_current_user)):
+    from web.database import get_mastery as db_get_mastery
+    return await db_get_mastery(user["id"])
+
+
+@app.post("/api/user/mastery")
+async def save_user_mastery(data: dict = Body(...), user: dict = Depends(get_current_user)):
+    from web.database import save_mastery as db_save_mastery
+    await db_save_mastery(user["id"], data)
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+async def admin_users(admin: dict = Depends(get_admin_user)):
+    from web.database import get_db
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT id, username, is_admin, created_at FROM users ORDER BY id")
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+@app.get("/api/admin/stats")
+async def admin_stats(admin: dict = Depends(get_admin_user)):
+    from web.database import get_db
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT COUNT(*) FROM users")
+        user_count = (await cur.fetchone())[0]
+        cur = await db.execute("SELECT COUNT(*) FROM runs")
+        run_count = (await cur.fetchone())[0]
+        return {"user_count": user_count, "run_count": run_count}
+    finally:
+        await db.close()
+
+
+@app.delete("/api/admin/users/{user_id}")
+async def admin_delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import get_db
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM runs WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM chats WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM reports WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM user_settings WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM user_mastery WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM users WHERE id=?", (user_id,))
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()
 
 
 if __name__ == "__main__":

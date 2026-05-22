@@ -1809,6 +1809,16 @@
             this.applyTheme(this.settings.theme);
             this.applyDefaults();
             this.bindEvents();
+            fetch("/api/user/settings", { headers: AuthModule.getAuthHeader() })
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (data) {
+                    if (data && typeof data === "object" && Object.keys(data).length > 0) {
+                        self.settings = Object.assign({}, self.defaults, data);
+                        localStorage.setItem("stem_tutor_settings", JSON.stringify(self.settings));
+                        self.applyTheme(self.settings.theme);
+                        self.applyDefaults();
+                    }
+                }).catch(function () {});
         },
 
         get: function (key) {
@@ -1818,6 +1828,11 @@
         set: function (key, value) {
             this.settings[key] = value;
             localStorage.setItem("stem_tutor_settings", JSON.stringify(this.settings));
+            fetch("/api/user/settings", {
+                method: "POST",
+                headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
+                body: JSON.stringify(this.settings)
+            }).catch(function () {});
         },
 
         applyTheme: function (theme) {
@@ -4001,14 +4016,35 @@
     var MasteryModule = {
         STORAGE_KEY: "stem_tutor_mastery",
 
+        _serverData: null,
+
         getData: function () {
+            if (this._serverData) return this._serverData;
             try { return JSON.parse(localStorage.getItem(this.STORAGE_KEY)) || { errors: {}, practice_history: [] }; }
             catch (e) { return { errors: {}, practice_history: [] }; }
         },
 
         saveData: function (data) {
+            this._serverData = data;
             try { localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data)); }
             catch (e) {}
+            fetch("/api/user/mastery", {
+                method: "POST",
+                headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
+                body: JSON.stringify(data)
+            }).catch(function () {});
+        },
+
+        loadFromServer: function () {
+            var self = this;
+            fetch("/api/user/mastery", { headers: AuthModule.getAuthHeader() })
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (data) {
+                    if (data && typeof data === "object") {
+                        self._serverData = data;
+                        localStorage.setItem(self.STORAGE_KEY, JSON.stringify(data));
+                    }
+                }).catch(function () {});
         },
 
         recordEncounter: function (errorCode) {
@@ -4144,6 +4180,7 @@
                     }
                 });
             });
+            this.loadFromServer();
         }
     };
 

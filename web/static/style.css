@@ -4627,8 +4627,10 @@ textarea {
 .batch-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .batch-items-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .batch-item-input {
-    background: var(--input-bg, #16213e); border: 1px solid var(--border-color, #333);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 8px; padding: 10px; position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
 .batch-item-input-header {
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
@@ -4644,5 +4646,5 @@ textarea {
 }
 .batch-item-input .ocr-btns button {
     font-size: 11px; padding: 2px 8px; border-radius: 4px;
-    background: var(--border-color, #333); border: none; color: var(--text-muted, #aaa); cursor: pointer;
+    background: var(--border-color); border: none; color: var(--text-muted); cursor: pointer;
 }

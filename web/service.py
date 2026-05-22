@@ -677,7 +677,8 @@ def _ocr_via_vision_api(image_bytes: bytes, settings) -> dict:
                             qs = qs / 100.0
                         qs = max(0.0, min(1.0, qs))
                         result_warnings = list(parsed.get("warnings", []))
-                        result_warnings.insert(0, f"ocr_model={model} (attempt {attempt + 1})")
+                        if model != ocr_model:
+                            result_warnings.insert(0, f"ocr_model={model} (attempt {attempt + 1})")
                         return {
                             "text": text,
                             "quality_score": qs,

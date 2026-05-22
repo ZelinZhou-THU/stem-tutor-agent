@@ -3,6 +3,8 @@
 
     var SITE_TITLE = "\u6570\u7406\u57fa\u7840\u8bfe\u7a0b\u5b66\u4e60\u8f85\u5bfc\u7cfb\u7edf";
     var _lastResult = null;
+    var cropperInstance = null;
+    var cropCallback = null;
 
     var LABEL_MAP = {
         correct: { text: "\u6b63\u786e", cls: "label-correct" },
@@ -2043,7 +2045,7 @@
             if (m) fallbackModel = m[1].split(" (")[0];
             var notice = document.createElement("div");
             notice.className = "ocr-fallback-notice";
-            notice.textContent = "\u63d0\u793a\uff1aKimi-K2.5 \u8bc6\u522b\u5931\u8d25\uff0c\u5df2\u81ea\u52a8\u5207\u6362\u81f3 " + fallbackModel + " \u6a21\u578b\u3002";
+            notice.textContent = "\u63d0\u793a\uff1a\u4e3b\u6a21\u578b\u8bc6\u522b\u5931\u8d25\uff0c\u5df2\u81ea\u52a8\u5207\u6362\u81f3 " + fallbackModel + " \u6a21\u578b\u3002";
             var existing = resultEl.querySelector(".ocr-fallback-notice");
             if (existing) existing.remove();
             resultEl.insertBefore(notice, resultEl.firstChild);
@@ -2993,6 +2995,37 @@
 
     window.AdminPanel = AdminPanel;
 
+    function openCropModal(file, callback) {
+        cropCallback = callback;
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            $("crop-image").src = e.target.result;
+            $("crop-modal").style.display = "flex";
+            if (cropperInstance) cropperInstance.destroy();
+            cropperInstance = new Cropper($("crop-image"), {
+                viewMode: 1, dragMode: "move", autoCropArea: 1.0, responsive: true,
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function closeCropModal() {
+        if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
+        $("crop-modal").style.display = "none";
+        $("crop-image").src = "";
+        cropCallback = null;
+    }
+
+    function confirmCrop() {
+        if (!cropperInstance || !cropCallback) return;
+        cropperInstance.getCroppedCanvas({ maxWidth: 2048, maxHeight: 2048, fillColor: "#fff" })
+            .toBlob(function (blob) {
+                var croppedFile = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+                cropCallback(croppedFile);
+                closeCropModal();
+            }, "image/jpeg", 0.92);
+    }
+
     function _onAuthReady() {
         if (_authReady) return;
         _authReady = true;
@@ -3094,8 +3127,6 @@
         var solutionOcrLoading = $("solution-ocr-loading");
         var solutionOcrPreview = $("solution-ocr-preview");
 
-        var cropperInstance = null;
-        var cropCallback = null;
 
         function resetForm() {
             $("problem-text").value = "";
@@ -3120,37 +3151,6 @@
             var outputArea = $("output-area");
             if (outputArea) outputArea.style.display = "none";
             errorMsg.style.display = "none";
-        }
-
-        function openCropModal(file, callback) {
-            cropCallback = callback;
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                $("crop-image").src = e.target.result;
-                $("crop-modal").style.display = "flex";
-                if (cropperInstance) cropperInstance.destroy();
-                cropperInstance = new Cropper($("crop-image"), {
-                    viewMode: 1, dragMode: "move", autoCropArea: 0.9, responsive: true,
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function closeCropModal() {
-            if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
-            $("crop-modal").style.display = "none";
-            $("crop-image").src = "";
-            cropCallback = null;
-        }
-
-        function confirmCrop() {
-            if (!cropperInstance || !cropCallback) return;
-            cropperInstance.getCroppedCanvas({ maxWidth: 2048, maxHeight: 2048, fillColor: "#fff" })
-                .toBlob(function (blob) {
-                    var croppedFile = new File([blob], "cropped.jpg", { type: "image/jpeg" });
-                    cropCallback(croppedFile);
-                    closeCropModal();
-                }, "image/jpeg", 0.92);
         }
 
         $("crop-cancel").addEventListener("click", closeCropModal);
@@ -4996,15 +4996,34 @@
                 '<div class="batch-item-input-header"><span>第 ' + (idx + 1) + ' 题</span><button class="batch-item-remove" title="删除">&times;</button></div>' +
                 '<label style="font-size:12px;color:var(--text-muted,#888)">题目</label>' +
                 '<textarea class="batch-problem-text" placeholder="输入题目文本" rows="2"></textarea>' +
-                '<div class="ocr-btns"><button class="ocr-problem-btn">📷 拍照识别</button><button class="ocr-problem-upload-btn">🖼 上传图片</button></div>' +
+                '<div class="upload-area upload-area-small batch-upload-zone" data-field="problem">' +
+                '<div class="upload-actions">' +
+                '<label class="upload-btn upload-btn-camera">拍照<input type="file" accept="image/*" capture="environment" class="batch-file-input"></label>' +
+                '<label class="upload-btn upload-btn-album">选择图片<input type="file" accept="image/*" class="batch-file-input"></label>' +
+                '</div><div class="batch-upload-hint" style="font-size:11px;margin-top:4px">或将图片拖拽到此处</div></div>' +
                 '<label style="font-size:12px;color:var(--text-muted,#888);margin-top:6px;display:block">学生解答</label>' +
                 '<textarea class="batch-solution-text" placeholder="输入学生解题步骤" rows="3"></textarea>' +
-                '<div class="ocr-btns"><button class="ocr-solution-btn">📷 拍照识别</button><button class="ocr-solution-upload-btn">🖼 上传图片</button></div>';
+                '<div class="upload-area upload-area-small batch-upload-zone" data-field="solution">' +
+                '<div class="upload-actions">' +
+                '<label class="upload-btn upload-btn-camera">拍照<input type="file" accept="image/*" capture="environment" class="batch-file-input"></label>' +
+                '<label class="upload-btn upload-btn-album">选择图片<input type="file" accept="image/*" class="batch-file-input"></label>' +
+                '</div><div class="batch-upload-hint" style="font-size:11px;margin-top:4px">或将图片拖拽到此处</div></div>';
             div.querySelector(".batch-item-remove").onclick = function() { div.remove(); _renumber(); };
-            div.querySelector(".ocr-problem-btn").onclick = function() { _ocrInput(this, "problem"); };
-            div.querySelector(".ocr-problem-upload-btn").onclick = function() { _ocrInput(this, "problem"); };
-            div.querySelector(".ocr-solution-btn").onclick = function() { _ocrInput(this, "solution"); };
-            div.querySelector(".ocr-solution-upload-btn").onclick = function() { _ocrInput(this, "solution"); };
+            var zones = div.querySelectorAll(".batch-upload-zone");
+            var inputs = div.querySelectorAll(".batch-file-input");
+            function wireZone(zone, input, field) {
+                input.addEventListener("change", function() { if (this.files[0]) _ocrWithCrop(this.files[0], zone, field); });
+                zone.addEventListener("dragover", function(e) { e.preventDefault(); zone.style.borderColor = "var(--accent)"; });
+                zone.addEventListener("dragleave", function() { zone.style.borderColor = ""; });
+                zone.addEventListener("drop", function(e) {
+                    e.preventDefault(); zone.style.borderColor = "";
+                    if (e.dataTransfer.files.length) _ocrWithCrop(e.dataTransfer.files[0], zone, field);
+                });
+            }
+            wireZone(zones[0], inputs[0], "problem");
+            wireZone(zones[0], inputs[1], "problem");
+            wireZone(zones[1], inputs[2], "solution");
+            wireZone(zones[1], inputs[3], "solution");
             list.appendChild(div);
             _updateCount();
         }
@@ -5021,25 +5040,27 @@
             document.getElementById("batch-submit-btn").disabled = n === 0;
         }
 
-        function _ocrInput(btn, field) {
-            var input = document.createElement("input");
-            input.type = "file";
-            input.accept = "image/*";
-            input.onchange = function() {
-                if (!input.files[0]) return;
-                var fd = new FormData();
-                fd.append("image", input.files[0]);
-                fd.append("model", document.getElementById("batch-model").value);
-                btn.textContent = "识别中...";
-                fetch("/ocr", { method: "POST", body: fd }).then(function(r) { return r.json(); }).then(function(data) {
-                    var text = data.text || "";
-                    var itemDiv = btn.closest(".batch-item-input");
-                    var textarea = field === "problem" ? itemDiv.querySelector(".batch-problem-text") : itemDiv.querySelector(".batch-solution-text");
-                    textarea.value = text;
-                    btn.textContent = btn.classList.contains("ocr-problem-btn") || btn.classList.contains("ocr-problem-upload-btn") ? "📷 拍照识别" : "📷 拍照识别";
-                }).catch(function() { btn.textContent = "识别失败"; });
-            };
-            input.click();
+        function _ocrWithCrop(file, zone, field) {
+            var model = document.getElementById("batch-model").value;
+            var hint = zone.querySelector(".batch-upload-hint");
+            if (hint) hint.textContent = "裁剪中...";
+            openCropModal(file, function(croppedFile) {
+                if (hint) hint.textContent = "识别中...";
+                callOcr(croppedFile, model,
+                    function(r) {
+                        var text = r.text || "";
+                        var itemDiv = zone.closest(".batch-item-input");
+                        var textarea = field === "problem" ? itemDiv.querySelector(".batch-problem-text") : itemDiv.querySelector(".batch-solution-text");
+                        textarea.value = text;
+                        if (hint) hint.textContent = "识别完成";
+                        setTimeout(function() { if (hint) hint.textContent = "或将图片拖拽到此处"; }, 1500);
+                    },
+                    function() {
+                        if (hint) hint.textContent = "识别失败，请重试";
+                        setTimeout(function() { if (hint) hint.textContent = "或将图片拖拽到此处"; }, 3000);
+                    }
+                );
+            });
         }
 
         function _submitBatch() {
@@ -5079,7 +5100,7 @@
             remove: remove,
             viewRun: viewRun,
             viewSummary: viewSummary,
-            _ocrInput: _ocrInput,
+            _ocrWithCrop: _ocrWithCrop,
         };
     })();
 })();

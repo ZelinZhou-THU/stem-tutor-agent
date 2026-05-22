@@ -4641,10 +4641,17 @@ textarea {
     width: 100%; background: transparent; border: none; color: inherit;
     font-size: 14px; resize: vertical; min-height: 50px; outline: none;
 }
-.batch-item-input .ocr-btns {
-    display: flex; gap: 6px; margin-top: 4px;
+.batch-item-input .batch-upload-zone {
+    margin-top: 4px;
+    padding: 8px 10px;
 }
-.batch-item-input .ocr-btns button {
-    font-size: 11px; padding: 2px 8px; border-radius: 4px;
-    background: var(--border-color); border: none; color: var(--text-muted); cursor: pointer;
+.batch-upload-zone .batch-upload-hint {
+    color: var(--text-muted);
+}
+.batch-upload-zone .upload-actions {
+    gap: 6px;
+}
+.batch-upload-zone .upload-btn {
+    padding: 4px 12px;
+    font-size: 12px;
 }

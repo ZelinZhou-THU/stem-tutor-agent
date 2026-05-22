@@ -6,7 +6,6 @@ import os
 import re
 import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
@@ -20,12 +19,7 @@ from stem_tutor.settings import load_provider_settings
 from stem_tutor.subjects.context import get_subject_context
 from stem_tutor.subjects.detector import VALID_SUBJECTS, detect_subject
 from stem_tutor.taxonomy.errors import lookup_error
-
-RUNS_DIR = Path(__file__).resolve().parent.parent / "logs" / "runs"
-RUNS_DIR.mkdir(parents=True, exist_ok=True)
-
-REPORTS_DIR = Path(__file__).resolve().parent.parent / "logs" / "reports"
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+from web import database
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
@@ -154,21 +148,26 @@ def _retry_sleep_seconds(attempt: int) -> float:
     return min(0.8 * (2 ** max(0, attempt - 1)), 3.0)
 
 
-def _save_run_payload(run_id: str, payload: dict) -> None:
+async def _save_run_payload(run_id: str, user_id: int, payload: dict) -> None:
     meta = payload.setdefault("run_meta", {})
     if not meta.get("run_id"):
         meta["run_id"] = run_id
     if not meta.get("completed_at"):
         meta["completed_at"] = datetime.now(timezone.utc).isoformat()
     meta["failed"] = payload.get("status") == "failed"
-    path = RUNS_DIR / f"{run_id}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+    run_status = payload.get("status", "running")
+    subject = meta.get("subject_id", "")
+    problem_text = ""
+    raw = payload.get("raw_output", {})
+    pi = raw.get("problem_input")
+    if isinstance(pi, dict):
+        problem_text = pi.get("problem_text", "")
+    await database.save_run(run_id, user_id, payload, status=run_status, subject=subject, problem_text=problem_text)
 
 
-def _save_running_placeholder(run_id: str, run_meta: dict) -> None:
-    path = RUNS_DIR / f"{run_id}.json"
-    if path.exists():
+async def _save_running_placeholder(run_id: str, user_id: int, run_meta: dict) -> None:
+    row = await database.load_run(run_id, user_id)
+    if row:
         return
     payload = {
         "first_critical_step_id": None,
@@ -189,60 +188,52 @@ def _save_running_placeholder(run_id: str, run_meta: dict) -> None:
         "raw_output": {},
         "tool_calls_log": [],
     }
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+    subject = run_meta.get("subject_id", "")
+    await database.save_run(run_id, user_id, payload, status="running", subject=subject, problem_text="")
 
 
-def _save_intermediate_state(run_id: str, accumulated_state: dict) -> None:
+async def _save_intermediate_state(run_id: str, user_id: int, accumulated_state: dict) -> None:
     response = _shape_response(accumulated_state)
     response["status"] = "running"
     response["user_status"] = ""
     meta = response.get("run_meta", {})
     meta["failed"] = False
     response["run_meta"] = meta
-    path = RUNS_DIR / f"{run_id}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(response, f, ensure_ascii=False, indent=2, default=str)
+    await database.update_run(run_id, response)
 
 
-def _save_run_state(run_id: str, state: dict):
+async def _save_run_state(run_id: str, user_id: int, state: dict):
     result = _shape_response(state)
     meta = result.get("run_meta", {})
-    meta["completed_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+    meta["completed_at"] = datetime.now(timezone.utc).isoformat()
     meta["failed"] = result.get("status") == "failed"
     result["run_meta"] = meta
-    path = RUNS_DIR / f"{run_id}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2, default=str)
+    await database.update_run(run_id, result, status=result.get("status"))
 
 
-def _save_run_error(run_id: str, error_msg: str, initial_state: dict):
+async def _save_run_error(run_id: str, user_id: int, error_msg: str, initial_state: dict):
     result = _shape_response(initial_state)
     result["status"] = "failed"
     result["fail_reason"] = error_msg
     meta = result.get("run_meta", {})
-    meta["completed_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+    meta["completed_at"] = datetime.now(timezone.utc).isoformat()
     meta["failed"] = True
     result["run_meta"] = meta
-    path = RUNS_DIR / f"{run_id}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2, default=str)
+    await database.update_run(run_id, result, status="failed")
 
 
-def _load_run_result(run_id: str) -> dict | None:
-    path = RUNS_DIR / f"{run_id}.json"
-    if not path.exists():
+async def _load_run_result(run_id: str, user_id: int) -> dict | None:
+    row = await database.load_run(run_id, user_id)
+    if not row:
         return None
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return row["data"]
 
 
-def _get_run_status(run_id: str) -> dict:
-    path = RUNS_DIR / f"{run_id}.json"
-    if not path.exists():
+async def _get_run_status(run_id: str, user_id: int) -> dict:
+    row = await database.load_run(run_id, user_id)
+    if not row:
         return {"status": "not_found", "run_id": run_id}
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = row["data"]
     meta = data.get("run_meta", {})
     user_status = data.get("user_status")
     if user_status == "complete":
@@ -754,6 +745,7 @@ def run_stem_tutor(
     subject_id: str = "calculus",
     mode: str = "workflow_r1",
     depth: str = "standard",
+    user_id: int | None = None,
 ) -> dict:
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
@@ -955,7 +947,10 @@ _SSE_HEARTBEAT_INTERVAL = 30
 _cancel_events: dict[str, "asyncio.Event"] = {}
 
 
-def cancel_run(run_id: str) -> bool:
+async def cancel_run(run_id: str, user_id: int) -> bool:
+    row = await database.load_run(run_id, user_id)
+    if not row:
+        return False
     evt = _cancel_events.get(run_id)
     if evt is None:
         return False
@@ -1001,6 +996,7 @@ async def run_stem_tutor_stream(
     subject_id: str = "calculus",
     mode: str = "workflow_r1",
     depth: str = "standard",
+    user_id: int | None = None,
 ):
     import asyncio
     import json as _json
@@ -1051,7 +1047,7 @@ async def run_stem_tutor_stream(
 
     yield f"data: {_json.dumps({'type': 'start', 'run_id': run_id, 'message': '开始分析', 'depth': depth, 'max_attempts': max_attempts}, ensure_ascii=False)}\n\n"
 
-    _save_running_placeholder(run_id, {
+    await _save_running_placeholder(run_id, user_id, {
         "run_id": run_id,
         "started_at": started_at,
         "provider": provider_info.get("provider_name", "unknown"),
@@ -1165,7 +1161,7 @@ async def run_stem_tutor_stream(
                         yield f"data: {_json.dumps(node_done_event, ensure_ascii=False)}\n\n"
 
                         try:
-                            _save_intermediate_state(run_id, accumulated_state)
+                            await _save_intermediate_state(run_id, user_id, accumulated_state)
                         except Exception:
                             pass
 
@@ -1176,7 +1172,7 @@ async def run_stem_tutor_stream(
                 cancelled_response["status"] = "cancelled"
                 cancelled_response["user_status"] = "cancelled"
                 cancelled_response["user_message"] = "分析已被用户取消"
-                _save_run_payload(run_id, cancelled_response)
+                await _save_run_payload(run_id, user_id, cancelled_response)
                 return
 
             response = _shape_response(accumulated_state)
@@ -1186,7 +1182,7 @@ async def run_stem_tutor_stream(
                 cancelled_response["status"] = "cancelled"
                 cancelled_response["user_status"] = "cancelled"
                 cancelled_response["user_message"] = "分析已被用户取消"
-                _save_run_payload(run_id, cancelled_response)
+                await _save_run_payload(run_id, user_id, cancelled_response)
             except Exception:
                 pass
             _cancel_events.pop(run_id, None)
@@ -1238,7 +1234,7 @@ async def run_stem_tutor_stream(
         if last_exc is not None:
             meta["last_error_type"] = type(last_exc).__name__
         final_response["run_meta"] = meta
-        _save_run_payload(run_id, final_response)
+        await _save_run_payload(run_id, user_id, final_response)
         yield f"data: {_json.dumps({'type': 'safe_error', 'message': final_response.get('user_message') or GENERIC_UNAVAILABLE_MESSAGE}, ensure_ascii=False)}\n\n"
         yield f"data: {_json.dumps({'type': 'result', 'data': final_response}, ensure_ascii=False)}\n\n"
         yield f"data: {_json.dumps({'type': 'done', 'message': '分析完成'}, ensure_ascii=False)}\n\n"
@@ -1247,31 +1243,25 @@ async def run_stem_tutor_stream(
     if final_state is not None:
         final_state["run_meta"] = final_response.get("run_meta", {})
 
-    _save_run_payload(run_id, final_response)
+    await _save_run_payload(run_id, user_id, final_response)
     yield f"data: {_json.dumps({'type': 'result', 'data': final_response}, ensure_ascii=False)}\n\n"
     yield f"data: {_json.dumps({'type': 'done', 'message': '分析完成'}, ensure_ascii=False)}\n\n"
     _cancel_events.pop(run_id, None)
     return
 
 
-def list_runs(
+async def list_runs(
+    user_id: int,
     subject: str | None = None,
     status: str | None = None,
     search: str | None = None,
     page: int = 1,
     per_page: int = 20,
 ) -> dict:
+    result = await database.list_runs_db(user_id, subject=subject, status=status, search=search, page=page, per_page=per_page)
     runs = []
-    if not RUNS_DIR.exists():
-        return {"runs": runs, "total": 0, "page": page, "per_page": per_page}
-
-    for path in sorted(RUNS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
-
+    for row in result["runs"]:
+        data = row["data"]
         meta = data.get("run_meta", {})
         run_status = data.get("user_status") or data.get("status", "unknown")
         if run_status == "success":
@@ -1287,23 +1277,9 @@ def list_runs(
         if isinstance(problem_input, dict):
             problem_text = problem_input.get("problem_text", "")
         if not problem_text:
-            problem_text = meta.get("problem_text", "")
+            problem_text = row.get("problem_text", "") or meta.get("problem_text", "")
 
-        subject_id = meta.get("subject_id", "")
-
-        if subject and subject_id != subject:
-            continue
-        if status:
-            if status == "complete" and run_status != "complete":
-                continue
-            if status == "failed" and run_status not in ("unavailable", "needs_review"):
-                continue
-            if status == "needs_review" and run_status != "needs_review":
-                continue
-            if status == "unavailable" and run_status != "unavailable":
-                continue
-        if search and search.lower() not in problem_text.lower():
-            continue
+        subject_id = meta.get("subject_id", "") or row.get("subject", "")
 
         started = meta.get("started_at", "")
         completed = meta.get("completed_at", "")
@@ -1326,11 +1302,11 @@ def list_runs(
             pass
 
         runs.append({
-            "run_id": meta.get("run_id", path.stem),
+            "run_id": meta.get("run_id", row.get("id", "")),
             "problem_preview": (problem_text[:80] + "...") if len(problem_text) > 80 else problem_text,
             "subject": subject_id,
             "subject_display": display_name,
-            "timestamp": completed or started or "",
+            "timestamp": completed or started or row.get("created_at", ""),
             "status": run_status,
             "user_status": data.get("user_status", run_status),
             "user_message": data.get("user_message", ""),
@@ -1340,30 +1316,15 @@ def list_runs(
             "depth": meta.get("depth", ""),
         })
 
-    total = len(runs)
-    start = (page - 1) * per_page
-    runs = runs[start:start + per_page]
-
-    return {"runs": runs, "total": total, "page": page, "per_page": per_page}
+    return {"runs": runs, "total": result["total"], "page": result["page"], "per_page": result["per_page"]}
 
 
-def delete_runs(run_ids: list[str]) -> dict:
-    deleted = 0
-    not_found = []
-    for rid in run_ids:
-        run_path = RUNS_DIR / f"{rid}.json"
-        chat_path = CHATS_DIR / f"{rid}.json"
-        if run_path.exists():
-            run_path.unlink()
-            if chat_path.exists():
-                chat_path.unlink()
-            deleted += 1
-        else:
-            not_found.append(rid)
-    return {"deleted": deleted, "not_found": not_found}
+async def delete_runs(user_id: int, run_ids: list[str]) -> dict:
+    deleted = await database.delete_runs_db(user_id, run_ids)
+    return {"deleted": deleted, "not_found": []}
 
 
-def cleanup_runs_before(days: int) -> dict:
+async def cleanup_runs_before(user_id: int, days: int) -> dict:
     from datetime import datetime, timezone, timedelta
 
     if days <= 0:
@@ -1371,27 +1332,15 @@ def cleanup_runs_before(days: int) -> dict:
     else:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-    deleted = 0
-    for path in list(RUNS_DIR.glob("*.json")):
-        try:
-            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-        except OSError:
-            continue
-        if mtime < cutoff:
-            rid = path.stem
-            path.unlink()
-            chat_path = CHATS_DIR / f"{rid}.json"
-            if chat_path.exists():
-                chat_path.unlink()
-            deleted += 1
+    deleted = await database.cleanup_runs_db(user_id, cutoff.isoformat())
     return {"deleted": deleted, "cutoff_date": cutoff.isoformat()}
 
 
-def _update_step_in_run(run_id: str, step_id: str, new_result) -> None:
-    path = RUNS_DIR / f"{run_id}.json"
-    if not path.exists():
+async def _update_step_in_run(run_id: str, user_id: int, step_id: str, new_result) -> None:
+    row = await database.load_run(run_id, user_id)
+    if not row:
         return
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = row["data"]
 
     for s in data.get("steps", []):
         if s.get("step_id") == step_id:
@@ -1412,11 +1361,11 @@ def _update_step_in_run(run_id: str, step_id: str, new_result) -> None:
         "new_result": new_result.model_dump(),
     })
 
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    await database.update_run(run_id, data)
 
 
-def reverify_step(run_id: str, step_id: str) -> dict:
-    run_data = _load_run_result(run_id)
+async def reverify_step(run_id: str, user_id: int, step_id: str) -> dict:
+    run_data = await _load_run_result(run_id, user_id)
     if not run_data:
         return {"success": False, "error": "运行记录不存在"}
 
@@ -1503,7 +1452,7 @@ def reverify_step(run_id: str, step_id: str) -> dict:
             sympy_equivalent=result.sympy_equivalent,
         )
 
-    _update_step_in_run(run_id, step_id, result)
+    await _update_step_in_run(run_id, user_id, step_id, result)
 
     return {
         "success": True,
@@ -1512,8 +1461,9 @@ def reverify_step(run_id: str, step_id: str) -> dict:
     }
 
 
-def get_stats() -> dict:
-    if not RUNS_DIR.exists():
+async def get_stats(user_id: int) -> dict:
+    all_rows = await database.get_all_runs_for_stats(user_id)
+    if not all_rows:
         return {
             "total_runs": 0, "success_count": 0, "failed_count": 0,
             "success_rate": 0, "avg_duration_seconds": 0,
@@ -1536,13 +1486,8 @@ def get_stats() -> dict:
     today_str = now.strftime("%Y-%m-%d")
     week_ago = now - timedelta(days=7)
 
-    for path in RUNS_DIR.glob("*.json"):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
-
+    for row in all_rows:
+        data = row["data"]
         meta = data.get("run_meta", {})
         run_status = data.get("user_status") or data.get("status", "unknown")
         if run_status == "success":
@@ -1621,31 +1566,17 @@ def get_stats() -> dict:
     }
 
 
-CHATS_DIR = Path(__file__).resolve().parent.parent / "logs" / "chats"
-CHATS_DIR.mkdir(parents=True, exist_ok=True)
+
+async def _load_chat_history(run_id: str, user_id: int) -> list[dict]:
+    return await database.load_chat(run_id, user_id)
 
 
-def _load_chat_history(run_id: str) -> list[dict]:
-    path = CHATS_DIR / f"{run_id}.json"
-    if not path.exists():
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data.get("messages", [])
-    except (json.JSONDecodeError, IOError):
-        return []
+async def _save_chat_history(run_id: str, user_id: int, messages: list[dict]) -> None:
+    await database.save_chat(run_id, user_id, messages)
 
 
-def _save_chat_history(run_id: str, messages: list[dict]) -> None:
-    path = CHATS_DIR / f"{run_id}.json"
-    data = {"run_id": run_id, "messages": messages}
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-
-def _build_chat_context(run_id: str) -> str:
-    result = _load_run_result(run_id)
+async def _build_chat_context(run_id: str, user_id: int) -> str:
+    result = await _load_run_result(run_id, user_id)
     if result is None:
         return ""
 
@@ -1703,20 +1634,21 @@ def _build_chat_context(run_id: str) -> str:
 
 async def chat_stream(
     run_id: str,
+    user_id: int,
     user_message: str,
     model_name: str = "DeepSeek-V3.2",
     provider_name: str = "openai-compatible",
 ):
     import json as _json
 
-    result = _load_run_result(run_id)
+    result = await _load_run_result(run_id, user_id)
     if result is None:
         yield f"data: {_json.dumps({'type': 'chat_error', 'message': '分析结果不存在'}, ensure_ascii=False)}\n\n"
         return
 
     settings = load_provider_settings()
 
-    context = _build_chat_context(run_id)
+    context = await _build_chat_context(run_id, user_id)
     system_prompt = f"""你是一位数理基础课程的辅导老师。你的职责是：
 1. 基于系统分析结果回答学生的追问
 2. 用清晰、通俗的语言解释数学概念
@@ -1727,7 +1659,7 @@ async def chat_stream(
 
 {context}"""
 
-    history = _load_chat_history(run_id)
+    history = await _load_chat_history(run_id, user_id)
 
     user_ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
     history.append({"role": "user", "content": user_message, "ts": user_ts})
@@ -1781,7 +1713,7 @@ async def chat_stream(
 
         assistant_ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
         history.append({"role": "assistant", "content": full_content, "ts": assistant_ts, "model": model_name})
-        _save_chat_history(run_id, history)
+        await _save_chat_history(run_id, user_id, history)
 
         yield f"data: {_json.dumps({'type': 'chat_done', 'message': '回复完成'}, ensure_ascii=False)}\n\n"
 
@@ -1816,24 +1748,20 @@ def _empty_report(days: int = 0) -> dict:
     }
 
 
-def get_report_run_list() -> list[dict]:
-    if not RUNS_DIR.exists():
+async def get_report_run_list(user_id: int) -> list[dict]:
+    all_rows = await database.get_all_runs_for_stats(user_id)
+    if not all_rows:
         return []
 
     runs = []
-    for path in sorted(RUNS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
-
+    for row in all_rows:
+        data = row["data"]
         meta = data.get("run_meta", {})
-        run_id = meta.get("run_id", path.stem)
-        subject_id = meta.get("subject_id", "")
+        run_id = meta.get("run_id", row.get("id", ""))
+        subject_id = meta.get("subject_id", "") or row.get("subject", "")
         started = meta.get("started_at", "")
         completed = meta.get("completed_at", "")
-        timestamp = completed or started or ""
+        timestamp = completed or started or row.get("created_at", "")
 
         display_name = subject_id
         try:
@@ -1848,7 +1776,7 @@ def get_report_run_list() -> list[dict]:
         if isinstance(problem_input, dict):
             problem_text = problem_input.get("problem_text", "")
         if not problem_text:
-            problem_text = meta.get("problem_text", "")
+            problem_text = row.get("problem_text", "") or meta.get("problem_text", "")
 
         has_errors = bool(data.get("diagnoses"))
         run_status = data.get("user_status") or data.get("status", "unknown")
@@ -1863,10 +1791,12 @@ def get_report_run_list() -> list[dict]:
             "has_errors": has_errors,
         })
 
+    runs.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
     return runs
 
 
-def get_report_data(
+async def get_report_data(
+    user_id: int,
     days: int = 30,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -1874,7 +1804,8 @@ def get_report_data(
 ) -> dict:
     from datetime import timedelta
 
-    if not RUNS_DIR.exists():
+    all_rows = await database.get_all_runs_for_stats(user_id)
+    if not all_rows:
         return _empty_report(days)
 
     now = datetime.now(timezone.utc)
@@ -1899,13 +1830,8 @@ def get_report_data(
         cutoff = now - timedelta(days=days)
 
     runs_data: list[dict] = []
-    for path in RUNS_DIR.glob("*.json"):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
-
+    for row in all_rows:
+        data = row["data"]
         meta = data.get("run_meta", {})
         run_id = meta.get("run_id", "")
         completed = meta.get("completed_at", "")
@@ -2124,7 +2050,7 @@ def get_report_data(
     }
 
 
-def _save_report(report_id: str, report_data: dict, sections: list, metadata: dict) -> None:
+async def _save_report(report_id: str, user_id: int, report_data: dict, sections: list, metadata: dict) -> None:
     import logging
     logger = logging.getLogger(__name__)
     payload = {
@@ -2136,37 +2062,24 @@ def _save_report(report_id: str, report_data: dict, sections: list, metadata: di
         "report_data": report_data,
         "sections": sections,
     }
-    path = REPORTS_DIR / f"{report_id}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-    logger.info("[Report] Saved report %s to %s", report_id, path)
+    await database.save_report(report_id, user_id, payload)
+    logger.info("[Report] Saved report %s to database", report_id)
 
 
-def _load_report(report_id: str) -> dict | None:
-    path = REPORTS_DIR / f"{report_id}.json"
-    if not path.exists():
+async def _load_report(report_id: str, user_id: int) -> dict | None:
+    row = await database.load_report(report_id, user_id)
+    if not row:
         return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return None
+    return row["data"]
 
 
-def list_reports(page: int = 1, per_page: int = 20) -> dict:
+async def list_reports(user_id: int, page: int = 1, per_page: int = 20) -> dict:
+    all_rows = await database.list_reports_db(user_id)
     reports = []
-    if not REPORTS_DIR.exists():
-        return {"reports": reports, "total": 0, "page": page, "per_page": per_page}
-
-    for path in sorted(REPORTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
-
+    for row in all_rows:
+        data = row["data"]
         reports.append({
-            "report_id": data.get("report_id", path.stem),
+            "report_id": data.get("report_id", row.get("id", "")),
             "title": data.get("title", "未命名报告"),
             "model": data.get("model", ""),
             "created_at": data.get("created_at", ""),
@@ -2184,13 +2097,12 @@ def list_reports(page: int = 1, per_page: int = 20) -> dict:
     }
 
 
-def delete_reports(report_ids: list[str]) -> dict:
+async def delete_reports(user_id: int, report_ids: list[str]) -> dict:
     deleted = 0
     not_found = []
     for rid in report_ids:
-        path = REPORTS_DIR / f"{rid}.json"
-        if path.exists():
-            path.unlink()
+        ok = await database.delete_report_db(rid, user_id)
+        if ok:
             deleted += 1
         else:
             not_found.append(rid)
@@ -2302,7 +2214,7 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     yield f"event: reference_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
 
 
-async def report_stream(data: dict, model_name: str = "qwen/qwen3.6-plus"):
+async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.6-plus"):
     import asyncio
     import json as _json
     import logging
@@ -2380,7 +2292,7 @@ async def report_stream(data: dict, model_name: str = "qwen/qwen3.6-plus"):
                 "total_runs": data.get("total_runs", 0),
             },
         }
-        _save_report(report_id, data, sections, metadata)
+        await _save_report(report_id, user_id, data, sections, metadata)
 
         for i, section in enumerate(sections):
             yield f"data: {_json.dumps({'type': 'report_section', 'index': i, 'section': section}, ensure_ascii=False)}\n\n"

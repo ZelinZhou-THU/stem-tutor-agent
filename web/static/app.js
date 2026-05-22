@@ -72,7 +72,7 @@
 
     /* ===== Router ===== */
     var AppRouter = {
-        pages: ["new", "history", "stats", "report", "logs", "settings", "admin"],
+        pages: ["new", "queue", "history", "stats", "report", "logs", "settings", "admin"],
         currentPage: "new",
 
         init: function () {
@@ -137,6 +137,7 @@
 
             var titles = {
                 new: "\u5206\u6790\u8bca\u65ad",
+                queue: "\u6279\u91cf\u961f\u5217",
                 history: "\u5386\u53f2\u8bb0\u5f55",
                 stats: "\u7edf\u8ba1\u6982\u89c8",
                 report: "\u5b66\u4e60\u62a5\u544a",
@@ -152,6 +153,7 @@
             this.currentPage = page;
 
             if (page === "history") HistoryModule.load();
+            if (page === "queue") QueueModule.load();
             if (page === "stats") StatsModule.load();
             if (page === "report") ReportModule.init();
             if (page === "settings") SettingsModule.loadValues();
@@ -4832,4 +4834,251 @@
     };
 
     document.addEventListener("DOMContentLoaded", init);
+
+    var QueueModule = (function() {
+        var _pollTimer = null;
+        var _currentBatchId = null;
+        var _expandedBatchId = null;
+
+        function _stopPoll() {
+            if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+        }
+
+        function _startPoll(batchId) {
+            _stopPoll();
+            _currentBatchId = batchId;
+            _pollTimer = setInterval(function() { _refreshStatus(batchId); }, 5000);
+        }
+
+        function _api(method, path, body) {
+            var opts = { method: method, headers: { "Authorization": "Bearer " + App.auth.token } };
+            if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+            return fetch(path, opts).then(function(r) { return r.json(); });
+        }
+
+        function load() {
+            _stopPoll();
+            _expandedBatchId = null;
+            document.getElementById("queue-filter-status").onchange = function() { _loadList(); };
+            document.getElementById("queue-new-btn").onclick = function() { _openNewModal(); };
+            _loadList();
+        }
+
+        function _loadList() {
+            var status = document.getElementById("queue-filter-status").value;
+            var params = "?per_page=50";
+            if (status) params += "&status=" + status;
+            _api("GET", "/batch/list" + params).then(function(data) {
+                _renderList(data);
+            });
+        }
+
+        function _renderList(data) {
+            var container = document.getElementById("queue-list");
+            if (!data.batches || data.batches.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-muted,#888)">暂无批量分析任务</p>';
+                return;
+            }
+            var html = "";
+            data.batches.forEach(function(b) {
+                var done = b.completed_count + b.failed_count;
+                var pct = b.total_count > 0 ? Math.round(done / b.total_count * 100) : 0;
+                var settings = typeof b.settings === "string" ? JSON.parse(b.settings) : (b.settings || {});
+                var statusClass = "batch-status-" + b.status;
+                var statusLabel = {pending:"等待中",running:"运行中",paused:"已暂停",completed:"已完成",cancelled:"已取消"}[b.status] || b.status;
+                html += '<div class="batch-card" data-batch-id="' + b.id + '">';
+                html += '<div class="batch-card-header">';
+                html += '<span class="batch-card-meta">' + (settings.subject_id || "微积分") + ' | ' + (settings.depth || "标准") + ' | ' + (b.created_at || "") + '</span>';
+                html += '<span class="batch-status-badge ' + statusClass + '">' + statusLabel + '</span>';
+                html += '</div>';
+                html += '<div class="batch-card-progress">';
+                html += '<div class="batch-progress-bar"><div class="batch-progress-fill" style="width:' + pct + '%"></div></div>';
+                html += '<div class="batch-progress-text">' + done + '/' + b.total_count + ' (' + pct + '%)</div>';
+                html += '</div>';
+                html += '<div class="batch-card-actions">';
+                if (b.status === "running") {
+                    html += '<button class="btn btn-sm" onclick="QueueModule.pause(\'' + b.id + '\')">暂停</button>';
+                    html += '<button class="btn btn-sm" onclick="QueueModule.cancel(\'' + b.id + '\')">取消</button>';
+                } else if (b.status === "paused") {
+                    html += '<button class="btn btn-sm btn-primary" onclick="QueueModule.resume(\'' + b.id + '\')">继续</button>';
+                    html += '<button class="btn btn-sm" onclick="QueueModule.cancel(\'' + b.id + '\')">取消</button>';
+                } else if (b.status === "pending") {
+                    html += '<button class="btn btn-sm btn-primary" onclick="QueueModule.start(\'' + b.id + '\')">开始</button>';
+                    html += '<button class="btn btn-sm" onclick="QueueModule.remove(\'' + b.id + '\')">删除</button>';
+                } else {
+                    if (b.status === "completed") html += '<button class="btn btn-sm" onclick="QueueModule.viewSummary(\'' + b.id + '\')">查看汇总</button>';
+                    html += '<button class="btn btn-sm" onclick="QueueModule.remove(\'' + b.id + '\')">删除</button>';
+                }
+                html += '<button class="btn btn-sm" onclick="QueueModule.toggleExpand(\'' + b.id + '\')">' + (_expandedBatchId === b.id ? '收起' : '展开详情') + '</button>';
+                html += '</div>';
+                if (_expandedBatchId === b.id) {
+                    html += '<div class="batch-item-list" id="batch-items-' + b.id + '">加载中...</div>';
+                }
+                html += '</div>';
+            });
+            container.innerHTML = html;
+            if (_expandedBatchId) {
+                _refreshStatus(_expandedBatchId);
+                if (!_pollTimer) _startPoll(_expandedBatchId);
+            }
+            data.batches.forEach(function(b) {
+                if (b.status === "running" && !_pollTimer) _startPoll(b.id);
+            });
+        }
+
+        function _refreshStatus(batchId) {
+            _api("GET", "/batch/" + batchId + "/status").then(function(data) {
+                var el = document.getElementById("batch-items-" + batchId);
+                if (!el) return;
+                var html = "";
+                (data.items || []).forEach(function(item) {
+                    var icon = {pending:"⏳",running:"🔄",completed:"✅",failed:"❌",cancelled:"🚫"}[item.status] || "⏳";
+                    html += '<div class="batch-item-row">';
+                    html += '<span class="batch-item-seq">#' + (item.seq + 1) + '</span>';
+                    html += '<span>' + icon + '</span>';
+                    if (item.status === "completed" && item.run_id) {
+                        html += '<a class="batch-item-link" onclick="QueueModule.viewRun(\'' + item.run_id + '\')">' + esc(item.problem_preview) + '</a>';
+                    } else {
+                        html += '<span class="batch-item-preview">' + esc(item.problem_preview) + '</span>';
+                    }
+                    if (item.error_message) html += '<span style="color:#ff6b6b;font-size:12px">(' + esc(item.error_message) + ')</span>';
+                    html += '</div>';
+                });
+                el.innerHTML = html || '<p style="color:var(--text-muted,#888)">暂无题目</p>';
+                if (data.status !== "running" && data.status !== "pending") {
+                    if (_currentBatchId === batchId) _stopPoll();
+                    _loadList();
+                }
+            });
+        }
+
+        function toggleExpand(batchId) {
+            _expandedBatchId = _expandedBatchId === batchId ? null : batchId;
+            _loadList();
+        }
+
+        function pause(batchId) { _api("POST", "/batch/" + batchId + "/pause").then(function() { _loadList(); }); }
+        function resume(batchId) { _api("POST", "/batch/" + batchId + "/resume").then(function() { _stopPoll(); _startPoll(batchId); _loadList(); }); }
+        function cancel(batchId) { if (confirm("确定取消此批次？")) _api("POST", "/batch/" + batchId + "/cancel").then(function() { _loadList(); }); }
+        function start(batchId) { _api("POST", "/batch/" + batchId + "/resume").then(function() { _startPoll(batchId); _loadList(); }); }
+        function remove(batchId) { if (confirm("确定删除此批次？")) _api("DELETE", "/batch/" + batchId).then(function() { _loadList(); }); }
+
+        function viewRun(runId) {
+            App.currentRunId = runId;
+            AppRouter.navigate("history");
+        }
+
+        function viewSummary(batchId) {
+            _expandedBatchId = batchId;
+            _loadList();
+        }
+
+        function _openNewModal() {
+            document.getElementById("batch-modal").style.display = "flex";
+            document.getElementById("batch-items-list").innerHTML = "";
+            document.getElementById("batch-item-count").textContent = "(0 题)";
+            document.getElementById("batch-submit-btn").disabled = true;
+            _addItem();
+            document.getElementById("batch-modal-close").onclick = function() { document.getElementById("batch-modal").style.display = "none"; };
+            document.querySelector("#batch-modal .modal-overlay").onclick = function() { document.getElementById("batch-modal").style.display = "none"; };
+            document.getElementById("batch-cancel-btn").onclick = function() { document.getElementById("batch-modal").style.display = "none"; };
+            document.getElementById("batch-add-item-btn").onclick = function() { _addItem(); };
+            document.getElementById("batch-submit-btn").onclick = function() { _submitBatch(); };
+        }
+
+        function _addItem() {
+            var list = document.getElementById("batch-items-list");
+            var idx = list.children.length;
+            var div = document.createElement("div");
+            div.className = "batch-item-input";
+            div.innerHTML =
+                '<div class="batch-item-input-header"><span>第 ' + (idx + 1) + ' 题</span><button class="batch-item-remove" title="删除">&times;</button></div>' +
+                '<label style="font-size:12px;color:var(--text-muted,#888)">题目</label>' +
+                '<textarea class="batch-problem-text" placeholder="输入题目文本" rows="2"></textarea>' +
+                '<div class="ocr-btns"><button class="ocr-problem-btn">📷 拍照识别</button><button class="ocr-problem-upload-btn">🖼 上传图片</button></div>' +
+                '<label style="font-size:12px;color:var(--text-muted,#888);margin-top:6px;display:block">学生解答</label>' +
+                '<textarea class="batch-solution-text" placeholder="输入学生解题步骤" rows="3"></textarea>' +
+                '<div class="ocr-btns"><button class="ocr-solution-btn">📷 拍照识别</button><button class="ocr-solution-upload-btn">🖼 上传图片</button></div>';
+            div.querySelector(".batch-item-remove").onclick = function() { div.remove(); _renumber(); };
+            div.querySelector(".ocr-problem-btn").onclick = function() { _ocrInput(this, "problem"); };
+            div.querySelector(".ocr-problem-upload-btn").onclick = function() { _ocrInput(this, "problem"); };
+            div.querySelector(".ocr-solution-btn").onclick = function() { _ocrInput(this, "solution"); };
+            div.querySelector(".ocr-solution-upload-btn").onclick = function() { _ocrInput(this, "solution"); };
+            list.appendChild(div);
+            _updateCount();
+        }
+
+        function _renumber() {
+            var items = document.querySelectorAll("#batch-items-list .batch-item-input");
+            items.forEach(function(el, i) { el.querySelector("span").textContent = "第 " + (i + 1) + " 题"; });
+            _updateCount();
+        }
+
+        function _updateCount() {
+            var n = document.querySelectorAll("#batch-items-list .batch-item-input").length;
+            document.getElementById("batch-item-count").textContent = "(" + n + " 题)";
+            document.getElementById("batch-submit-btn").disabled = n === 0;
+        }
+
+        function _ocrInput(btn, field) {
+            var input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.onchange = function() {
+                if (!input.files[0]) return;
+                var fd = new FormData();
+                fd.append("image", input.files[0]);
+                fd.append("model", document.getElementById("batch-model").value);
+                btn.textContent = "识别中...";
+                fetch("/ocr", { method: "POST", body: fd }).then(function(r) { return r.json(); }).then(function(data) {
+                    var text = data.text || "";
+                    var itemDiv = btn.closest(".batch-item-input");
+                    var textarea = field === "problem" ? itemDiv.querySelector(".batch-problem-text") : itemDiv.querySelector(".batch-solution-text");
+                    textarea.value = text;
+                    btn.textContent = btn.classList.contains("ocr-problem-btn") || btn.classList.contains("ocr-problem-upload-btn") ? "📷 拍照识别" : "📷 拍照识别";
+                }).catch(function() { btn.textContent = "识别失败"; });
+            };
+            input.click();
+        }
+
+        function _submitBatch() {
+            var items = [];
+            document.querySelectorAll("#batch-items-list .batch-item-input").forEach(function(el) {
+                var pt = el.querySelector(".batch-problem-text").value.trim();
+                var st = el.querySelector(".batch-solution-text").value.trim();
+                if (pt) items.push({ problem_text: pt, student_solution: st, source_type: "text" });
+            });
+            if (items.length === 0) { alert("至少需要一道题目"); return; }
+            var settings = {
+                model: document.getElementById("batch-model").value,
+                subject_id: document.getElementById("batch-subject").value,
+                mode: document.getElementById("batch-mode").value,
+                depth: document.getElementById("batch-depth").value,
+            };
+            document.getElementById("batch-submit-btn").disabled = true;
+            document.getElementById("batch-submit-btn").textContent = "提交中...";
+            _api("POST", "/batch/create", { items: items, settings: settings, auto_start: true }).then(function(data) {
+                document.getElementById("batch-modal").style.display = "none";
+                document.getElementById("batch-submit-btn").textContent = "提交批量分析";
+                _loadList();
+                if (data.batch_id) _startPoll(data.batch_id);
+            }).catch(function() {
+                document.getElementById("batch-submit-btn").disabled = false;
+                document.getElementById("batch-submit-btn").textContent = "提交批量分析";
+            });
+        }
+
+        return {
+            load: load,
+            toggleExpand: toggleExpand,
+            pause: pause,
+            resume: resume,
+            cancel: cancel,
+            start: start,
+            remove: remove,
+            viewRun: viewRun,
+            viewSummary: viewSummary,
+            _ocrInput: _ocrInput,
+        };
+    })();
 })();

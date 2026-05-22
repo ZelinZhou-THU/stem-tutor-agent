@@ -535,6 +535,72 @@ async def save_user_mastery(data: dict = Body(...), user: dict = Depends(get_cur
     return {"ok": True}
 
 
+@app.get("/api/admin/users/{user_id}")
+async def admin_get_user_detail(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import get_user_by_id, get_settings, get_mastery
+    user = await get_user_by_id(user_id)
+    if not user:
+        return JSONResponse(status_code=404, content={"error": "用户不存在"})
+    settings = await get_settings(user_id)
+    mastery = await get_mastery(user_id)
+    return {
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "is_admin": bool(user["is_admin"]),
+            "created_at": user["created_at"],
+        },
+        "settings": settings,
+        "mastery": mastery,
+    }
+
+
+@app.get("/api/admin/users/{user_id}/runs")
+async def admin_get_user_runs(
+    user_id: int,
+    page: int = 1,
+    per_page: int = 20,
+    admin: dict = Depends(get_admin_user),
+):
+    from web.service import list_runs
+    return await list_runs(user_id, page=page, per_page=per_page)
+
+
+@app.get("/api/admin/users/{user_id}/reports")
+async def admin_get_user_reports(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import list_reports_db
+    reports = await list_reports_db(user_id)
+    return reports
+
+
+@app.get("/api/admin/users/{user_id}/chats")
+async def admin_get_user_chats(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import list_chats_by_user
+    return await list_chats_by_user(user_id)
+
+
+@app.get("/api/admin/users/{user_id}/settings")
+async def admin_get_user_settings(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import get_settings
+    return await get_settings(user_id)
+
+
+@app.get("/api/admin/users/{user_id}/mastery")
+async def admin_get_user_mastery(user_id: int, admin: dict = Depends(get_admin_user)):
+    from web.database import get_mastery
+    return await get_mastery(user_id)
+
+
+@app.get("/api/admin/users/{user_id}/run/{run_id}")
+async def admin_get_run_detail(user_id: int, run_id: str, admin: dict = Depends(get_admin_user)):
+    from web.database import load_run
+    row = await load_run(run_id, user_id)
+    if not row:
+        return JSONResponse(status_code=404, content={"error": "运行记录不存在"})
+    data = row["data"]
+    return data
+
+
 @app.get("/api/admin/users")
 async def admin_users(admin: dict = Depends(get_admin_user)):
     from web.database import get_db
@@ -562,18 +628,22 @@ async def admin_stats(admin: dict = Depends(get_admin_user)):
 
 
 @app.delete("/api/admin/users/{user_id}")
-async def admin_delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
+async def admin_delete_user(user_id: int, cascade: bool = True, admin: dict = Depends(get_admin_user)):
+    if user_id == admin.get("id"):
+        return JSONResponse(status_code=400, content={"detail": "不能删除当前登录的管理员账号"})
+
     from web.database import get_db
     db = await get_db()
     try:
-        await db.execute("DELETE FROM runs WHERE user_id=?", (user_id,))
-        await db.execute("DELETE FROM chats WHERE user_id=?", (user_id,))
-        await db.execute("DELETE FROM reports WHERE user_id=?", (user_id,))
-        await db.execute("DELETE FROM user_settings WHERE user_id=?", (user_id,))
-        await db.execute("DELETE FROM user_mastery WHERE user_id=?", (user_id,))
+        if cascade:
+            await db.execute("DELETE FROM runs WHERE user_id=?", (user_id,))
+            await db.execute("DELETE FROM chats WHERE user_id=?", (user_id,))
+            await db.execute("DELETE FROM reports WHERE user_id=?", (user_id,))
+            await db.execute("DELETE FROM user_settings WHERE user_id=?", (user_id,))
+            await db.execute("DELETE FROM user_mastery WHERE user_id=?", (user_id,))
         await db.execute("DELETE FROM users WHERE id=?", (user_id,))
         await db.commit()
-        return {"ok": True}
+        return {"ok": True, "cascade": cascade}
     finally:
         await db.close()
 

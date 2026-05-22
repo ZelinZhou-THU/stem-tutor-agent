@@ -2356,9 +2356,13 @@
     function _onAuthReady() {
         if (_authReady) return;
         _authReady = true;
-    function init() {
-        AuthModule.init();
-    }
+        AppRouter.init();
+        SettingsModule.init();
+        InputPanel.init();
+        initMobileSidebar();
+        OnboardingModule.init();
+        ExportModule.init();
+        MasteryModule.init();
 
         // Bind history filters
         ["history-filter-subject", "history-filter-status"].forEach(function (id) {
@@ -3023,6 +3027,10 @@
         function updateSubjectLabels(subjectId) {
             document.title = SITE_TITLE;
         }
+    }
+
+    function init() {
+        AuthModule.init();
     }
 
     /* ===== Result Rendering (global scope for HistoryModule) ===== */

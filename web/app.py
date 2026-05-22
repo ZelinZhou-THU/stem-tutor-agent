@@ -46,25 +46,25 @@ async def register(req: RegisterRequest):
     username = req.username.strip()
     password = req.password
     if len(username) < 2 or len(username) > 32:
-        return JSONResponse(status_code=400, content={"error": "用户名需要2-32个字符"})
+        return JSONResponse(status_code=400, content={"detail": "\u7528\u6237\u540d\u9700\u89812-32\u4e2a\u5b57\u7b26"})
     if len(password) < 4:
-        return JSONResponse(status_code=400, content={"error": "密码至少4位"})
+        return JSONResponse(status_code=400, content={"detail": "\u5bc6\u7801\u81f3\u5c114\u4f4d"})
     existing = await get_user_by_username(username)
     if existing:
-        return JSONResponse(status_code=409, content={"error": "用户名已存在"})
+        return JSONResponse(status_code=409, content={"detail": "\u7528\u6237\u540d\u5df2\u5b58\u5728"})
     pw_hash = hash_password(password)
     user_id = await create_user(username, pw_hash)
     token = create_access_token(user_id, username)
-    return {"access_token": token, "token_type": "bearer", "username": username, "is_admin": False}
+    return {"access_token": token, "token_type": "bearer", "user": {"id": user_id, "username": username, "is_admin": False}}
 
 
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
     user = await get_user_by_username(req.username.strip())
     if not user or not verify_password(req.password, user["password_hash"]):
-        return JSONResponse(status_code=401, content={"error": "用户名或密码错误"})
+        return JSONResponse(status_code=401, content={"detail": "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef"})
     token = create_access_token(user["id"], user["username"], bool(user["is_admin"]))
-    return {"access_token": token, "token_type": "bearer", "username": user["username"], "is_admin": bool(user["is_admin"])}
+    return {"access_token": token, "token_type": "bearer", "user": {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}}
 
 
 @app.get("/api/auth/me")

@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from fastapi import Body, FastAPI, File, Form, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -16,6 +16,9 @@ from stem_tutor.subjects.context import get_subject_context
 from stem_tutor.subjects.detector import detect_subject
 from stem_tutor.subjects.loader import SubjectRegistry
 from stem_tutor.taxonomy.errors import lookup_error
+from web.auth import create_access_token, get_admin_user, get_current_user, hash_password, verify_password
+from web.database import _ensure_db, create_user, get_user_by_username
+from web.models import LoginRequest, RegisterRequest
 from web.service import ocr_problem_text, run_stem_tutor, run_stem_tutor_stream, _load_run_result, _get_run_status
 from web.service import _load_chat_history, chat_stream, list_runs, get_stats, reverify_step, cancel_run
 from web.service import delete_runs, cleanup_runs_before
@@ -27,6 +30,46 @@ from web.service import practice_reference_stream
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="STEM Tutor")
+
+
+@app.on_event("startup")
+async def startup():
+    await _ensure_db()
+    admin = await get_user_by_username("admin")
+    if not admin:
+        pw_hash = hash_password("admin123")
+        await create_user("admin", pw_hash, is_admin=True)
+
+
+@app.post("/api/auth/register")
+async def register(req: RegisterRequest):
+    username = req.username.strip()
+    password = req.password
+    if len(username) < 2 or len(username) > 32:
+        return JSONResponse(status_code=400, content={"error": "用户名需要2-32个字符"})
+    if len(password) < 4:
+        return JSONResponse(status_code=400, content={"error": "密码至少4位"})
+    existing = await get_user_by_username(username)
+    if existing:
+        return JSONResponse(status_code=409, content={"error": "用户名已存在"})
+    pw_hash = hash_password(password)
+    user_id = await create_user(username, pw_hash)
+    token = create_access_token(user_id, username)
+    return {"access_token": token, "token_type": "bearer", "username": username, "is_admin": False}
+
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest):
+    user = await get_user_by_username(req.username.strip())
+    if not user or not verify_password(req.password, user["password_hash"]):
+        return JSONResponse(status_code=401, content={"error": "用户名或密码错误"})
+    token = create_access_token(user["id"], user["username"], bool(user["is_admin"]))
+    return {"access_token": token, "token_type": "bearer", "username": user["username"], "is_admin": bool(user["is_admin"])}
+
+
+@app.get("/api/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}
 
 
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):

@@ -469,6 +469,12 @@ LLMProvider（抽象基类）
 - **结构化输出优先** — 所有节点输出 Pydantic 模型，保证结构稳定
 - **预算感知降级** — 全局预算池，自动降级到轻量策略
 
+## Credits
+
+由 [ZelinZhou-THU](https://github.com/ZelinZhou-THU) 构建 — 一个注重可解释性的 AI 辅导课程项目。
+
+基于 [LangGraph](https://github.com/langchain-ai/langgraph)、[SymPy](https://www.sympy.org/)、[FastAPI](https://fastapi.tiangolo.com/) 和 [LangChain](https://github.com/langchain-ai/langchain) 生态构建。
+
 ## 备注
 
 - 本项目为课程大作业导向的工程原型

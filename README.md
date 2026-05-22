@@ -2,7 +2,7 @@
 
 > **Your math is wrong. Here's exactly where and why.**
 
-AI agent that verifies every step of a student solution, pinpoints the root cause of errors with SymPy symbolic math, and generates targeted practice — covering 8 STEM subjects with a full-featured web UI.
+AI agent that verifies every step of a student solution, pinpoints the root cause of errors with SymPy symbolic math, and generates targeted practice. Covers 8 STEM subjects with a full-featured web UI.
 
 **English** | [中文](README.zh-CN.md)
 
@@ -99,7 +99,7 @@ python -m cli.main --input fixtures/sample_case.json --provider real --health-ch
 pytest -q
 ```
 
-All 24 test files use `tmp_path` + `monkeypatch` for database isolation — no real LLM services needed.
+All 24 test files use `tmp_path` + `monkeypatch` for database isolation. No real LLM services needed.
 
 </details>
 
@@ -476,6 +476,12 @@ Supports 4 model groups: `reasoning` / `fast` / `ocr` / `baseline`. Each node ca
 - Contributions welcome — please maintain clear module boundaries
 - First startup auto-creates admin account: `admin / admin123`
 - Visit `http://localhost:8000/#admin` for the admin panel (requires admin login)
+
+## Credits
+
+Built by [ZelinZhou-THU](https://github.com/ZelinZhou-THU) — a course final project focused on explainability and verifiability in AI tutoring.
+
+Powered by [LangGraph](https://github.com/langchain-ai/langgraph), [SymPy](https://www.sympy.org/), [FastAPI](https://fastapi.tiangolo.com/), and the [LangChain](https://github.com/langchain-ai/langchain) ecosystem.
 
 ## License
 

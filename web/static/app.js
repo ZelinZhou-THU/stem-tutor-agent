@@ -4993,7 +4993,8 @@
             var div = document.createElement("div");
             div.className = "batch-item-input";
             div.innerHTML =
-                '<div class="batch-item-input-header"><span>第 ' + (idx + 1) + ' 题</span><button class="batch-item-remove" title="删除">&times;</button></div>' +
+                '<div class="batch-item-input-header"><span class="batch-item-toggle" title="展开/折叠">▼ 第 ' + (idx + 1) + ' 题</span><button class="batch-item-remove" title="删除">&times;</button></div>' +
+                '<div class="batch-item-body">' +
                 '<label style="font-size:12px;color:var(--text-muted,#888)">题目</label>' +
                 '<textarea class="batch-problem-text" placeholder="输入题目文本" rows="2"></textarea>' +
                 '<div class="ocr-math-preview is-empty batch-ocr-preview" data-field="problem" data-placeholder="公式预览"></div>' +
@@ -5009,8 +5010,14 @@
                 '<div class="upload-actions">' +
                 '<label class="upload-btn upload-btn-camera">拍照<input type="file" accept="image/*" capture="environment" class="batch-file-input"></label>' +
                 '<label class="upload-btn upload-btn-album">选择图片<input type="file" accept="image/*" class="batch-file-input"></label>' +
-                '</div><div class="batch-upload-hint" style="font-size:11px;margin-top:4px">或将图片拖拽到此处</div></div>';
+                '</div><div class="batch-upload-hint" style="font-size:11px;margin-top:4px">或将图片拖拽到此处</div></div>' +
+                '</div>';
             div.querySelector(".batch-item-remove").onclick = function() { div.remove(); _renumber(); };
+            div.querySelector(".batch-item-toggle").onclick = function() {
+                var body = div.querySelector(".batch-item-body");
+                var collapsed = body.classList.toggle("collapsed");
+                this.textContent = (collapsed ? "▶ " : "▼ ") + this.textContent.slice(2);
+            };
             var zones = div.querySelectorAll(".batch-upload-zone");
             var inputs = div.querySelectorAll(".batch-file-input");
             function wireZone(zone, input, field) {
@@ -5039,7 +5046,11 @@
 
         function _renumber() {
             var items = document.querySelectorAll("#batch-items-list .batch-item-input");
-            items.forEach(function(el, i) { el.querySelector("span").textContent = "第 " + (i + 1) + " 题"; });
+            items.forEach(function(el, i) {
+                var toggle = el.querySelector(".batch-item-toggle");
+                var arrow = toggle.textContent.charAt(0);
+                toggle.textContent = arrow + " 第 " + (i + 1) + " 题";
+            });
             _updateCount();
         }
 

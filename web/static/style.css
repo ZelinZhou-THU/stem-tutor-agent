@@ -4636,6 +4636,10 @@ textarea {
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
 }
 .batch-item-input-header span { font-weight: bold; font-size: 13px; }
+.batch-item-toggle { cursor: pointer; user-select: none; }
+.batch-item-toggle:hover { color: var(--accent); }
+.batch-item-body.collapsed { display: none; }
+.batch-item-body { transition: max-height 0.2s ease; }
 .batch-item-remove { background: none; border: none; color: #ff6b6b; cursor: pointer; font-size: 18px; }
 .batch-item-input textarea {
     width: 100%; background: transparent; border: none; color: inherit;

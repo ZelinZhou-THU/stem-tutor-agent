@@ -53,6 +53,10 @@
                 <span class="nav-icon">📋</span>
                 <span class="nav-text">分析诊断</span>
             </a>
+            <a href="#queue" class="nav-item" data-page="queue" title="批量队列">
+                <span class="nav-icon">&#128438;</span>
+                <span class="nav-text">批量队列</span>
+            </a>
             <a href="#history" class="nav-item" data-page="history">
                 <span class="nav-icon">📜</span>
                 <span class="nav-text">历史记录</span>
@@ -407,6 +411,26 @@
                     </details>
                 </div>
 
+            </section>
+
+            <section id="page-queue" class="page" style="display:none">
+                <div class="queue-page">
+                    <div class="queue-header">
+                        <h2>批量分析队列</h2>
+                        <div class="queue-actions">
+                            <button id="queue-new-btn" class="btn btn-primary">+ 新建批次</button>
+                            <select id="queue-filter-status" class="input-field" style="width:auto">
+                                <option value="">全部状态</option>
+                                <option value="running">运行中</option>
+                                <option value="paused">已暂停</option>
+                                <option value="completed">已完成</option>
+                                <option value="cancelled">已取消</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="queue-list" class="queue-list"></div>
+                    <div id="queue-pagination" class="pagination"></div>
+                </div>
             </section>
 
             <!-- ==================== 历史记录页面 ==================== -->
@@ -954,6 +978,57 @@
             </div>
             <div class="crop-body">
                 <img id="crop-image" src="" alt="裁剪">
+            </div>
+        </div>
+    </div>
+
+    <div id="batch-modal" class="modal" style="display:none">
+        <div class="modal-overlay"></div>
+        <div class="modal-content batch-modal-content">
+            <div class="modal-header">
+                <h3>新建批量分析</h3>
+                <button class="modal-close" id="batch-modal-close">&times;</button>
+            </div>
+            <div class="modal-body batch-modal-body">
+                <div class="batch-settings">
+                    <label>学科</label>
+                    <select id="batch-subject" class="input-field">
+                        <option value="auto_detect">自动检测</option>
+                        <option value="calculus" selected>微积分</option>
+                        <option value="linear_algebra">线性代数</option>
+                        <option value="mechanics">力学</option>
+                        <option value="electromagnetism">电磁学</option>
+                        <option value="optics">光学</option>
+                        <option value="quantum">量子力学</option>
+                        <option value="relativity">相对论</option>
+                        <option value="thermodynamics">热力学</option>
+                    </select>
+                    <label>模式</label>
+                    <select id="batch-mode" class="input-field">
+                        <option value="workflow_r1">工作流分析</option>
+                        <option value="baseline_qwen3.6">基线对比</option>
+                    </select>
+                    <label>深度</label>
+                    <select id="batch-depth" class="input-field">
+                        <option value="quick">快速</option>
+                        <option value="standard" selected>标准</option>
+                        <option value="thorough">深度</option>
+                    </select>
+                    <label>模型</label>
+                    <select id="batch-model" class="input-field">
+                        <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
+                        <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                    </select>
+                </div>
+                <div class="batch-items-header">
+                    <h4>题目列表 <span id="batch-item-count">(0 题)</span></h4>
+                    <button id="batch-add-item-btn" class="btn btn-sm">+ 添加题目</button>
+                </div>
+                <div id="batch-items-list" class="batch-items-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="batch-submit-btn" class="btn btn-primary" disabled>提交批量分析</button>
+                <button id="batch-cancel-btn" class="btn">取消</button>
             </div>
         </div>
     </div>

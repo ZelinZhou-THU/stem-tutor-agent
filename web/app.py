@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -17,7 +18,12 @@ from stem_tutor.subjects.detector import detect_subject
 from stem_tutor.subjects.loader import SubjectRegistry
 from stem_tutor.taxonomy.errors import lookup_error
 from web.auth import create_access_token, get_admin_user, get_current_user, hash_password, verify_password
-from web.database import _ensure_db, create_user, get_user_by_username
+from web.batch_worker import get_batch_worker
+from web.database import (
+    _ensure_db, create_user, get_user_by_username,
+    create_batch, load_batch, update_batch_status, update_batch_item,
+    add_batch_items, list_batch_items, list_batches, delete_batch,
+)
 from web.models import LoginRequest, RegisterRequest
 from web.service import ocr_problem_text, run_stem_tutor, run_stem_tutor_stream, _load_run_result, _get_run_status
 from web.service import _load_chat_history, chat_stream, list_runs, get_stats, reverify_step, cancel_run
@@ -39,6 +45,12 @@ async def startup():
     if not admin:
         pw_hash = hash_password("admin123")
         await create_user("admin", pw_hash, is_admin=True)
+    await get_batch_worker().start()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await get_batch_worker().stop()
 
 
 @app.post("/api/auth/register")
@@ -652,3 +664,125 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("web.app:app", reload=True)
+
+
+@app.post("/batch/create")
+async def batch_create(req: dict = Body(...), user: dict = Depends(get_current_user)):
+    items = req.get("items", [])
+    settings = req.get("settings", {})
+    auto_start = req.get("auto_start", True)
+    if not items:
+        return JSONResponse(status_code=400, content={"error": "至少需要一道题目"})
+    if len(items) > 100:
+        return JSONResponse(status_code=400, content={"error": "单次最多 100 道题目"})
+    for idx, item in enumerate(items):
+        if not item.get("problem_text", "").strip():
+            return JSONResponse(status_code=400, content={"error": f"第 {idx + 1} 题缺少题目内容"})
+    batch_id = await create_batch(
+        user_id=user["id"],
+        settings={
+            "model": settings.get("model", "qwen/qwen3.6-plus"),
+            "subject_id": settings.get("subject_id", "calculus"),
+            "mode": settings.get("mode", "workflow_r1"),
+            "depth": settings.get("depth", "standard"),
+        },
+        total_count=len(items),
+    )
+    await add_batch_items(batch_id, items)
+    if auto_start:
+        await update_batch_status(batch_id, "running")
+        get_batch_worker().notify()
+    return {"batch_id": batch_id, "total_count": len(items)}
+
+
+@app.get("/batch/list")
+async def batch_list(
+    status: str | None = None,
+    page: int = 1,
+    per_page: int = 20,
+    user: dict = Depends(get_current_user),
+):
+    return await list_batches(user["id"], status=status, page=page, per_page=per_page)
+
+
+@app.get("/batch/{batch_id}/status")
+async def batch_status(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批次不存在"})
+    items = await list_batch_items(batch_id)
+    total = batch["total_count"]
+    done = batch["completed_count"] + batch["failed_count"]
+    current_item = next((i for i in items if i["status"] == "running"), None)
+    settings_data = json.loads(batch["settings"]) if isinstance(batch["settings"], str) else batch["settings"]
+    return {
+        "batch_id": batch["id"],
+        "status": batch["status"],
+        "total_count": total,
+        "completed_count": batch["completed_count"],
+        "failed_count": batch["failed_count"],
+        "progress_percent": int(done / total * 100) if total > 0 else 0,
+        "current_item_seq": current_item["seq"] if current_item else None,
+        "items": [
+            {
+                "seq": i["seq"],
+                "status": i["status"],
+                "problem_preview": i["problem_text"][:60] + ("..." if len(i["problem_text"]) > 60 else ""),
+                "run_id": i["run_id"],
+                "error_message": i["error_message"],
+            }
+            for i in items
+        ],
+        "settings": settings_data,
+        "created_at": batch["created_at"],
+        "updated_at": batch["updated_at"],
+    }
+
+
+@app.post("/batch/{batch_id}/pause")
+async def batch_pause(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批次不存在"})
+    if batch["status"] != "running":
+        return JSONResponse(status_code=400, content={"error": "只能暂停运行中的批次"})
+    await update_batch_status(batch_id, "paused")
+    return {"status": "paused"}
+
+
+@app.post("/batch/{batch_id}/resume")
+async def batch_resume(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批次不存在"})
+    if batch["status"] not in ("paused", "pending"):
+        return JSONResponse(status_code=400, content={"error": "只能继续已暂停或等待中的批次"})
+    await update_batch_status(batch_id, "running")
+    get_batch_worker().notify()
+    return {"status": "running"}
+
+
+@app.post("/batch/{batch_id}/cancel")
+async def batch_cancel(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批次不存在"})
+    if batch["status"] not in ("running", "paused"):
+        return JSONResponse(status_code=400, content={"error": "只能取消运行中或暂停的批次"})
+    await update_batch_status(batch_id, "cancelled")
+    items = await list_batch_items(batch_id)
+    for item in items:
+        if item["status"] == "pending":
+            await update_batch_item(batch_id, item["seq"], "cancelled")
+    return {"status": "cancelled"}
+
+
+@app.delete("/batch/{batch_id}")
+async def batch_delete(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批次不存在"})
+    if batch["status"] == "running":
+        return JSONResponse(status_code=400, content={"error": "请先暂停或取消运行中的批次"})
+    await delete_batch(batch_id, user["id"])
+    return {"status": "deleted"}

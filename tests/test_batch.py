@@ -5,6 +5,7 @@ import json
 import os
 
 import pytest
+import pytest_asyncio
 
 import web.database as db
 import web.database as db_mod
@@ -137,6 +138,100 @@ async def _mock_stream(**kwargs):
     yield f'data: {_json.dumps({"type": "start", "run_id": "mock-run-id"}, ensure_ascii=False)}\n\n'
     yield f'data: {_json.dumps({"type": "result", "data": {"run_id": "mock-run-id", "status": "success"}}, ensure_ascii=False)}\n\n'
     yield f'data: {_json.dumps({"type": "done", "message": "done"}, ensure_ascii=False)}\n\n'
+
+
+@pytest_asyncio.fixture
+async def auth_client(tmp_path, monkeypatch):
+    from httpx import AsyncClient, ASGITransport
+    from web.app import app
+    from web.database import _ensure_db, create_user
+    from web.auth import create_access_token
+
+    db_path = tmp_path / "test_batch_api.db"
+    monkeypatch.setattr(db, "DB_PATH", db_path)
+    db._initialized = False
+    await _ensure_db()
+
+    uid = await create_user("batch_api_user", "hashed_pw")
+    token = create_access_token(uid, "batch_api_user", is_admin=False)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {token}"
+        yield ac
+    db._initialized = False
+
+
+@pytest.mark.asyncio
+async def test_batch_create_and_status_api(auth_client):
+    resp = await auth_client.post("/batch/create", json={
+        "items": [
+            {"problem_text": "1+1=?", "student_solution": "2", "source_type": "text"},
+            {"problem_text": "2+2=?", "student_solution": "4", "source_type": "text"},
+        ],
+        "settings": {"model": "qwen/qwen3.6-plus", "subject_id": "calculus", "mode": "workflow_r1", "depth": "standard"},
+        "auto_start": False,
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "batch_id" in data
+    assert data["total_count"] == 2
+
+    batch_id = data["batch_id"]
+    resp2 = await auth_client.get(f"/batch/{batch_id}/status")
+    assert resp2.status_code == 200
+    status = resp2.json()
+    assert status["total_count"] == 2
+    assert status["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_batch_list_api(auth_client):
+    resp = await auth_client.get("/batch/list")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "batches" in data
+    assert "total" in data
+
+
+@pytest.mark.asyncio
+async def test_batch_pause_resume_cancel_api(auth_client):
+    resp = await auth_client.post("/batch/create", json={
+        "items": [{"problem_text": "test", "student_solution": "t", "source_type": "text"}],
+        "settings": {},
+        "auto_start": True,
+    })
+    batch_id = resp.json()["batch_id"]
+
+    resp2 = await auth_client.post(f"/batch/{batch_id}/pause")
+    assert resp2.status_code == 200
+    assert resp2.json()["status"] == "paused"
+
+    resp3 = await auth_client.post(f"/batch/{batch_id}/resume")
+    assert resp3.status_code == 200
+    assert resp3.json()["status"] == "running"
+
+    resp4 = await auth_client.post(f"/batch/{batch_id}/cancel")
+    assert resp4.status_code == 200
+    assert resp4.json()["status"] == "cancelled"
+
+    resp5 = await auth_client.delete(f"/batch/{batch_id}")
+    assert resp5.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_batch_create_validation(auth_client):
+    resp = await auth_client.post("/batch/create", json={
+        "items": [],
+        "settings": {},
+    })
+    assert resp.status_code == 400
+
+    resp2 = await auth_client.post("/batch/create", json={
+        "items": [{"problem_text": "", "student_solution": "", "source_type": "text"}],
+        "settings": {},
+    })
+    assert resp2.status_code == 400
 
 
 @pytest.mark.asyncio

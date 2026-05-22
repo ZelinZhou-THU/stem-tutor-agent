@@ -170,7 +170,7 @@
             var sel = $("logs-run-select");
             var currentVal = sel.value;
             sel.innerHTML = '<option value="">选择一次分析记录...</option>';
-            fetch("/history?per_page=100")
+            fetch("/history?per_page=100", { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     var runs = data.runs || [];
@@ -199,7 +199,7 @@
         _loadResult: function (runId) {
             var self = this;
             $("logs-content").style.display = "none";
-            fetch("/analyze/result/" + runId)
+            fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) {
                     if (!r.ok) throw new Error("HTTP " + r.status);
                     return r.json();
@@ -413,7 +413,7 @@
             params.push("page=" + this._page);
             params.push("per_page=" + this._perPage);
 
-            fetch("/history?" + params.join("&"))
+            fetch("/history?" + params.join("&"), { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     self._currentRuns = data.runs || [];
@@ -495,7 +495,7 @@
                         function () {
                             fetch("/api/runs", {
                                 method: "DELETE",
-                                headers: { "Content-Type": "application/json" },
+                                headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
                                 body: JSON.stringify({"run_ids": [runId]})
                             }).then(function (r) { return r.json(); })
                             .then(function (data) { console.log("Delete response:", data); self.load(); })
@@ -620,7 +620,7 @@
                 function () {
                     fetch("/api/runs", {
                         method: "DELETE",
-                        headers: { "Content-Type": "application/json" },
+                        headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
                         body: JSON.stringify({"run_ids": ids})
                     })
                     .then(function (r) { return r.json(); })
@@ -640,7 +640,7 @@
                 "\u786e\u8ba4\u6e05\u7406",
                 "\u786e\u5b9a\u8981\u6e05\u7406 " + label + " \u7684\u6240\u6709\u8bb0\u5f55\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u6062\u590d\u3002",
                 function () {
-                    fetch("/api/runs/cleanup?before_days=" + days, { method: "POST" })
+                    fetch("/api/runs/cleanup?before_days=" + days, { method: "POST", headers: AuthModule.getAuthHeader() })
                     .then(function (r) { return r.json(); })
                     .then(function () {
                         self._clampPage();
@@ -743,7 +743,7 @@
             var resultsDiv = $("results");
             if (resultsDiv) resultsDiv.style.display = "none";
 
-            fetch("/analyze/result/" + runId)
+            fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) {
                     if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "HTTP " + r.status); });
                     return r.json();
@@ -767,7 +767,7 @@
         },
 
         reanalyze: function (runId) {
-            fetch("/analyze/result/" + runId)
+            fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     var raw = data.raw_output || {};
@@ -794,7 +794,7 @@
 
         load: function () {
             var self = this;
-            fetch("/stats")
+            fetch("/stats", { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     self.renderSummary(data);
@@ -996,7 +996,7 @@
 
         _loadRunList: function () {
             var self = this;
-            fetch("/report/runs")
+            fetch("/report/runs", { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (runs) {
                     self._allRuns = runs || [];
@@ -1151,7 +1151,7 @@
             this._pendingSections = [];
 
             var qs = Object.keys(params).map(function (k) { return k + "=" + encodeURIComponent(params[k]); }).join("&");
-            fetch("/report/data?" + qs)
+            fetch("/report/data?" + qs, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     self.reportData = data;
@@ -1180,7 +1180,7 @@
             if (params.end_date) formData.append("end_date", params.end_date);
             if (params.run_ids) formData.append("run_ids", params.run_ids);
 
-            fetch("/report/generate", { method: "POST", body: formData, signal: AbortSignal.timeout(600000) })
+            fetch("/report/generate", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData, signal: AbortSignal.timeout(600000) })
                 .then(function (r) {
                     if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "生成失败"); });
                     return r.body;
@@ -1647,7 +1647,7 @@
             var histList = $("report-history-list");
             if (histList) histList.innerHTML = '<div class="spinner"></div>';
 
-            fetch("/report/list?page=" + page + "&per_page=10")
+            fetch("/report/list?page=" + page + "&per_page=10", { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     self._renderHistoryList(data);
@@ -1756,7 +1756,7 @@
             self._hideAll();
             self._showLoading(true);
 
-            fetch("/report/" + reportId)
+            fetch("/report/" + reportId, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) {
                     if (!r.ok) throw new Error("报告不存在");
                     return r.json();
@@ -1780,7 +1780,7 @@
 
         _deleteReport: function (reportId) {
             var self = this;
-            fetch("/report/" + reportId, { method: "DELETE" })
+            fetch("/report/" + reportId, { method: "DELETE", headers: AuthModule.getAuthHeader() })
                 .then(function (r) { return r.json(); })
                 .then(function () {
                     self._showHistory(1);
@@ -1879,7 +1879,7 @@
             var exportBtn = $("btn-export-data");
             if (exportBtn) {
                 exportBtn.addEventListener("click", function () {
-                    fetch("/history?per_page=9999")
+                    fetch("/history?per_page=9999", { headers: AuthModule.getAuthHeader() })
                         .then(function (r) { return r.json(); })
                         .then(function (data) {
                             var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -2146,15 +2146,204 @@
         });
     }
 
+    /* ===== AuthModule ===== */
+    var AuthModule = {
+        TOKEN_KEY: "stem_tutor_token",
+        USER_KEY: "stem_tutor_user",
+
+        init: function () {
+            var token = localStorage.getItem(this.TOKEN_KEY);
+            if (token) {
+                this._validateToken(token);
+            } else {
+                this.showAuthScreen();
+            }
+            this._bindEvents();
+        },
+
+        _validateToken: function (token) {
+            var self = this;
+            fetch("/api/auth/me", {
+                headers: { "Authorization": "Bearer " + token }
+            }).then(function (resp) {
+                if (!resp.ok) throw new Error("invalid");
+                return resp.json();
+            }).then(function (user) {
+                localStorage.setItem(self.USER_KEY, JSON.stringify(user));
+                self.hideAuthScreen();
+                self.updateUserDisplay(user);
+                _onAuthReady();
+            }).catch(function () {
+                localStorage.removeItem(self.TOKEN_KEY);
+                localStorage.removeItem(self.USER_KEY);
+                self.showAuthScreen();
+            });
+        },
+
+        showAuthScreen: function () {
+            var el = $("auth-screen");
+            if (el) el.style.display = "flex";
+        },
+
+        hideAuthScreen: function () {
+            var el = $("auth-screen");
+            if (el) el.style.display = "none";
+        },
+
+        updateUserDisplay: function (user) {
+            var nameEl = $("user-display-name");
+            var infoEl = $("user-info");
+            if (nameEl && user) nameEl.textContent = user.username || "";
+            if (infoEl) infoEl.style.display = "flex";
+        },
+
+        _bindEvents: function () {
+            var self = this;
+
+            var loginForm = $("auth-login-form");
+            if (loginForm) loginForm.addEventListener("submit", function (e) { e.preventDefault(); self._login(); });
+
+            var registerForm = $("auth-register-form");
+            if (registerForm) registerForm.addEventListener("submit", function (e) { e.preventDefault(); self._register(); });
+
+            var tabs = document.querySelectorAll(".auth-tab");
+            tabs.forEach(function (tab) {
+                tab.addEventListener("click", function () {
+                    tabs.forEach(function (t) { t.classList.remove("active"); });
+                    this.classList.add("active");
+                    var target = this.getAttribute("data-auth-tab");
+                    var loginForm = $("auth-login-form");
+                    var registerForm = $("auth-register-form");
+                    if (loginForm) loginForm.style.display = target === "login" ? "" : "none";
+                    if (registerForm) registerForm.style.display = target === "register" ? "" : "none";
+                    var loginErr = $("auth-login-error");
+                    var regErr = $("auth-register-error");
+                    if (loginErr) loginErr.style.display = "none";
+                    if (regErr) regErr.style.display = "none";
+                });
+            });
+
+            var logoutBtn = $("btn-logout");
+            if (logoutBtn) logoutBtn.addEventListener("click", function () { self.logout(); });
+        },
+
+        _login: function () {
+            var self = this;
+            var username = ($("auth-username").value || "").trim();
+            var password = $("auth-password").value || "";
+            var errorEl = $("auth-login-error");
+
+            if (!username || !password) {
+                if (errorEl) { errorEl.textContent = "\u8bf7\u8f93\u5165\u7528\u6237\u540d\u548c\u5bc6\u7801"; errorEl.style.display = ""; }
+                return;
+            }
+
+            fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: username, password: password })
+            }).then(function (resp) {
+                return resp.json().then(function (data) {
+                    if (!resp.ok) throw new Error(data.detail || "\u767b\u5f55\u5931\u8d25");
+                    return data;
+                });
+            }).then(function (data) {
+                localStorage.setItem(self.TOKEN_KEY, data.access_token);
+                localStorage.setItem(self.USER_KEY, JSON.stringify(data.user));
+                self.hideAuthScreen();
+                self.updateUserDisplay(data.user);
+                self._syncLocalData();
+                _onAuthReady();
+            }).catch(function (err) {
+                if (errorEl) { errorEl.textContent = err.message || "\u767b\u5f55\u5931\u8d25"; errorEl.style.display = ""; }
+            });
+        },
+
+        _register: function () {
+            var self = this;
+            var username = ($("reg-username").value || "").trim();
+            var password = $("reg-password").value || "";
+            var errorEl = $("auth-register-error");
+
+            if (username.length < 2 || username.length > 32) {
+                if (errorEl) { errorEl.textContent = "\u7528\u6237\u540d\u9700\u8981 2-32 \u4e2a\u5b57\u7b26"; errorEl.style.display = ""; }
+                return;
+            }
+            if (password.length < 4) {
+                if (errorEl) { errorEl.textContent = "\u5bc6\u7801\u81f3\u5c11 4 \u4f4d"; errorEl.style.display = ""; }
+                return;
+            }
+
+            fetch("/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: username, password: password })
+            }).then(function (resp) {
+                return resp.json().then(function (data) {
+                    if (!resp.ok) throw new Error(data.detail || "\u6ce8\u518c\u5931\u8d25");
+                    return data;
+                });
+            }).then(function (data) {
+                localStorage.setItem(self.TOKEN_KEY, data.access_token);
+                localStorage.setItem(self.USER_KEY, JSON.stringify(data.user));
+                self.hideAuthScreen();
+                self.updateUserDisplay(data.user);
+                self._syncLocalData();
+                _onAuthReady();
+            }).catch(function (err) {
+                if (errorEl) { errorEl.textContent = err.message || "\u6ce8\u518c\u5931\u8d25"; errorEl.style.display = ""; }
+            });
+        },
+
+        logout: function () {
+            localStorage.removeItem(this.TOKEN_KEY);
+            localStorage.removeItem(this.USER_KEY);
+            var infoEl = $("user-info");
+            if (infoEl) infoEl.style.display = "none";
+            this.showAuthScreen();
+        },
+
+        getAuthHeader: function () {
+            var token = localStorage.getItem(this.TOKEN_KEY);
+            if (token) return { "Authorization": "Bearer " + token };
+            return {};
+        },
+
+        _syncLocalData: function () {
+            var masteryRaw = localStorage.getItem("stem_tutor_mastery");
+            if (masteryRaw) {
+                try {
+                    var mastery = JSON.parse(masteryRaw);
+                    fetch("/api/user/mastery", {
+                        method: "POST",
+                        headers: Object.assign({ "Content-Type": "application/json" }, this.getAuthHeader()),
+                        body: JSON.stringify(mastery)
+                    }).catch(function () {});
+                } catch (e) {}
+            }
+            var settingsRaw = localStorage.getItem("stem_tutor_settings");
+            if (settingsRaw) {
+                try {
+                    var settings = JSON.parse(settingsRaw);
+                    fetch("/api/user/settings", {
+                        method: "POST",
+                        headers: Object.assign({ "Content-Type": "application/json" }, this.getAuthHeader()),
+                        body: JSON.stringify(settings)
+                    }).catch(function () {});
+                } catch (e) {}
+            }
+        }
+    };
+
     /* ===== Main Init ===== */
+    var _authReady = false;
+
+    function _onAuthReady() {
+        if (_authReady) return;
+        _authReady = true;
     function init() {
-        AppRouter.init();
-        SettingsModule.init();
-        InputPanel.init();
-        initMobileSidebar();
-        OnboardingModule.init();
-        ExportModule.init();
-        MasteryModule.init();
+        AuthModule.init();
+    }
 
         // Bind history filters
         ["history-filter-subject", "history-filter-status"].forEach(function (id) {
@@ -2544,7 +2733,7 @@
 
         function cancelAnalysis() {
             if (currentRunId) {
-                fetch("/analyze/cancel/" + currentRunId, { method: "POST" }).catch(function () {});
+                fetch("/analyze/cancel/" + currentRunId, { method: "POST", headers: AuthModule.getAuthHeader() }).catch(function () {});
             }
             if (abortController) { abortController.abort(); abortController = null; }
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
@@ -2556,7 +2745,7 @@
             currentRunId = null;
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
             abortController = new AbortController();
-            fetch("/analyze/stream", { method: "POST", body: formData, signal: abortController.signal })
+            fetch("/analyze/stream", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData, signal: abortController.signal })
                 .then(function (resp) {
                     if (!resp.ok) {
                         return resp.json().catch(function () { return {}; }).then(function (err) {
@@ -2575,7 +2764,7 @@
         }
 
         function loadResultAndRender(runId) {
-            return fetch("/analyze/result/" + runId)
+            return fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
                 .then(function (r) {
                     if (!r.ok) {
                         return r.json().catch(function () { return {}; }).then(function (d) {
@@ -2598,7 +2787,7 @@
             function pollStatus() {
                 if (pollCount >= maxPolls) { showError("\u67e5\u8be2\u7ed3\u679c\u8d85\u65f6\uff0c\u8bf7\u91cd\u8bd5\u3002"); hideLoading(); return; }
                 pollCount++;
-                fetch("/analyze/status/" + runId)
+                fetch("/analyze/status/" + runId, { headers: AuthModule.getAuthHeader() })
                     .then(function (resp) { return resp.json(); })
                     .then(function (data) {
                         var status = normalizeRunStatus(data.user_status || data.status);
@@ -3010,11 +3199,11 @@
         formData.append("run_id", runId);
         formData.append("step_id", stepId);
 
-        fetch("/api/verify-step", { method: "POST", body: formData })
+        fetch("/api/verify-step", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (data.success) {
-                    fetch("/analyze/result/" + runId)
+                    fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
                         .then(function (r) { return r.json(); })
                         .then(function (fullData) {
                             renderResults(fullData);
@@ -3249,7 +3438,7 @@
     }
 
     function loadChatHistory(runId) {
-        fetch("/chat/history/" + runId)
+        fetch("/chat/history/" + runId, { headers: AuthModule.getAuthHeader() })
             .then(function (resp) {
                 if (!resp.ok) return resp.json().then(function (d) { throw new Error(d.error || "HTTP " + resp.status); });
                 return resp.json();
@@ -3285,7 +3474,7 @@
         formData.append("message", text);
         formData.append("model", $("chat-model-select").value);
 
-        fetch("/chat/stream", { method: "POST", body: formData })
+        fetch("/chat/stream", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
             .then(function (resp) {
                 if (!resp.ok) throw new Error("HTTP " + resp.status);
                 return readChatSSE(resp.body, bubble);

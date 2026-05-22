@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数理基础课程学习辅导系统</title>
-    <link rel="stylesheet" href="/static/style.css?v=6">
+    <link rel="stylesheet" href="/static/style.css?v=7">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -14,6 +14,29 @@
     <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 </head>
 <body>
+    <div id="auth-screen" class="auth-screen" style="display:none;">
+        <div class="auth-card">
+            <div class="auth-logo">🎓</div>
+            <h2 class="auth-title">数理基础课程学习辅导系统</h2>
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" data-auth-tab="login">登录</button>
+                <button type="button" class="auth-tab" data-auth-tab="register">注册</button>
+            </div>
+            <form id="auth-login-form" class="auth-form">
+                <input type="text" id="auth-username" placeholder="用户名" autocomplete="username" required>
+                <input type="password" id="auth-password" placeholder="密码" autocomplete="current-password" required>
+                <button type="submit" class="btn-primary auth-submit">登录</button>
+                <p id="auth-login-error" class="auth-error" style="display:none;"></p>
+            </form>
+            <form id="auth-register-form" class="auth-form" style="display:none;">
+                <input type="text" id="reg-username" placeholder="用户名（2-32字符）" autocomplete="username" required>
+                <input type="password" id="reg-password" placeholder="密码（至少4位）" autocomplete="new-password" required>
+                <button type="submit" class="btn-primary auth-submit">注册</button>
+                <p id="auth-register-error" class="auth-error" style="display:none;"></p>
+            </form>
+        </div>
+    </div>
+
     <div id="overlay" class="overlay"></div>
 
     <aside id="sidebar" class="sidebar">
@@ -53,7 +76,11 @@
         </nav>
 
         <div class="sidebar-footer">
-            <p>Powered by LangGraph · FastAPI</p>
+            <div class="user-info" id="user-info" style="display:none;">
+                <span class="user-display-name" id="user-display-name"></span>
+                <button type="button" class="btn-logout" id="btn-logout">退出登录</button>
+            </div>
+            <p id="powered-by-text">Powered by LangGraph · FastAPI</p>
         </div>
     </aside>
 
@@ -804,7 +831,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/app.js?v=9"></script>
 
     <div id="confirm-overlay" class="confirm-overlay" style="display:none;">
         <div class="confirm-dialog">

@@ -3994,3 +3994,48 @@ textarea {
 .btn-mastered-toggle.mastered:hover {
     opacity: 0.85;
 }
+
+/* ===== Auth Screen ===== */
+.auth-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-main, #f5f6fa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50000;
+}
+.auth-card {
+    background: var(--bg-surface, #fff);
+    border-radius: var(--radius-lg, 12px);
+    padding: 40px 36px;
+    width: 380px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+.auth-logo { text-align: center; font-size: 2.5rem; margin-bottom: 8px; }
+.auth-title { text-align: center; margin: 0 0 20px; font-size: 1.2rem; color: var(--text-primary, #222); }
+.auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--border-color, #e0e0e0); }
+.auth-tab {
+    flex: 1; padding: 8px; background: none; border: none; cursor: pointer;
+    font-size: 0.95rem; color: var(--text-secondary, #666);
+    border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s;
+}
+.auth-tab.active { color: var(--accent, #4a6fa5); border-bottom-color: var(--accent, #4a6fa5); font-weight: 600; }
+.auth-form input {
+    display: block; width: 100%; padding: 10px 12px; margin-bottom: 12px;
+    border: 1px solid var(--border-color, #e0e0e0); border-radius: var(--radius-sm, 6px);
+    font-size: 0.95rem; background: var(--bg-main, #f5f6fa); color: var(--text-primary, #222);
+    box-sizing: border-box;
+}
+.auth-form input:focus { outline: none; border-color: var(--accent, #4a6fa5); box-shadow: 0 0 0 3px rgba(74,111,165,0.15); }
+.auth-submit { width: 100%; padding: 10px; margin-top: 4px; }
+.auth-error { color: #c0392b; font-size: 0.85rem; margin-top: 8px; }
+.user-info { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.user-display-name { font-size: 0.85rem; color: var(--text-primary, #222); font-weight: 500; }
+.btn-logout { background: none; border: none; color: var(--text-secondary, #888); cursor: pointer; font-size: 0.82rem; padding: 2px 8px; }
+.btn-logout:hover { color: #c0392b; }
+
+[data-theme="dark"] .auth-screen { background: #1a1a2e; }
+[data-theme="dark"] .auth-card { background: #252540; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+[data-theme="dark"] .auth-form input { background: #1a1a2e; color: #e0e0e0; border-color: #3a3a5c; }

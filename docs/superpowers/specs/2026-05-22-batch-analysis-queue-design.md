@@ -267,10 +267,13 @@ app = FastAPI(lifespan=lifespan)
 
 1. **设置区**：选择学科、模式、深度、模型（复用现有表单的下拉组件样式）
 2. **题目输入区**：可扩展的题目列表
-   - 每道题有：题号、题目文本框、学生解答文本框、删除按钮
+   - 每道题有：题号、题目文本框（支持拍照/上传图片 OCR）、学生解答文本框（支持拍照/上传图片 OCR）、删除按钮
+   - OCR 流程与现有单题分析一致：点击拍照/上传按钮 → 调用 `POST /ocr` → 结果填入文本框 → 用户可编辑调整
    - "添加题目"按钮追加新行
    - 支持粘贴多题（以空行分隔，系统自动拆分）
 3. **底部**：题目数量统计 + "提交"按钮
+
+**关键设计**：OCR 在提交前完成，提交时所有题目都已是文本。批量分析时不再做 OCR，worker 只处理文本输入。这样用户可以在提交前检查和修正 OCR 结果，也避免了 worker 需要处理图片数据的复杂性。
 
 ### 4.4 批次详情页（点击批次卡片展开）
 
@@ -353,18 +356,17 @@ app = FastAPI(lifespan=lifespan)
 | `web/batch_worker.py` | 新建 | BatchWorker 类（~120 行） |
 | `web/app.py` | 新增 | 7 个 batch API 端点 + lifespan 修改（~100 行） |
 | `web/service.py` | 不改 | 复用 run_stem_tutor_stream |
-| `web/templates/index.html` | 新增 | #queue section + 新建批次模态框（~120 行） |
-| `web/static/app.js` | 新增 | QueueModule + 路由注册（~250 行） |
+| `web/templates/index.html` | 新增 | #queue section + 新建批次模态框（含 OCR 上传按钮）（~150 行） |
+| `web/static/app.js` | 新增 | QueueModule + OCR 触发 + 路由注册（~300 行） |
 | `web/static/style.css` | 新增 | 队列样式（~100 行） |
 | `tests/test_batch.py` | 新建 | 数据库 CRUD + worker 逻辑测试（~120 行） |
 
-**总计约 910 行新代码，0 行改动现有代码。**
+**总计约 960 行新代码，0 行改动现有代码。**
 
 ---
 
 ## 9. 不在范围内（Out of Scope）
 
-- OCR 图片输入的批量提交（V1 只支持文本输入）
 - WebSocket 实时推送（轮询足够）
 - 并行分析（串行足够）
 - 批量汇总统计图表（V1 只展示列表，图表后续迭代）

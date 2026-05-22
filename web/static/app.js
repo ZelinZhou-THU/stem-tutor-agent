@@ -4996,6 +4996,7 @@
                 '<div class="batch-item-input-header"><span>第 ' + (idx + 1) + ' 题</span><button class="batch-item-remove" title="删除">&times;</button></div>' +
                 '<label style="font-size:12px;color:var(--text-muted,#888)">题目</label>' +
                 '<textarea class="batch-problem-text" placeholder="输入题目文本" rows="2"></textarea>' +
+                '<div class="ocr-math-preview is-empty batch-ocr-preview" data-field="problem" data-placeholder="公式预览"></div>' +
                 '<div class="upload-area upload-area-small batch-upload-zone" data-field="problem">' +
                 '<div class="upload-actions">' +
                 '<label class="upload-btn upload-btn-camera">拍照<input type="file" accept="image/*" capture="environment" class="batch-file-input"></label>' +
@@ -5003,6 +5004,7 @@
                 '</div><div class="batch-upload-hint" style="font-size:11px;margin-top:4px">或将图片拖拽到此处</div></div>' +
                 '<label style="font-size:12px;color:var(--text-muted,#888);margin-top:6px;display:block">学生解答</label>' +
                 '<textarea class="batch-solution-text" placeholder="输入学生解题步骤" rows="3"></textarea>' +
+                '<div class="ocr-math-preview is-empty batch-ocr-preview" data-field="solution" data-placeholder="公式预览"></div>' +
                 '<div class="upload-area upload-area-small batch-upload-zone" data-field="solution">' +
                 '<div class="upload-actions">' +
                 '<label class="upload-btn upload-btn-camera">拍照<input type="file" accept="image/*" capture="environment" class="batch-file-input"></label>' +
@@ -5024,6 +5026,13 @@
             wireZone(zones[0], inputs[1], "problem");
             wireZone(zones[1], inputs[2], "solution");
             wireZone(zones[1], inputs[3], "solution");
+            var previews = div.querySelectorAll(".batch-ocr-preview");
+            div.querySelector(".batch-problem-text").addEventListener("input", function() {
+                debounceRenderOcrPreview("batch-problem-" + idx, this.value, previews[0]);
+            });
+            div.querySelector(".batch-solution-text").addEventListener("input", function() {
+                debounceRenderOcrPreview("batch-solution-" + idx, this.value, previews[1]);
+            });
             list.appendChild(div);
             _updateCount();
         }
@@ -5052,6 +5061,8 @@
                         var itemDiv = zone.closest(".batch-item-input");
                         var textarea = field === "problem" ? itemDiv.querySelector(".batch-problem-text") : itemDiv.querySelector(".batch-solution-text");
                         textarea.value = text;
+                        var preview = itemDiv.querySelector('.batch-ocr-preview[data-field="' + field + '"]');
+                        if (preview) renderOcrPreview(text, preview);
                         if (hint) hint.textContent = "识别完成";
                         setTimeout(function() { if (hint) hint.textContent = "或将图片拖拽到此处"; }, 1500);
                     },

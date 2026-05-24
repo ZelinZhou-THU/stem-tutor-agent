@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "LangGraph-based multi-subject STEM tutoring prototype"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "AGPL-3.0-only"
 dependencies = [
   "pydantic>=2.7.0",
   "langgraph>=0.2.0",

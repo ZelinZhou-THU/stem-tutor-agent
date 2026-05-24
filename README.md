@@ -10,7 +10,7 @@ AI agent that verifies every step of a student solution, pinpoints the root caus
 [![LangGraph](https://img.shields.io/badge/LangGraph-Workflow-1C8C3C)](https://github.com/langchain-ai/langgraph)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Web_UI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![SymPy](https://img.shields.io/badge/SymPy-Symbolic_Math-7744AA)](https://sympy.org)
-[![License](https://img.shields.io/badge/License-Apache_2.0-F0C802?logo=apache&logoColor=white)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-009900?logo=gnu&logoColor=white)](LICENSE)
 
 ## How It Works
 
@@ -477,6 +477,10 @@ Supports 4 model groups: `reasoning` / `fast` / `ocr` / `baseline`. Each node ca
 - First startup auto-creates admin account: `admin / admin123`
 - Visit `http://localhost:8000/#admin` for the admin panel (requires admin login)
 
+## Disclaimer
+
+This system uses AI language models to generate tutoring feedback and practice problems. While we employ verification strategies (symbolic math, numerical sampling, tool-based computation) to improve accuracy, AI-generated content may contain errors. Users should independently verify critical information. The authors assume no liability for any outcomes resulting from the use of this system.
+
 ## Credits
 
 Built by [ZelinZhou-THU](https://github.com/ZelinZhou-THU) — a course final project focused on explainability and verifiability in AI tutoring.
@@ -485,4 +489,4 @@ Powered by [LangGraph](https://github.com/langchain-ai/langgraph), [SymPy](https
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)

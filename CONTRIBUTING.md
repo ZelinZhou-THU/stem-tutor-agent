@@ -22,6 +22,27 @@ Thanks for your interest in contributing! Here's how to get started.
 - Keep functions small and focused
 - Maintain module boundaries as described in the README
 
-## License
+## Licensing & DCO
 
-By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
+To contribute, you must agree to the following terms. No separate CLA is required.
+
+**By submitting a Pull Request, you agree that:**
+
+1. Your contributions are licensed under the [GNU Affero General Public License v3.0](LICENSE), consistent with the rest of the project; and
+2. You grant the project maintainer (ZelinZhou-THU) a perpetual, worldwide, non-exclusive, royalty-free license to use, reproduce, modify, sublicense, and distribute your contributions under any license terms, including proprietary commercial licenses, without restriction or compensation.
+
+### Developer Certificate of Origin (DCO)
+
+Every commit must include a `Signed-off-by` line to certify you have the right to submit the code:
+
+```bash
+git commit -s -m "feat: your message"
+```
+
+This certifies you agree to the [Developer Certificate of Origin](https://developercertificate.org/) version 1.1.
+
+### First-time contributors
+
+When opening your first PR, include a comment on it stating:
+
+> "I have read the terms in CONTRIBUTING.md and agree to them."

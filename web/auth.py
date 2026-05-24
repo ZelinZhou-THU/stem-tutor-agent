@@ -10,7 +10,13 @@ from jose import JWTError, jwt
 
 from web.database import get_user_by_id
 
-SECRET_KEY = os.environ.get("STEM_TUTOR_JWT_SECRET", "stem-tutor-dev-secret-change-in-prod")
+SECRET_KEY = os.environ.get("STEM_TUTOR_JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "STEM_TUTOR_JWT_SECRET environment variable is not set. "
+        "Set it to a secure random value before starting the server:\n"
+        "  python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 72
 

@@ -836,6 +836,19 @@ async def update_batch_item(batch_id: str, seq: int, status: str, run_id: str | 
         await db.close()
 
 
+async def set_batch_item_run_id(batch_id: str, seq: int, run_id: str) -> None:
+    now = _now_iso()
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE batch_items SET run_id=?, updated_at=? WHERE batch_id=? AND seq=?",
+            (run_id, now, batch_id, seq),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
 async def claim_next_pending_item(batch_id: str) -> dict | None:
     db = await get_db()
     try:

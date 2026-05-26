@@ -10,6 +10,7 @@ from web.database import (
     get_running_batches,
     load_batch,
     recover_stale_running_items,
+    set_batch_item_run_id,
     update_batch_item,
     update_batch_status,
 )
@@ -85,15 +86,26 @@ class BatchWorker:
                 depth=settings.get("depth", "standard"),
                 user_id=batch["user_id"],
             ):
+                if run_id is None and '"type": "start"' in chunk:
+                    for line in chunk.strip().split("\n"):
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])
+                            except json.JSONDecodeError:
+                                continue
+                            if data.get("type") == "start" and data.get("run_id"):
+                                run_id = data["run_id"]
+                                await set_batch_item_run_id(batch_id, item["seq"], run_id)
                 if '"type": "result"' in chunk:
                     for line in chunk.strip().split("\n"):
                         if line.startswith("data: "):
                             data = json.loads(line[6:])
                             if data.get("type") == "result":
-                                run_id = (
-                                    data.get("data", {}).get("run_id")
-                                    or data.get("data", {}).get("run_meta", {}).get("run_id")
-                                )
+                                if run_id is None:
+                                    run_id = (
+                                        data.get("data", {}).get("run_id")
+                                        or data.get("data", {}).get("run_meta", {}).get("run_id")
+                                    )
                 batch_fresh = await load_batch(batch_id, batch["user_id"])
                 if batch_fresh and batch_fresh["status"] in ("paused", "cancelled"):
                     break

@@ -3656,6 +3656,12 @@
             var pollInterval = 3000;
             var maxPolls = 120;
             var pollCount = 0;
+            var startTime = Date.now();
+            function formatElapsed() {
+                var sec = Math.floor((Date.now() - startTime) / 1000);
+                if (sec >= 60) return Math.floor(sec / 60) + "\u5206" + (sec % 60) + "\u79d2";
+                return sec + "\u79d2";
+            }
             function pollStatus() {
                 if (pollCount >= maxPolls) { showError("\u67e5\u8be2\u7ed3\u679c\u8d85\u65f6\uff0c\u8bf7\u91cd\u8bd5\u3002"); hideLoading(); return; }
                 pollCount++;
@@ -3672,7 +3678,7 @@
                             var statusEl = loadingDiv.querySelector(".loading-status");
                             if (statusEl) {
                                 statusEl.style.display = "";
-                                statusEl.textContent = "\u8fde\u63a5\u65ad\u5f00\uff0c\u540e\u7aef\u4ecd\u5728\u8fd0\u884c...\uff08\u5df2\u8f6e\u8be2 " + pollCount + " \u6b21\uff09";
+                                statusEl.textContent = "\u540e\u7aef\u4ecd\u5728\u8fd0\u884c...\uff08\u5df2\u7b49\u5f85 " + formatElapsed() + "\uff09";
                             }
                             reconnectTimer = setTimeout(pollStatus, pollInterval);
                         }
@@ -3686,6 +3692,12 @@
             var pollInterval = 3000;
             var maxPolls = 120;
             var pollCount = 0;
+            var startTime = Date.now();
+            function formatElapsed() {
+                var sec = Math.floor((Date.now() - startTime) / 1000);
+                if (sec >= 60) return Math.floor(sec / 60) + "\u5206" + (sec % 60) + "\u79d2";
+                return sec + "\u79d2";
+            }
             function pollBatch() {
                 if (pollCount >= maxPolls) {
                     showError("\u67e5\u8be2\u7ed3\u679c\u8d85\u65f6\uff0c\u8bf7\u91cd\u8bd5\u3002");
@@ -3712,7 +3724,7 @@
                         var statusEl = loadingDiv.querySelector(".loading-status");
                         if (statusEl) {
                             statusEl.style.display = "";
-                            statusEl.textContent = "\u6b63\u5728\u5206\u6790\u8bca\u65ad...\uff08\u5df2\u7b49\u5f85 " + pollCount + " \u6b21\uff09";
+                            statusEl.textContent = "\u6b63\u5728\u5206\u6790\u8bca\u65ad...\uff08\u5df2\u7b49\u5f85 " + formatElapsed() + "\uff09";
                         }
                         reconnectTimer = setTimeout(pollBatch, pollInterval);
                     })

@@ -3675,6 +3675,9 @@
                                 hideLoading();
                             });
                         } else {
+                            if (data.completed_nodes) {
+                                data.completed_nodes.forEach(function(n) { completeStep(n); });
+                            }
                             if (data.last_node) {
                                 renderPartial(data.last_node, data);
                             }

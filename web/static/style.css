@@ -4659,3 +4659,7 @@ textarea {
     padding: 4px 12px;
     font-size: 12px;
 }
+
+#admin-stat-pending-card {
+    border-left: 4px solid var(--warning, #ff9800);
+}

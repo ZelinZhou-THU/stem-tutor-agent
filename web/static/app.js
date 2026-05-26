@@ -2459,13 +2459,18 @@
                         if (!r.ok) throw new Error(data.detail || data.error || "加载失败");
                         return data;
                     });
+                }),
+                fetch("/api/admin/pending-users", { headers: AuthModule.getAuthHeader() }).then(function (r) {
+                    return r.json().then(function (data) { if (!r.ok) throw new Error(data.detail || data.error || "加载失败"); return data; });
                 })
             ]).then(function (results) {
                 var stats = results[0] || {};
                 var users = results[1] || [];
+                var pending = results[2] || [];
                 self._users = users;
                 self.renderStats(stats, users);
                 self.renderUsers(users);
+                self.renderPendingUsers(pending);
                 if (loading) loading.style.display = "none";
                 if (content) content.style.display = "";
                 if (!users.length && empty) empty.style.display = "";
@@ -2901,6 +2906,8 @@
             if (usersEl) usersEl.textContent = totalUsers;
             if (runsEl) runsEl.textContent = runCount;
             if (adminsEl) adminsEl.textContent = adminCount;
+            var pendingEl = $("admin-stat-pending");
+            if (pendingEl) pendingEl.textContent = stats.pending_count || 0;
         },
 
         renderUsers: function (users) {
@@ -2918,6 +2925,9 @@
                 html += '<td>' + esc(String(user.id)) + '</td>';
                 html += '<td>' + esc(user.username || '') + '</td>';
                 html += '<td><span class="status-badge ' + badge + '">' + role + '</span></td>';
+                var statusText = user.status === 'pending' ? '待审批' : (user.status === 'active' ? '正常' : user.status);
+                var statusBadge = user.status === 'pending' ? 'status-running' : 'status-complete';
+                html += '<td><span class="status-badge ' + statusBadge + '">' + statusText + '</span></td>';
                 html += '<td>' + esc(formatTimestamp(user.created_at)) + '</td>';
                 html += '<td>';
                 html += '<button type="button" class="btn-secondary btn-sm admin-view-btn" data-user-id="' + esc(String(user.id)) + '">查看</button>';
@@ -2940,6 +2950,101 @@
                     var userId = parseInt(this.getAttribute('data-user-id'), 10);
                     if (!isNaN(userId)) self.navigateToUser(userId);
                 });
+            });
+        },
+
+        renderPendingUsers: function (pending) {
+            var section = $("admin-pending-section");
+            var body = $("admin-pending-body");
+            if (!section || !body) return;
+            if (!pending || !pending.length) {
+                section.style.display = "none";
+                return;
+            }
+            section.style.display = "";
+            var html = '';
+            pending.forEach(function (user) {
+                html += '<tr>';
+                html += '<td>' + esc(String(user.id)) + '</td>';
+                html += '<td>' + esc(user.username || '') + '</td>';
+                html += '<td>' + esc(formatTimestamp(user.created_at)) + '</td>';
+                html += '<td>';
+                html += '<button type="button" class="btn-primary btn-sm admin-approve-btn" data-user-id="' + esc(String(user.id)) + '">通过</button>';
+                html += '<button type="button" class="btn-danger btn-sm admin-reject-btn" data-user-id="' + esc(String(user.id)) + '" data-username="' + esc(user.username || '') + '">拒绝</button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            body.innerHTML = html;
+            var self = this;
+            body.querySelectorAll('.admin-approve-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var uid = parseInt(this.getAttribute('data-user-id'), 10);
+                    if (!isNaN(uid)) self._approveUser(uid);
+                });
+            });
+            body.querySelectorAll('.admin-reject-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var uid = parseInt(this.getAttribute('data-user-id'), 10);
+                    var uname = this.getAttribute('data-username') || '';
+                    if (!isNaN(uid)) self._rejectUser(uid, uname);
+                });
+            });
+            this._bindApproveAll();
+        },
+
+        _approveUser: function (userId) {
+            var self = this;
+            fetch("/api/admin/users/" + userId + "/approve", {
+                method: "POST",
+                headers: AuthModule.getAuthHeader()
+            }).then(function (r) {
+                return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "操作失败"); return d; });
+            }).then(function () {
+                self.load();
+            }).catch(function (err) {
+                alert("审批失败：" + (err.message || "未知错误"));
+            });
+        },
+
+        _rejectUser: function (userId, username) {
+            if (!confirm("确定拒绝用户 " + username + " 的注册申请？（该用户名可被重新注册）")) return;
+            var self = this;
+            fetch("/api/admin/users/" + userId + "/reject", {
+                method: "POST",
+                headers: AuthModule.getAuthHeader()
+            }).then(function (r) {
+                return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "操作失败"); return d; });
+            }).then(function () {
+                self.load();
+            }).catch(function (err) {
+                alert("拒绝失败：" + (err.message || "未知错误"));
+            });
+        },
+
+        _bindApproveAll: function () {
+            var btn = $("admin-approve-all-btn");
+            if (!btn || btn._bound) return;
+            btn._bound = true;
+            var self = this;
+            btn.addEventListener("click", function () {
+                var body = $("admin-pending-body");
+                var count = body ? body.querySelectorAll("tr").length : 0;
+                if (count === 0) return;
+                if (!confirm("确定通过所有 " + count + " 个待审批用户？")) return;
+                var rows = body.querySelectorAll(".admin-approve-btn");
+                var promises = [];
+                rows.forEach(function (r) {
+                    var uid = parseInt(r.getAttribute("data-user-id"), 10);
+                    if (!isNaN(uid)) {
+                        promises.push(
+                            fetch("/api/admin/users/" + uid + "/approve", {
+                                method: "POST",
+                                headers: AuthModule.getAuthHeader()
+                            }).then(function (r2) { return r2.json(); })
+                        );
+                    }
+                });
+                Promise.all(promises).then(function () { self.load(); });
             });
         },
 

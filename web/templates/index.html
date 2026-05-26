@@ -871,6 +871,32 @@
                                 <div class="admin-stat-label">管理员数</div>
                                 <div class="admin-stat-value" id="admin-stat-admins">0</div>
                             </div>
+                            <div class="admin-stat-card" id="admin-stat-pending-card" style="cursor:pointer;">
+                                <div class="admin-stat-label">待审批</div>
+                                <div class="admin-stat-value" id="admin-stat-pending">0</div>
+                            </div>
+                        </div>
+
+                        <div class="admin-section" id="admin-pending-section" style="display:none;">
+                            <div class="admin-section-header">
+                                <h4>⏳ 待审批用户</h4>
+                                <div>
+                                    <button type="button" class="btn-primary btn-sm" id="admin-approve-all-btn">全部通过</button>
+                                </div>
+                            </div>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>用户名</th>
+                                            <th>申请时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-pending-body"></tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <div class="admin-section">
@@ -885,6 +911,7 @@
                                             <th>ID</th>
                                             <th>用户名</th>
                                             <th>角色</th>
+                                            <th>状态</th>
                                             <th>创建时间</th>
                                             <th>操作</th>
                                         </tr>

@@ -3654,7 +3654,7 @@
         function showReconnectingUI(runId) {
             currentRunId = runId;
             var pollInterval = 3000;
-            var maxPolls = 120;
+            var maxPolls = 600;
             var pollCount = 0;
             var startTime = Date.now();
             function formatElapsed() {
@@ -3700,7 +3700,7 @@
 
         function pollBatchUntilComplete(batchId) {
             var pollInterval = 3000;
-            var maxPolls = 120;
+            var maxPolls = 600;
             var pollCount = 0;
             var startTime = Date.now();
             function formatElapsed() {

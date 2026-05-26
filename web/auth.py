@@ -1,7 +1,19 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
+
+from dotenv import load_dotenv
+
+for candidate in [
+    Path(__file__).resolve().parent.parent / "key.env",
+    Path(__file__).resolve().parent.parent.parent / "key.env",
+    Path(__file__).resolve().parent.parent.parent.parent / "key.env",
+]:
+    if candidate.exists():
+        load_dotenv(dotenv_path=candidate)
+        break
 
 from bcrypt import checkpw, gensalt, hashpw
 from fastapi import Depends, HTTPException, status
@@ -47,6 +59,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_
     user = await get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if user.get("status") != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号未激活")
     return user
 
 

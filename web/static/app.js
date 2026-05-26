@@ -5147,6 +5147,7 @@
             var params = "?per_page=50";
             if (status) params += "&status=" + status;
             _api("GET", "/batch/list" + params).then(function(data) {
+                data.batches = (data.batches || []).filter(function(b) { return b.total_count > 1; });
                 _renderList(data);
             });
         }
@@ -5402,4 +5403,5 @@
             _ocrWithCrop: _ocrWithCrop,
         };
     })();
+    window.QueueModule = QueueModule;
 })();

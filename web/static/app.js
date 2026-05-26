@@ -3045,6 +3045,7 @@
                 });
             });
             this._bindApproveAll();
+            this._bindRejectAll();
         },
 
         _approveUser: function (userId) {
@@ -3093,6 +3094,33 @@
                     if (!isNaN(uid)) {
                         promises.push(
                             fetch("/api/admin/users/" + uid + "/approve", {
+                                method: "POST",
+                                headers: AuthModule.getAuthHeader()
+                            }).then(function (r2) { return r2.json(); })
+                        );
+                    }
+                });
+                Promise.all(promises).then(function () { self.load(); });
+            });
+        },
+
+        _bindRejectAll: function () {
+            var btn = $("admin-reject-all-btn");
+            if (!btn || btn._bound) return;
+            btn._bound = true;
+            var self = this;
+            btn.addEventListener("click", function () {
+                var body = $("admin-pending-body");
+                var count = body ? body.querySelectorAll("tr").length : 0;
+                if (count === 0) return;
+                if (!confirm("确定拒绝所有 " + count + " 个待审批用户？用户名可被重新注册。")) return;
+                var rows = body.querySelectorAll(".admin-reject-btn");
+                var promises = [];
+                rows.forEach(function (r) {
+                    var uid = parseInt(r.getAttribute("data-user-id"), 10);
+                    if (!isNaN(uid)) {
+                        promises.push(
+                            fetch("/api/admin/users/" + uid + "/reject", {
                                 method: "POST",
                                 headers: AuthModule.getAuthHeader()
                             }).then(function (r2) { return r2.json(); })

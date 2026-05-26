@@ -23,6 +23,7 @@ from web.database import (
     _ensure_db, create_user, get_user_by_username,
     create_batch, load_batch, update_batch_status, update_batch_item,
     add_batch_items, list_batch_items, list_batches, delete_batch,
+    close_pool,
 )
 from web.models import LoginRequest, RegisterRequest, ChangePasswordRequest
 from web.service import ocr_problem_text, run_stem_tutor, run_stem_tutor_stream, _load_run_result, _get_run_status
@@ -51,6 +52,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await get_batch_worker().stop()
+    await close_pool()
 
 
 @app.post("/api/auth/register")

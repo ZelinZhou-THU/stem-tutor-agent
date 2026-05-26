@@ -228,24 +228,27 @@ def _stmt_type(sql: str) -> str:
 
 
 async def _ensure_db() -> None:
-    global _initialized
+    global _initialized, _pg_pool
     if _initialized:
         return
     if USE_PG and PG_URL:
         import asyncpg
-        conn = await asyncpg.connect(PG_URL)
+        pool = await asyncpg.create_pool(PG_URL, min_size=1, max_size=3)
         try:
-            await conn.execute(_PG_SCHEMA)
-            cols = await conn.fetch(
-                "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
-            )
-            col_names = [r["column_name"] for r in cols]
-            if "status" not in col_names:
-                await conn.execute(
-                    "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+            async with pool.acquire() as conn:
+                await conn.execute(_PG_SCHEMA)
+                cols = await conn.fetch(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
                 )
-        finally:
-            await conn.close()
+                col_names = [r["column_name"] for r in cols]
+                if "status" not in col_names:
+                    await conn.execute(
+                        "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+                    )
+        except BaseException:
+            await pool.close()
+            raise
+        _pg_pool = pool
     else:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         async with aiosqlite.connect(str(DB_PATH)) as db:
@@ -263,8 +266,9 @@ async def _ensure_db() -> None:
 class _DB:
     """统一包装 aiosqlite 和 asyncpg 的数据库连接。"""
 
-    def __init__(self, raw_conn):
+    def __init__(self, raw_conn, pool=None):
         self._raw = raw_conn
+        self._pool = pool
         self._is_pg = type(raw_conn).__module__.startswith("asyncpg")
         self._pg_stmt = None
         self._pg_sql = None
@@ -352,19 +356,32 @@ class _DB:
             await self._raw.commit()
 
     async def close(self):
-        await self._raw.close()
+        if self._is_pg and self._pool:
+            await self._pool.release(self._raw)
+        else:
+            await self._raw.close()
 
 
 async def get_db() -> _DB:
-    """获取数据库连接——自动选择 SQLite（本地）或 PostgreSQL（Vercel）。"""
     await _ensure_db()
-    if USE_PG and PG_URL:
+    if USE_PG and _pg_pool:
+        conn = await _pg_pool.acquire()
+        return _DB(conn, pool=_pg_pool)
+    elif USE_PG and PG_URL:
         import asyncpg
         conn = await asyncpg.connect(PG_URL)
+        return _DB(conn)
     else:
         conn = await aiosqlite.connect(str(DB_PATH))
         conn.row_factory = aiosqlite.Row
-    return _DB(conn)
+        return _DB(conn)
+
+
+async def close_pool() -> None:
+    global _pg_pool
+    if _pg_pool is not None:
+        await _pg_pool.close()
+        _pg_pool = None
 
 
 def _now_iso() -> str:

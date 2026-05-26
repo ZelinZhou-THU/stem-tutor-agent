@@ -2347,6 +2347,16 @@
                     return data;
                 });
             }).then(function (data) {
+                if (data.status === "pending") {
+                    if (errorEl) {
+                        errorEl.style.color = "var(--success, #4caf50)";
+                        errorEl.textContent = "注册成功，请等待管理员审批后登录";
+                        errorEl.style.display = "";
+                    }
+                    var form = $("auth-register-form");
+                    if (form) form.reset();
+                    return;
+                }
                 localStorage.setItem(self.TOKEN_KEY, data.access_token);
                 localStorage.setItem(self.USER_KEY, JSON.stringify(data.user));
                 self.hideAuthScreen();
@@ -2354,7 +2364,7 @@
                 self._syncLocalData();
                 _onAuthReady();
             }).catch(function (err) {
-                if (errorEl) { errorEl.textContent = err.message || "\u6ce8\u518c\u5931\u8d25"; errorEl.style.display = ""; }
+                if (errorEl) { errorEl.style.color = ""; errorEl.textContent = err.message || "注册失败"; errorEl.style.display = ""; }
             });
         },
 

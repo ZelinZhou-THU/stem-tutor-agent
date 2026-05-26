@@ -87,6 +87,18 @@ Visit http://localhost:8000. First startup auto-creates admin account: `admin / 
 > pip install -r requirements.lock
 > ```
 
+### Configuration
+
+Copy `key.env.example` to `key.env` and fill in at least these:
+
+```bash
+# Required: LLM API key
+PARATERA_API_KEY=your-api-key-here
+
+# Required: JWT secret for user login (generate with: python -c "import secrets; print(secrets.token_urlsafe(64))")
+STEM_TUTOR_JWT_SECRET=your-random-secret-here
+```
+
 <details>
 <summary>📖 More ways to run</summary>
 
@@ -336,6 +348,7 @@ The project reads `key.env` from the workspace root (see `key.env.example`), wit
 | `STEM_TUTOR_SUBJECT` | Default subject | `calculus` |
 | `PARATERA_API_KEY` | LLM API key | (empty) |
 | `PARATERA_URL` | LLM API URL | (empty) |
+| `STEM_TUTOR_JWT_SECRET` | JWT signing key for authentication | (required, no default) |
 
 <details>
 <summary>⚙️ All Configuration Options</summary>

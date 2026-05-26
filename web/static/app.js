@@ -3197,12 +3197,15 @@
         cropCallback = callback;
         var reader = new FileReader();
         reader.onload = function (e) {
-            $("crop-image").src = e.target.result;
-            $("crop-modal").style.display = "flex";
-            if (cropperInstance) cropperInstance.destroy();
-            cropperInstance = new Cropper($("crop-image"), {
-                viewMode: 1, dragMode: "move", autoCropArea: 1.0, responsive: true,
-            });
+            var dataUrl = e.target.result;
+            $("crop-image").onload = function () {
+                $("crop-modal").style.display = "flex";
+                if (cropperInstance) cropperInstance.destroy();
+                cropperInstance = new Cropper($("crop-image"), {
+                    viewMode: 1, dragMode: "move", autoCropArea: 1.0, responsive: true,
+                });
+            };
+            $("crop-image").src = dataUrl;
         };
         reader.readAsDataURL(file);
     }

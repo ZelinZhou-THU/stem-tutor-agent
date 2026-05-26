@@ -1190,6 +1190,12 @@ async def run_stem_tutor_stream(
             return
         except Exception as exc:
             last_exc = exc
+            import logging as _logging
+            _logging.getLogger(__name__).error(
+                "[Analyze] Graph execution failed (attempt %d/%d): %s: %s",
+                attempt, max_attempts, type(exc).__name__, exc,
+                exc_info=True,
+            )
             if attempt < max_attempts and _is_retryable_exception(exc):
                 delay = _retry_sleep_seconds(attempt)
                 yield f"data: {_json.dumps({'type': 'retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': '网络或模型暂时不稳定，正在自动重试...'}, ensure_ascii=False)}\n\n"

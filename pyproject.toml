@@ -42,4 +42,4 @@ pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.vercel]
-entrypoint = "web/app:app"
+entrypoint = "api:app"

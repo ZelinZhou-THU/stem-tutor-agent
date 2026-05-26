@@ -243,7 +243,7 @@ async def analyze_stream(
     if image is not None:
         image_bytes = await image.read()
 
-    settings = json.dumps({
+    settings = {
         "model": model,
         "subject_id": subject_id,
         "mode": mode,
@@ -251,7 +251,7 @@ async def analyze_stream(
         "student_solution": student_solution,
         "source_type": source_type,
         "image_stored": image_bytes is not None,
-    })
+    }
     batch_id = await create_batch(user["id"], settings, total_count=1)
     await add_batch_items(batch_id, [{
         "problem_text": resolved_problem_text,

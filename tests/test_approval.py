@@ -119,3 +119,43 @@ def test_stats_include_pending_count():
             assert "pending_count" in data
             assert isinstance(data["pending_count"], int)
     _run(_test())
+
+
+def test_change_password_api():
+    async def _test():
+        from web.app import app
+        from web.database import _ensure_db, create_user
+        from web.auth import hash_password
+        await _ensure_admin()
+        name = _uid()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            from web.database import get_user_by_username
+            await create_user(name, hash_password("oldpass"), status="active")
+            login_resp = await ac.post("/api/auth/login", json={"username": name, "password": "oldpass"})
+            token = login_resp.json()["access_token"]
+            headers = {"Authorization": "Bearer " + token}
+            resp = await ac.post("/api/user/change-password", json={"old_password": "oldpass", "new_password": "newpass123"}, headers=headers)
+            assert resp.status_code == 200
+            login_after = await ac.post("/api/auth/login", json={"username": name, "password": "newpass123"})
+            assert login_after.status_code == 200
+    _run(_test())
+
+
+def test_change_password_wrong_old():
+    async def _test():
+        from web.app import app
+        from web.database import _ensure_db, create_user
+        from web.auth import hash_password
+        await _ensure_admin()
+        name = _uid()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            await create_user(name, hash_password("correct"), status="active")
+            login_resp = await ac.post("/api/auth/login", json={"username": name, "password": "correct"})
+            token = login_resp.json()["access_token"]
+            headers = {"Authorization": "Bearer " + token}
+            resp = await ac.post("/api/user/change-password", json={"old_password": "wrong", "new_password": "newpass"}, headers=headers)
+            assert resp.status_code == 400
+            assert "\u5bc6\u7801\u9519\u8bef" in resp.json().get("detail", "")
+    _run(_test())

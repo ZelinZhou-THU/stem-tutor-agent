@@ -1937,6 +1937,61 @@
             bind("setting-default-model", "defaultModel");
             bind("setting-auto-save", "autoSaveHistory", true);
 
+            var changePwdBtn = $("btn-change-password");
+            if (changePwdBtn) {
+                changePwdBtn.addEventListener("click", function () {
+                    var modal = $("password-modal");
+                    if (modal) modal.style.display = "flex";
+                    var pwdOld = $("pwd-old"); if (pwdOld) pwdOld.value = "";
+                    var pwdNew = $("pwd-new"); if (pwdNew) pwdNew.value = "";
+                    var pwdConfirm = $("pwd-confirm"); if (pwdConfirm) pwdConfirm.value = "";
+                    var pwdErr = $("pwd-error"); if (pwdErr) pwdErr.style.display = "none";
+                });
+            }
+            var pwdModalClose = $("password-modal-close");
+            if (pwdModalClose) pwdModalClose.addEventListener("click", function () { var m = $("password-modal"); if (m) m.style.display = "none"; });
+            var pwdCancelBtn = $("pwd-cancel-btn");
+            if (pwdCancelBtn) pwdCancelBtn.addEventListener("click", function () { var m = $("password-modal"); if (m) m.style.display = "none"; });
+            var pwdConfirmBtn = $("pwd-confirm-btn");
+            if (pwdConfirmBtn) {
+                pwdConfirmBtn.addEventListener("click", function () {
+                    var errorEl = $("pwd-error");
+                    var oldPwd = ($("pwd-old").value || "");
+                    var newPwd = ($("pwd-new").value || "");
+                    var confirmPwd = ($("pwd-confirm").value || "");
+                    if (!oldPwd || !newPwd || !confirmPwd) {
+                        if (errorEl) { errorEl.textContent = "请填写所有字段"; errorEl.style.display = ""; }
+                        return;
+                    }
+                    if (newPwd !== confirmPwd) {
+                        if (errorEl) { errorEl.textContent = "两次输入的新密码不一致"; errorEl.style.display = ""; }
+                        return;
+                    }
+                    if (newPwd.length < 4) {
+                        if (errorEl) { errorEl.textContent = "新密码至少4位"; errorEl.style.display = ""; }
+                        return;
+                    }
+                    pwdConfirmBtn.textContent = "修改中...";
+                    pwdConfirmBtn.disabled = true;
+                    fetch("/api/user/change-password", {
+                        method: "POST",
+                        headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
+                        body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+                    }).then(function (r) {
+                        return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "修改失败"); return d; });
+                    }).then(function () {
+                        var modal = $("password-modal");
+                        if (modal) modal.style.display = "none";
+                        alert("密码修改成功");
+                    }).catch(function (err) {
+                        if (errorEl) { errorEl.textContent = err.message || "修改失败"; errorEl.style.display = ""; }
+                    }).finally(function () {
+                        pwdConfirmBtn.textContent = "确认修改";
+                        pwdConfirmBtn.disabled = false;
+                    });
+                });
+            }
+
             var exportBtn = $("btn-export-data");
             if (exportBtn) {
                 exportBtn.addEventListener("click", function () {

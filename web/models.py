@@ -22,3 +22,8 @@ class UserResponse(BaseModel):
     id: int
     username: str
     is_admin: bool
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str

@@ -24,7 +24,7 @@ from web.database import (
     create_batch, load_batch, update_batch_status, update_batch_item,
     add_batch_items, list_batch_items, list_batches, delete_batch,
 )
-from web.models import LoginRequest, RegisterRequest
+from web.models import LoginRequest, RegisterRequest, ChangePasswordRequest
 from web.service import ocr_problem_text, run_stem_tutor, run_stem_tutor_stream, _load_run_result, _get_run_status
 from web.service import _load_chat_history, chat_stream, list_runs, get_stats, reverify_step, cancel_run
 from web.service import delete_runs, cleanup_runs_before
@@ -85,6 +85,20 @@ async def login(req: LoginRequest):
 @app.get("/api/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}
+
+
+@app.post("/api/user/change-password")
+async def change_password(req: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    if len(req.new_password) < 4:
+        return JSONResponse(status_code=400, content={"detail": "新密码至少4位"})
+    if not verify_password(req.old_password, user["password_hash"]):
+        return JSONResponse(status_code=400, content={"detail": "当前密码错误"})
+    if req.old_password == req.new_password:
+        return JSONResponse(status_code=400, content={"detail": "新密码不能与当前密码相同"})
+    new_hash = hash_password(req.new_password)
+    from web.database import update_password
+    await update_password(user["id"], new_hash)
+    return {"ok": True}
 
 
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):

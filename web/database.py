@@ -201,6 +201,18 @@ async def reject_user(user_id: int) -> bool:
         await db.close()
 
 
+async def update_password(user_id: int, new_password_hash: str) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "UPDATE users SET password_hash=? WHERE id=?", (new_password_hash, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+
 # ── Run CRUD ───────────────────────────────────────────────────────────
 
 async def save_run(

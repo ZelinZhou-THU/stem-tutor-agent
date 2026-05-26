@@ -65,16 +65,27 @@ flowchart TD
 
 ### 环境要求
 
-- Python 3.10+（推荐 3.11）
+- Python 3.11 – 3.12
 
 ### 安装 & 运行
 
 ```bash
+# 安装运行时依赖
 pip install -e .
+
+# （可选）安装测试依赖
+pip install -e ".[dev]"
+
+# 启动服务
 python -m web.app
 ```
 
 访问 http://localhost:8000。首次启动自动创建管理员账户：`admin / admin123`。
+
+> 如需精确复现环境版本，可使用 `requirements.lock`：
+> ```bash
+> pip install -r requirements.lock
+> ```
 
 <details>
 <summary>📖 更多运行方式</summary>

@@ -65,16 +65,27 @@ Paste your solution into ChatGPT and it says *"This is incorrect."* STEM Tutor A
 
 ### Requirements
 
-- Python 3.10+ (3.11 recommended)
+- Python 3.11 – 3.12
 
 ### Install & Run
 
 ```bash
+# Install runtime dependencies
 pip install -e .
+
+# (Optional) Install dev dependencies for running tests
+pip install -e ".[dev]"
+
+# Start the server
 python -m web.app
 ```
 
 Visit http://localhost:8000. First startup auto-creates admin account: `admin / admin123`.
+
+> For exact version reproduction, use `requirements.lock`:
+> ```bash
+> pip install -r requirements.lock
+> ```
 
 <details>
 <summary>📖 More ways to run</summary>

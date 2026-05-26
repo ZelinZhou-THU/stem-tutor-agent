@@ -40,3 +40,6 @@ include = ["stem_tutor*", "web*", "cli*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.vercel]
+entrypoint = "web/app:app"

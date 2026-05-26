@@ -3675,10 +3675,17 @@
                                 hideLoading();
                             });
                         } else {
+                            if (data.last_node) {
+                                renderPartial(data.last_node, data);
+                            }
                             var statusEl = loadingDiv.querySelector(".loading-status");
                             if (statusEl) {
                                 statusEl.style.display = "";
-                                statusEl.textContent = "\u540e\u7aef\u4ecd\u5728\u8fd0\u884c...\uff08\u5df2\u7b49\u5f85 " + formatElapsed() + "\uff09";
+                                var label = data.last_node_label || "";
+                                var msg = label
+                                    ? label + " \u5df2\u5b8c\u6210\uff08\u5df2\u7b49\u5f85 " + formatElapsed() + "\uff09"
+                                    : "\u540e\u7aef\u4ecd\u5728\u8fd0\u884c...\uff08\u5df2\u7b49\u5f85 " + formatElapsed() + "\uff09";
+                                statusEl.textContent = msg;
                             }
                             reconnectTimer = setTimeout(pollStatus, pollInterval);
                         }

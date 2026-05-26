@@ -198,6 +198,13 @@ async def _save_intermediate_state(run_id: str, user_id: int, accumulated_state:
     response["user_status"] = ""
     meta = response.get("run_meta", {})
     meta["failed"] = False
+    last_node = accumulated_state.get("_last_completed_node", "")
+    completed_nodes = meta.get("completed_nodes", [])
+    if last_node and last_node not in completed_nodes:
+        completed_nodes.append(last_node)
+    meta["completed_nodes"] = completed_nodes
+    meta["last_node"] = last_node
+    meta["last_node_label"] = NODE_LABELS.get(last_node, last_node)
     response["run_meta"] = meta
     await database.update_run(run_id, response)
 
@@ -255,7 +262,31 @@ async def _get_run_status(run_id: str, user_id: int) -> dict:
 
     status = data.get("status")
     if status == "running":
-        return {"status": "running", "run_id": run_id}
+        result = {"status": "running", "run_id": run_id}
+        meta = data.get("run_meta", {})
+        if meta.get("last_node"):
+            result["last_node"] = meta["last_node"]
+            result["last_node_label"] = meta.get("last_node_label", meta["last_node"])
+            result["completed_nodes"] = meta.get("completed_nodes", [])
+        if data.get("steps") and len(data["steps"]) > 0:
+            result["steps"] = data["steps"]
+            result["steps_done"] = len(data["steps"])
+        if data.get("reference_solution"):
+            result["reference_solution"] = data["reference_solution"]
+        if data.get("diagnoses") and len(data["diagnoses"]) > 0:
+            result["diagnoses"] = data["diagnoses"]
+            result["diagnoses_done"] = len(data["diagnoses"])
+        if data.get("feedback") or data.get("next_action") or data.get("caution_note"):
+            result["feedback"] = {
+                "next_action": data.get("next_action"),
+                "caution_note": data.get("caution_note"),
+                "review_concepts": data.get("review_concepts", []),
+                "concise_summary": data.get("concise_summary"),
+                "likely_cause": data.get("likely_cause"),
+            }
+        if data.get("review_problems") and len(data["review_problems"]) > 0:
+            result["review_problems"] = data["review_problems"]
+        return result
     if status == "cancelled":
         return {"status": "cancelled", "user_status": "cancelled", "run_id": run_id}
     if status == "manual_review_required":
@@ -1121,6 +1152,8 @@ async def run_stem_tutor_stream(
 
                         for key, value in node_output.items():
                             accumulated_state[key] = value
+
+                        accumulated_state["_last_completed_node"] = node_name
 
                         label = NODE_LABELS.get(node_name, node_name)
                         yield f"data: {_json.dumps({'type': 'node_start', 'node': node_name, 'label': label}, ensure_ascii=False)}\n\n"

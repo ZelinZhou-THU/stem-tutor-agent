@@ -73,7 +73,7 @@ class ProviderSettings:
 
 def _load_env_file(path: Path) -> dict[str, str]:
     data: dict[str, str] = {}
-    if not path.exists():
+    if not path.exists() or not path.is_file():
         return data
 
     text = path.read_text(encoding="utf-8-sig")

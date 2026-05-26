@@ -21,8 +21,13 @@ from stem_tutor.settings import ProviderSettings
 from stem_tutor.subjects.context import get_subject_context
 
 
+import logging
+
+_llm_log = logging.getLogger("stem_tutor.llm")
+
+
 def _log(msg: str) -> None:
-    print(f"[LLM-DEBUG] {msg}", flush=True, file=sys.stderr)
+    _llm_log.info("[LLM] %s", msg)
 
 
 def _fix_json_escapes(text: str) -> str:

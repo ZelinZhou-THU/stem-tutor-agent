@@ -3589,10 +3589,14 @@
         });
 
         var currentRunId = null;
+        var currentBatchId = null;
         var reconnectTimer = null;
         var abortController = null;
 
         function cancelAnalysis() {
+            if (currentBatchId) {
+                fetch("/batch/" + currentBatchId + "/cancel", { method: "POST", headers: AuthModule.getAuthHeader() }).catch(function () {});
+            }
             if (currentRunId) {
                 fetch("/analyze/cancel/" + currentRunId, { method: "POST", headers: AuthModule.getAuthHeader() }).catch(function () {});
             }
@@ -3604,6 +3608,7 @@
 
         function startStreamWithReconnect(formData) {
             currentRunId = null;
+            currentBatchId = null;
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
             abortController = new AbortController();
             fetch("/analyze/stream", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData, signal: abortController.signal })
@@ -3615,13 +3620,19 @@
                     }
                     return readSSEStream(resp.body);
                 })
-                .then(function (data) { renderResults(data); })
+                .then(function (data) {
+                    if (data && data._batchId) {
+                        pollBatchUntilComplete(data._batchId);
+                    } else if (data) {
+                        renderResults(data);
+                    }
+                })
                 .catch(function (err) {
                     if (err.name === "AbortError") return;
                     if (currentRunId) { showReconnectingUI(currentRunId); }
                     else { showError("\u8bf7\u6c42\u5931\u8d25\uff1a" + err.message); }
                 })
-                .finally(function () { hideLoading(); abortController = null; });
+                .finally(function () { abortController = null; });
         }
 
         function loadResultAndRender(runId) {
@@ -3671,15 +3682,60 @@
             pollStatus();
         }
 
+        function pollBatchUntilComplete(batchId) {
+            var pollInterval = 3000;
+            var maxPolls = 120;
+            var pollCount = 0;
+            function pollBatch() {
+                if (pollCount >= maxPolls) {
+                    showError("\u67e5\u8be2\u7ed3\u679c\u8d85\u65f6\uff0c\u8bf7\u91cd\u8bd5\u3002");
+                    hideLoading();
+                    return;
+                }
+                pollCount++;
+                fetch("/analyze/batch-status/" + batchId, { headers: AuthModule.getAuthHeader() })
+                    .then(function (resp) {
+                        if (!resp.ok) throw new Error("HTTP " + resp.status);
+                        return resp.json();
+                    })
+                    .then(function (data) {
+                        if (data.run_id) {
+                            currentRunId = data.run_id;
+                            showReconnectingUI(data.run_id);
+                            return;
+                        }
+                        if (data.status === "failed") {
+                            showError(data.error || "\u5206\u6790\u5931\u8d25");
+                            hideLoading();
+                            return;
+                        }
+                        var statusEl = loadingDiv.querySelector(".loading-status");
+                        if (statusEl) {
+                            statusEl.style.display = "";
+                            statusEl.textContent = "\u6b63\u5728\u5206\u6790\u8bca\u65ad...\uff08\u5df2\u7b49\u5f85 " + pollCount + " \u6b21\uff09";
+                        }
+                        reconnectTimer = setTimeout(pollBatch, pollInterval);
+                    })
+                    .catch(function () {
+                        reconnectTimer = setTimeout(pollBatch, pollInterval);
+                    });
+            }
+            pollBatch();
+        }
+
         function readSSEStream(body) {
             var reader = body.getReader();
             var decoder = new TextDecoder("utf-8");
             var buffer = "";
             var resultData = null;
+            var batchId = null;
 
             function readNext() {
                 return reader.read().then(function (chunk) {
                     if (chunk.done) {
+                        if (batchId) {
+                            return { _batchId: batchId };
+                        }
                         if (resultData) return resultData;
                         throw new Error("\u6d41\u7ed3\u675f\u4f46\u672a\u6536\u5230\u5b8c\u6574\u7ed3\u679c");
                     }
@@ -3693,6 +3749,7 @@
                         try { var event = JSON.parse(jsonStr); } catch (e) { continue; }
                         if (event.type === "start") {
                             currentRunId = event.run_id || null;
+                            if (event.batch_id) { batchId = event.batch_id; currentBatchId = event.batch_id; }
                             var cancelBtn = $("cancel-analysis-btn");
                             if (cancelBtn) cancelBtn.style.display = "";
                         } else if (event.type === "retrying") {

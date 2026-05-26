@@ -243,24 +243,30 @@ async def analyze_stream(
     if image is not None:
         image_bytes = await image.read()
 
-    async def event_generator():
-        async for chunk in run_stem_tutor_stream(
-            problem_text=resolved_problem_text,
-            raw_student_solution=student_solution,
-            source_type=source_type,
-            image_bytes=image_bytes,
-            provider_name="openai-compatible",
-            model_name=model,
-            ocr_model_name=ocr_model_name,
-            subject_id=subject_id,
-            mode=mode,
-            depth=depth,
-            user_id=user["id"],
-        ):
-            yield chunk
+    settings = json.dumps({
+        "model": model,
+        "subject_id": subject_id,
+        "mode": mode,
+        "depth": depth,
+        "student_solution": student_solution,
+        "source_type": source_type,
+        "image_stored": image_bytes is not None,
+    })
+    batch_id = await create_batch(user["id"], settings, total_count=1)
+    await add_batch_items(batch_id, [{
+        "problem_text": resolved_problem_text,
+        "student_solution": student_solution,
+        "source_type": source_type,
+    }])
+    await update_batch_status(batch_id, "running")
+    get_batch_worker().notify()
+
+    async def _quick_stream():
+        yield f"data: {json.dumps({'type': 'start', 'batch_id': batch_id}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'message': '任务已提交，正在后台处理...'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
-        event_generator(),
+        _quick_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -305,6 +311,23 @@ async def analyze_result(run_id: str, user: dict = Depends(get_current_user)):
     if result is None:
         return JSONResponse(status_code=404, content={"error": "结果不存在", "run_id": run_id})
     return JSONResponse(content=result)
+
+
+@app.get("/analyze/batch-status/{batch_id}")
+async def batch_analyze_status(batch_id: str, user: dict = Depends(get_current_user)):
+    batch = await load_batch(batch_id, user["id"])
+    if not batch:
+        return JSONResponse(status_code=404, content={"error": "批处理不存在"})
+    items = await list_batch_items(batch_id)
+    item = items[0] if items else None
+    if item and item.get("run_id"):
+        run_status = await _get_run_status(item["run_id"], user["id"])
+        return JSONResponse(content={"status": run_status.get("status", "running"), "run_id": item["run_id"], **run_status})
+    if item and item.get("status") == "running":
+        return JSONResponse(content={"status": "running", "run_id": None})
+    if item and item.get("status") == "failed":
+        return JSONResponse(content={"status": "failed", "error": item.get("error_message", "分析失败")})
+    return JSONResponse(content={"status": "pending"})
 
 
 @app.get("/chat/history/{run_id}")

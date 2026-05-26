@@ -200,6 +200,18 @@ _initialized = False
 _pg_pool = None
 
 
+def _pg_convert_replace(sql: str) -> str:
+    m = re.match(
+        r"INSERT\s+OR\s+REPLACE\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)",
+        sql, re.IGNORECASE,
+    )
+    if not m:
+        return sql
+    cols = [c.strip() for c in m.group(2).split(",")]
+    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols)
+    return f"INSERT INTO {m.group(1)} ({m.group(2)}) VALUES ({m.group(3)}) ON CONFLICT ({cols[0]}) DO UPDATE SET {set_clause}"
+
+
 def _pg_convert(sql: str) -> str:
     i = [0]
 
@@ -263,7 +275,8 @@ class _DB:
 
     async def execute(self, sql: str, params=None) -> _DB:
         if self._is_pg:
-            pg_sql = _pg_convert(sql)
+            pg_sql = _pg_convert_replace(sql)
+            pg_sql = _pg_convert(pg_sql)
             stmt = _stmt_type(sql)
             self._pg_stmt = stmt
             if stmt in ("SELECT", "WITH", "PRAGMA"):

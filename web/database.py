@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     is_admin INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL
 );
 
@@ -110,7 +111,11 @@ async def _ensure_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(_SCHEMA)
-        await db.commit()
+        cols = await db.execute("PRAGMA table_info(users)")
+        col_names = [r[1] for r in await cols.fetchall()]
+        if "status" not in col_names:
+            await db.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+            await db.commit()
     _initialized = True
 
 
@@ -127,12 +132,12 @@ def _now_iso() -> str:
 
 # ── User CRUD ──────────────────────────────────────────────────────────
 
-async def create_user(username: str, password_hash: str, is_admin: bool = False) -> int:
+async def create_user(username: str, password_hash: str, is_admin: bool = False, status: str = "active") -> int:
     db = await get_db()
     try:
         cur = await db.execute(
-            "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?)",
-            (username, password_hash, int(is_admin), _now_iso()),
+            "INSERT INTO users (username, password_hash, is_admin, status, created_at) VALUES (?, ?, ?, ?, ?)",
+            (username, password_hash, int(is_admin), status, _now_iso()),
         )
         await db.commit()
         return cur.lastrowid
@@ -156,6 +161,42 @@ async def get_user_by_id(user_id: int) -> dict[str, Any] | None:
         cur = await db.execute("SELECT * FROM users WHERE id=?", (user_id,))
         row = await cur.fetchone()
         return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def list_pending_users() -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT id, username, created_at FROM users WHERE status='pending' ORDER BY created_at ASC"
+        )
+        rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def approve_user(user_id: int) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "UPDATE users SET status='active' WHERE id=? AND status='pending'", (user_id,)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def reject_user(user_id: int) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "DELETE FROM users WHERE id=? AND status='pending'", (user_id,)
+        )
+        await db.commit()
+        return cur.rowcount > 0
     finally:
         await db.close()
 

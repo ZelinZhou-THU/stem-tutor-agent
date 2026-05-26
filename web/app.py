@@ -647,12 +647,12 @@ async def admin_stats(admin: dict = Depends(get_admin_user)):
     from web.database import get_db
     db = await get_db()
     try:
-        cur = await db.execute("SELECT COUNT(*) FROM users")
-        user_count = (await cur.fetchone())[0]
-        cur = await db.execute("SELECT COUNT(*) FROM runs")
-        run_count = (await cur.fetchone())[0]
-        cur = await db.execute("SELECT COUNT(*) FROM users WHERE status='pending'")
-        pending_count = (await cur.fetchone())[0]
+        row = await db.fetchone("SELECT COUNT(*) AS cnt FROM users")
+        user_count = row["cnt"]
+        row = await db.fetchone("SELECT COUNT(*) AS cnt FROM runs")
+        run_count = row["cnt"]
+        row = await db.fetchone("SELECT COUNT(*) AS cnt FROM users WHERE status='pending'")
+        pending_count = row["cnt"]
         return {"user_count": user_count, "run_count": run_count, "pending_count": pending_count}
     finally:
         await db.close()

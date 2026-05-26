@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -8,11 +10,15 @@ from uuid import uuid4
 
 import aiosqlite
 
+USE_PG = bool(os.environ.get("DATABASE_URL"))
+PG_URL = os.environ.get("DATABASE_URL", "")
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "stem_tutor.db"
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-_SCHEMA = """
+
+_SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -101,29 +107,251 @@ CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON batch_items(batch_id, seq);
 CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id, created_at DESC);
 """
 
+_PG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    subject TEXT,
+    problem_text TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS chats (
+    run_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    messages TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (run_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    title TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id INTEGER PRIMARY KEY,
+    settings TEXT NOT NULL DEFAULT '{}',
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS user_mastery (
+    user_id INTEGER PRIMARY KEY,
+    data TEXT NOT NULL DEFAULT '{"errors":{},"practice_history":[]}',
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS batches (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    total_count INTEGER NOT NULL DEFAULT 0,
+    completed_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    settings TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS batch_items (
+    id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    problem_text TEXT NOT NULL DEFAULT '',
+    student_solution TEXT NOT NULL DEFAULT '',
+    source_type TEXT NOT NULL DEFAULT 'text',
+    run_id TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON batch_items(batch_id, seq);
+CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id, created_at DESC);
+"""
+
 _initialized = False
+_pg_pool = None
+
+
+def _pg_convert(sql: str) -> str:
+    i = [0]
+
+    def _repl(m):
+        i[0] += 1
+        return f"${i[0]}"
+
+    return re.sub(r"\?", _repl, sql)
+
+
+def _stmt_type(sql: str) -> str:
+    s = sql.strip().split(None, 1)
+    return s[0].upper() if s else ""
 
 
 async def _ensure_db() -> None:
     global _initialized
     if _initialized:
         return
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(str(DB_PATH)) as db:
-        await db.executescript(_SCHEMA)
-        cols = await db.execute("PRAGMA table_info(users)")
-        col_names = [r[1] for r in await cols.fetchall()]
-        if "status" not in col_names:
-            await db.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
-            await db.commit()
+    if USE_PG and PG_URL:
+        import asyncpg
+        conn = await asyncpg.connect(PG_URL)
+        try:
+            await conn.execute(_PG_SCHEMA)
+            cols = await conn.fetch(
+                "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
+            )
+            col_names = [r["column_name"] for r in cols]
+            if "status" not in col_names:
+                await conn.execute(
+                    "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+                )
+        finally:
+            await conn.close()
+    else:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        async with aiosqlite.connect(str(DB_PATH)) as db:
+            await db.executescript(_SQLITE_SCHEMA)
+            cols = await db.execute("PRAGMA table_info(users)")
+            col_names = [r[1] for r in await cols.fetchall()]
+            if "status" not in col_names:
+                await db.execute(
+                    "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+                )
+                await db.commit()
     _initialized = True
 
 
-async def get_db() -> aiosqlite.Connection:
+class _DB:
+    """统一包装 aiosqlite 和 asyncpg 的数据库连接。"""
+
+    def __init__(self, raw_conn):
+        self._raw = raw_conn
+        self._is_pg = type(raw_conn).__module__.startswith("asyncpg")
+        self._pg_stmt = None
+        self._pg_sql = None
+        self._pg_params = None
+        self._sqlite_cur = None
+        self._rowcount = 0
+        self._lastrowid = None
+
+    async def execute(self, sql: str, params=None) -> _DB:
+        if self._is_pg:
+            pg_sql = _pg_convert(sql)
+            stmt = _stmt_type(sql)
+            self._pg_stmt = stmt
+            if stmt in ("SELECT", "WITH", "PRAGMA"):
+                self._pg_sql = pg_sql
+                self._pg_params = params
+            else:
+                self._pg_sql = None
+                self._pg_params = None
+                args = params if isinstance(params, (list, tuple)) else (params,) if params is not None else ()
+                result = await self._raw.execute(pg_sql, *args)
+                parts = result.split()
+                self._rowcount = int(parts[-1]) if len(parts) >= 2 and parts[-1].isdigit() else 0
+                if stmt == "INSERT":
+                    try:
+                        self._lastrowid = await self._raw.fetchval("SELECT LASTVAL()")
+                    except Exception:
+                        self._lastrowid = None
+        else:
+            self._sqlite_cur = await self._raw.execute(sql, params or ())
+        return self
+
+    async def fetchone(self, sql=None, params=None):
+        if sql is not None:
+            await self.execute(sql, params)
+        if self._is_pg and self._pg_sql:
+            args = self._pg_params if isinstance(self._pg_params, (list, tuple)) else (self._pg_params,) if self._pg_params is not None else ()
+            row = await self._raw.fetchrow(self._pg_sql, *args)
+            self._rowcount = 1 if row else 0
+            self._pg_sql = None
+            return dict(row) if row else None
+        if self._sqlite_cur:
+            row = await self._sqlite_cur.fetchone()
+            return dict(row) if row else None
+        return None
+
+    async def fetchall(self, sql=None, params=None):
+        if sql is not None:
+            await self.execute(sql, params)
+        if self._is_pg and self._pg_sql:
+            args = self._pg_params if isinstance(self._pg_params, (list, tuple)) else (self._pg_params,) if self._pg_params is not None else ()
+            rows = await self._raw.fetch(self._pg_sql, *args)
+            self._rowcount = len(rows)
+            self._pg_sql = None
+            return [dict(r) for r in rows]
+        if self._sqlite_cur:
+            rows = await self._sqlite_cur.fetchall()
+            return [dict(r) for r in rows]
+        return []
+
+    @property
+    def rowcount(self) -> int:
+        if self._is_pg:
+            return self._rowcount
+        return self._sqlite_cur.rowcount or 0 if self._sqlite_cur else 0
+
+    @property
+    def lastrowid(self):
+        if self._is_pg:
+            return self._lastrowid
+        return self._sqlite_cur.lastrowid if self._sqlite_cur else None
+
+    async def executescript(self, sql: str):
+        if self._is_pg:
+            for statement in sql.split(";"):
+                s = statement.strip()
+                if s:
+                    await self._raw.execute(s)
+        else:
+            await self._raw.executescript(sql)
+
+    async def commit(self):
+        if not self._is_pg:
+            await self._raw.commit()
+
+    async def close(self):
+        await self._raw.close()
+
+
+async def get_db() -> _DB:
+    """获取数据库连接——自动选择 SQLite（本地）或 PostgreSQL（Vercel）。"""
     await _ensure_db()
-    db = await aiosqlite.connect(str(DB_PATH))
-    db.row_factory = aiosqlite.Row
-    return db
+    if USE_PG and PG_URL:
+        import asyncpg
+        conn = await asyncpg.connect(PG_URL)
+    else:
+        conn = await aiosqlite.connect(str(DB_PATH))
+        conn.row_factory = aiosqlite.Row
+    return _DB(conn)
 
 
 def _now_iso() -> str:
@@ -137,7 +365,7 @@ async def create_user(username: str, password_hash: str, is_admin: bool = False,
     try:
         cur = await db.execute(
             "INSERT INTO users (username, password_hash, is_admin, status, created_at) VALUES (?, ?, ?, ?, ?)",
-            (username, password_hash, int(is_admin), status, _now_iso()),
+            (username, password_hash, bool(is_admin) if USE_PG else int(is_admin), status, _now_iso()),
         )
         await db.commit()
         return cur.lastrowid
@@ -148,9 +376,8 @@ async def create_user(username: str, password_hash: str, is_admin: bool = False,
 async def get_user_by_username(username: str) -> dict[str, Any] | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM users WHERE username=?", (username,))
-        row = await cur.fetchone()
-        return dict(row) if row else None
+        row = await db.fetchone("SELECT * FROM users WHERE username=?", (username,))
+        return row
     finally:
         await db.close()
 
@@ -158,9 +385,8 @@ async def get_user_by_username(username: str) -> dict[str, Any] | None:
 async def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM users WHERE id=?", (user_id,))
-        row = await cur.fetchone()
-        return dict(row) if row else None
+        row = await db.fetchone("SELECT * FROM users WHERE id=?", (user_id,))
+        return row
     finally:
         await db.close()
 
@@ -168,11 +394,10 @@ async def get_user_by_id(user_id: int) -> dict[str, Any] | None:
 async def list_pending_users() -> list[dict[str, Any]]:
     db = await get_db()
     try:
-        cur = await db.execute(
+        rows = await db.fetchall(
             "SELECT id, username, created_at FROM users WHERE status='pending' ORDER BY created_at ASC"
         )
-        rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        return rows
     finally:
         await db.close()
 
@@ -257,13 +482,11 @@ async def update_run(run_id: str, data: dict, status: str | None = None) -> None
 async def load_run(run_id: str, user_id: int) -> dict | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM runs WHERE id=? AND user_id=?", (run_id, user_id))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT * FROM runs WHERE id=? AND user_id=?", (run_id, user_id))
         if not row:
             return None
-        d = dict(row)
-        d["data"] = json.loads(d["data"])
-        return d
+        row["data"] = json.loads(row["data"])
+        return row
     finally:
         await db.close()
 
@@ -271,13 +494,11 @@ async def load_run(run_id: str, user_id: int) -> dict | None:
 async def load_run_admin(run_id: str) -> dict | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM runs WHERE id=?", (run_id,))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT * FROM runs WHERE id=?", (run_id,))
         if not row:
             return None
-        d = dict(row)
-        d["data"] = json.loads(d["data"])
-        return d
+        row["data"] = json.loads(row["data"])
+        return row
     finally:
         await db.close()
 
@@ -305,18 +526,16 @@ async def list_runs_db(
             params.append(f"%{search}%")
         where = " AND ".join(where_clauses)
 
-        count_cur = await db.execute(f"SELECT COUNT(*) FROM runs r WHERE {where}", params)
-        total = (await count_cur.fetchone())[0]
+        row = await db.fetchone(f"SELECT COUNT(*) FROM runs r WHERE {where}", params)
+        total = row[list(row.keys())[0]] if row else 0
 
         offset = (page - 1) * per_page
-        data_cur = await db.execute(
+        rows = await db.fetchall(
             f"SELECT r.* FROM runs r WHERE {where} ORDER BY r.created_at DESC LIMIT ? OFFSET ?",
             params + [per_page, offset],
         )
-        rows = await data_cur.fetchall()
         runs = []
-        for row in rows:
-            d = dict(row)
+        for d in rows:
             d["data"] = json.loads(d["data"])
             runs.append(d)
         return {"runs": runs, "total": total, "page": page, "per_page": per_page}
@@ -356,11 +575,9 @@ async def cleanup_runs_db(user_id: int, before_iso: str) -> int:
 async def get_all_runs_for_stats(user_id: int) -> list[dict]:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM runs WHERE user_id=? ORDER BY created_at", (user_id,))
-        rows = await cur.fetchall()
+        rows = await db.fetchall("SELECT * FROM runs WHERE user_id=? ORDER BY created_at", (user_id,))
         result = []
-        for row in rows:
-            d = dict(row)
+        for d in rows:
             d["data"] = json.loads(d["data"])
             result.append(d)
         return result
@@ -385,8 +602,7 @@ async def save_chat(run_id: str, user_id: int, messages: list) -> None:
 async def load_chat(run_id: str, user_id: int) -> list:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT messages FROM chats WHERE run_id=? AND user_id=?", (run_id, user_id))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT messages FROM chats WHERE run_id=? AND user_id=?", (run_id, user_id))
         if not row:
             return []
         return json.loads(row["messages"])
@@ -397,14 +613,12 @@ async def load_chat(run_id: str, user_id: int) -> list:
 async def list_chats_by_user(user_id: int) -> list[dict]:
     db = await get_db()
     try:
-        cur = await db.execute(
+        rows = await db.fetchall(
             "SELECT run_id, user_id, messages, updated_at FROM chats WHERE user_id=? ORDER BY updated_at DESC",
             (user_id,),
         )
-        rows = await cur.fetchall()
         result = []
-        for row in rows:
-            d = dict(row)
+        for d in rows:
             d["messages"] = json.loads(d["messages"])
             result.append(d)
         return result
@@ -429,13 +643,11 @@ async def save_report(report_id: str, user_id: int, data: dict) -> None:
 async def load_report(report_id: str, user_id: int) -> dict | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM reports WHERE id=? AND user_id=?", (report_id, user_id))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT * FROM reports WHERE id=? AND user_id=?", (report_id, user_id))
         if not row:
             return None
-        d = dict(row)
-        d["data"] = json.loads(d["data"])
-        return d
+        row["data"] = json.loads(row["data"])
+        return row
     finally:
         await db.close()
 
@@ -443,11 +655,9 @@ async def load_report(report_id: str, user_id: int) -> dict | None:
 async def list_reports_db(user_id: int) -> list[dict]:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM reports WHERE user_id=? ORDER BY created_at DESC", (user_id,))
-        rows = await cur.fetchall()
+        rows = await db.fetchall("SELECT * FROM reports WHERE user_id=? ORDER BY created_at DESC", (user_id,))
         result = []
-        for row in rows:
-            d = dict(row)
+        for d in rows:
             d["data"] = json.loads(d["data"])
             result.append(d)
         return result
@@ -470,8 +680,7 @@ async def delete_report_db(report_id: str, user_id: int) -> bool:
 async def get_settings(user_id: int) -> dict:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT settings FROM user_settings WHERE user_id=?", (user_id,))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT settings FROM user_settings WHERE user_id=?", (user_id,))
         if not row:
             return {}
         return json.loads(row["settings"])
@@ -496,8 +705,7 @@ async def save_settings(user_id: int, settings: dict) -> None:
 async def get_mastery(user_id: int) -> dict:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT data FROM user_mastery WHERE user_id=?", (user_id,))
-        row = await cur.fetchone()
+        row = await db.fetchone("SELECT data FROM user_mastery WHERE user_id=?", (user_id,))
         if not row:
             return {"errors": {}, "practice_history": []}
         return json.loads(row["data"])
@@ -537,9 +745,8 @@ async def create_batch(user_id: int, settings: dict, total_count: int) -> str:
 async def load_batch(batch_id: str, user_id: int) -> dict | None:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM batches WHERE id=? AND user_id=?", (batch_id, user_id))
-        row = await cur.fetchone()
-        return dict(row) if row else None
+        row = await db.fetchone("SELECT * FROM batches WHERE id=? AND user_id=?", (batch_id, user_id))
+        return row
     finally:
         await db.close()
 
@@ -572,9 +779,8 @@ async def add_batch_items(batch_id: str, items: list[dict]) -> None:
 async def list_batch_items(batch_id: str) -> list[dict]:
     db = await get_db()
     try:
-        cur = await db.execute("SELECT * FROM batch_items WHERE batch_id=? ORDER BY seq", (batch_id,))
-        rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        rows = await db.fetchall("SELECT * FROM batch_items WHERE batch_id=? ORDER BY seq", (batch_id,))
+        return rows
     finally:
         await db.close()
 
@@ -591,9 +797,9 @@ async def update_batch_item(batch_id: str, seq: int, status: str, run_id: str | 
             await db.execute("UPDATE batches SET completed_count = completed_count + 1, updated_at=? WHERE id=?", (now, batch_id))
         elif status == "failed":
             await db.execute("UPDATE batches SET failed_count = failed_count + 1, updated_at=? WHERE id=?", (now, batch_id))
-        done_row = await (await db.execute("SELECT completed_count + failed_count FROM batches WHERE id=?", (batch_id,))).fetchone()
-        total_row = await (await db.execute("SELECT total_count FROM batches WHERE id=?", (batch_id,))).fetchone()
-        if done_row and total_row and done_row[0] >= total_row[0]:
+        done_row = await db.fetchone("SELECT completed_count + failed_count AS done FROM batches WHERE id=?", (batch_id,))
+        total_row = await db.fetchone("SELECT total_count FROM batches WHERE id=?", (batch_id,))
+        if done_row and total_row and done_row["done"] >= total_row["total_count"]:
             await db.execute("UPDATE batches SET status='completed', updated_at=? WHERE id=?", (now, batch_id))
         await db.commit()
     finally:
@@ -603,11 +809,10 @@ async def update_batch_item(batch_id: str, seq: int, status: str, run_id: str | 
 async def claim_next_pending_item(batch_id: str) -> dict | None:
     db = await get_db()
     try:
-        cur = await db.execute(
+        row = await db.fetchone(
             "SELECT * FROM batch_items WHERE batch_id=? AND status='pending' ORDER BY seq LIMIT 1",
             (batch_id,),
         )
-        row = await cur.fetchone()
         if not row:
             return None
         now = _now_iso()
@@ -616,7 +821,7 @@ async def claim_next_pending_item(batch_id: str) -> dict | None:
             (now, batch_id, row["seq"]),
         )
         await db.commit()
-        return dict(row)
+        return row
     finally:
         await db.close()
 
@@ -629,15 +834,14 @@ async def list_batches(user_id: int, status: str | None = None, page: int = 1, p
         if status:
             where += " AND status=?"
             params.append(status)
-        count_cur = await db.execute(f"SELECT COUNT(*) FROM batches {where}", params)
-        total = (await count_cur.fetchone())[0]
+        row = await db.fetchone(f"SELECT COUNT(*) AS cnt FROM batches {where}", params)
+        total = row["cnt"] if row else 0
         params.extend([per_page, (page - 1) * per_page])
-        cur = await db.execute(
+        rows = await db.fetchall(
             f"SELECT * FROM batches {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
             params,
         )
-        rows = await cur.fetchall()
-        return {"batches": [dict(r) for r in rows], "total": total, "page": page, "per_page": per_page}
+        return {"batches": rows, "total": total, "page": page, "per_page": per_page}
     finally:
         await db.close()
 
@@ -668,10 +872,9 @@ async def recover_stale_running_items() -> int:
 async def get_running_batches() -> list[dict]:
     db = await get_db()
     try:
-        cur = await db.execute(
+        rows = await db.fetchall(
             "SELECT * FROM batches WHERE status='running' AND completed_count + failed_count < total_count ORDER BY created_at"
         )
-        rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        return rows
     finally:
         await db.close()

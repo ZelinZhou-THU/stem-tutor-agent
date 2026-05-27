@@ -3579,6 +3579,10 @@
             formData.append("mode", $("mode-select").value);
             var depthRadio = document.querySelector('input[name="depth"]:checked');
             if (depthRadio) formData.append("depth", depthRadio.value);
+            if (depthRadio && depthRadio.value === "no_ref") {
+                var refStep = loadingDiv.querySelector('.loading-step[data-step="reference"]');
+                if (refStep) refStep.style.display = "none";
+            }
 
             InputPanel.collapse();
             var lt = $("loading").querySelector(".loading-title");
@@ -3858,6 +3862,7 @@
         function resetLoadingSteps() {
             loadingDiv.querySelectorAll(".loading-step").forEach(function (el) {
                 el.classList.remove("active", "done");
+                el.style.display = "";
                 var icon = el.querySelector(".loading-step-icon");
                 if (icon) icon.innerHTML = "\u2610";
                 var detailEl = el.querySelector(".loading-step-detail");

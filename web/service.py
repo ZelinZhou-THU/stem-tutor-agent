@@ -409,6 +409,10 @@ def _shape_response(state: dict) -> dict:
         elif isinstance(p, dict):
             review_list.append(p)
 
+    ref_sol = state.get("reference_solution")
+    if ref_sol is not None and hasattr(ref_sol, "model_dump"):
+        ref_sol = ref_sol.model_dump()
+
     response = {
         "first_critical_step_id": _get_attr(feedback, "first_critical_step_id") if feedback else None,
         "concise_summary": _get_attr(feedback, "concise_summary", "") if feedback else "",
@@ -427,7 +431,7 @@ def _shape_response(state: dict) -> dict:
         "run_meta": run_meta_serialized,
         "raw_output": raw_output_serialized,
         "tool_calls_log": state.get("tool_calls_log", []),
-        "reference_solution": state.get("reference_solution"),
+        "reference_solution": ref_sol,
     }
 
     if ocr_meta:
@@ -1163,7 +1167,13 @@ async def run_stem_tutor_stream(
                             yield f"data: {_json.dumps({'type': 'progress', 'node': node_name, 'detail': f'解析到 {step_count} 个解题步骤'}, ensure_ascii=False)}\n\n"
 
                         elif node_name == "generate_reference_solution":
-                            ref_text = node_output.get("reference_solution", {}).get("reference_text", "")
+                            ref_sol = node_output.get("reference_solution", {})
+                            if isinstance(ref_sol, dict):
+                                ref_text = ref_sol.get("reference_text", "")
+                            elif hasattr(ref_sol, "reference_text"):
+                                ref_text = ref_sol.reference_text
+                            else:
+                                ref_text = ""
                             is_valid = ref_text and not ref_text.startswith("Reference solution unavailable")
                             detail = "参考解答已生成" if is_valid else "参考解答生成失败，将跳过逐句验证"
                             yield f"data: {_json.dumps({'type': 'progress', 'node': node_name, 'detail': detail}, ensure_ascii=False)}\n\n"

@@ -24,9 +24,8 @@ from web import database
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 RUN_ATTEMPTS_BY_DEPTH = {
-    "quick": 1,
-    "standard": 2,
-    "thorough": 3,
+    "no_ref": 1,
+    "with_ref": 2,
 }
 
 RECOVERABLE_UNCERTAINTY_FLAGS = {
@@ -51,7 +50,7 @@ def _resolve_max_run_attempts(depth: str) -> int:
             return max(1, int(env))
         except ValueError:
             pass
-    return RUN_ATTEMPTS_BY_DEPTH.get(depth, RUN_ATTEMPTS_BY_DEPTH["standard"])
+    return RUN_ATTEMPTS_BY_DEPTH.get(depth, RUN_ATTEMPTS_BY_DEPTH["with_ref"])
 
 
 def _is_retryable_exception(exc: Exception) -> bool:
@@ -776,14 +775,14 @@ def run_stem_tutor(
     ocr_model_name: str | None = "qwen/qwen3.6-plus",
     subject_id: str = "calculus",
     mode: str = "workflow_r1",
-    depth: str = "standard",
+    depth: str = "with_ref",
     user_id: int | None = None,
 ) -> dict:
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
 
-    if depth in ("quick", "standard", "thorough"):
-        os.environ["STEM_TUTOR_DEPTH"] = depth
+    os.environ["STEM_TUTOR_DEPTH"] = depth
+    if depth == "no_ref":
         os.environ["STEM_TUTOR_BUDGET_ENABLED"] = "true"
 
     if subject_id == "auto_detect":
@@ -1027,7 +1026,7 @@ async def run_stem_tutor_stream(
     run_id: str | None = None,
     subject_id: str = "calculus",
     mode: str = "workflow_r1",
-    depth: str = "standard",
+    depth: str = "with_ref",
     user_id: int | None = None,
 ):
     import asyncio
@@ -1043,8 +1042,8 @@ async def run_stem_tutor_stream(
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
 
-    if depth in ("quick", "standard", "thorough"):
-        os.environ["STEM_TUTOR_DEPTH"] = depth
+    os.environ["STEM_TUTOR_DEPTH"] = depth
+    if depth == "no_ref":
         os.environ["STEM_TUTOR_BUDGET_ENABLED"] = "true"
 
     if subject_id == "auto_detect":

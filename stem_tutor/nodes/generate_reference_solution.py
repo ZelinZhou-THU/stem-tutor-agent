@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import logging
+import os
 import time as _time
 from datetime import datetime, timezone
 
@@ -241,7 +242,7 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     logging.info(f"[generate_reference_solution] [budget] Generating solution for: {problem[:80]}...")
 
     budget_meta = state.get("budget_metadata", {})
-    depth = budget_meta.get("depth", "standard")
+    depth = budget_meta.get("depth", "with_ref")
     complexity = budget_meta.get("complexity", "moderate")
 
     subject_overrides = None
@@ -397,6 +398,13 @@ def _build_computation_hints_legacy(tool_calls: list[dict]) -> str:
 
 def make_generate_reference_solution_node(provider: LLMProvider):
     def generate_reference_solution_node(state: TutorGraphState) -> TutorGraphState:
+        if os.environ.get("STEM_TUTOR_DEPTH", "").strip() == "no_ref":
+            state["reference_solution"] = ReferenceSolutionPayload(
+                reference_text="Reference solution unavailable (no_ref mode)",
+                key_assertions=[],
+            )
+            return state
+
         if _is_budget_enabled():
             return _run_new_path(provider, state)
 

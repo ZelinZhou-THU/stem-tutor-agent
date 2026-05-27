@@ -32,7 +32,7 @@ DEFAULT_DETERMINISTIC_VERIFY_ENABLED = True
 DEFAULT_TOOL_RESULT_MAX_CHARS = 200
 DEFAULT_NODE_TIMING_ENABLED = True
 DEFAULT_PARALLEL_REVIEW_ENABLED = True
-DEFAULT_DEPTH = "standard"
+DEFAULT_DEPTH = "with_ref"
 
 
 @dataclass(frozen=True)
@@ -352,11 +352,11 @@ def is_parallel_review_enabled() -> bool:
 
 def load_depth() -> str:
     val = os.environ.get("STEM_TUTOR_DEPTH", "").strip().lower()
-    if val in ("quick", "standard", "thorough"):
+    if val in ("no_ref", "with_ref"):
         return val
     env_data = _load_env_file(_find_key_env(Path.cwd()) or Path(""))
     val2 = env_data.get("STEM_TUTOR_DEPTH", "").strip().lower()
-    if val2 in ("quick", "standard", "thorough"):
+    if val2 in ("no_ref", "with_ref"):
         return val2
     return DEFAULT_DEPTH
 

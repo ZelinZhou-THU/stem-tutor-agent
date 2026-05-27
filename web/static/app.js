@@ -1842,7 +1842,7 @@
         defaults: {
             theme: "light",
             defaultSubject: "auto_detect",
-            defaultDepth: "standard",
+            defaultDepth: "with_ref",
             defaultMode: "workflow_r1",
             defaultModel: "qwen/qwen3.6-plus",
             autoSaveHistory: true
@@ -3396,9 +3396,8 @@
         updateModelVisibility();
 
         var DEPTH_HINTS = {
-            quick: "\u5feb\u901f\u6a21\u5f0f\uff1a\u53c2\u8003\u89e3\u7b54\u4ec5\u7528 LLM \u63a8\u7406\uff0c\u9a8c\u8bc1\u4f7f\u7528 SymPy + \u6570\u503c\u6821\u9a8c",
-            standard: "\u6807\u51c6\u6a21\u5f0f\uff1a\u5b8c\u6574\u7b56\u7565\u94fe\uff0c\u53cc\u8f6e\u5de5\u5177\u9a8c\u8bc1",
-            thorough: "\u6df1\u5ea6\u6a21\u5f0f\uff1a\u5de5\u5177\u8c03\u7528\u6700\u591a 3 \u8f6e\uff0c\u4e32\u884c\u8de8\u6b65\u9a8c\u8bc1\uff0c\u8d85\u65f6\u5bb9\u5fcd\u5ea6\u66f4\u9ad8"
+            no_ref: "\u8df3\u8fc7\u53c2\u8003\u89e3\u7b54\uff0c\u76f4\u63a5\u9a8c\u8bc1\u6b65\u9aa4\u2014\u2014\u66f4\u5feb\uff0c\u9002\u5408\u7b80\u5355\u9898\u76ee",
+            with_ref: "\u5148\u751f\u6210\u53c2\u8003\u89e3\u7b54\u518d\u9010\u6b65\u9a8c\u8bc1\u2014\u2014\u66f4\u51c6\uff0c\u9002\u5408\u590d\u6742\u9898\u76ee"
         };
         document.querySelectorAll('input[name="depth"]').forEach(function (radio) {
             radio.addEventListener("change", function () {

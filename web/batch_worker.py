@@ -83,7 +83,7 @@ class BatchWorker:
                 model_name=settings.get("model", "qwen/qwen3.6-plus"),
                 subject_id=settings.get("subject_id", "calculus"),
                 mode=settings.get("mode", "workflow_r1"),
-                depth=settings.get("depth", "standard"),
+                depth=settings.get("depth", "with_ref"),
                 user_id=batch["user_id"],
             ):
                 if run_id is None and '"type": "start"' in chunk:

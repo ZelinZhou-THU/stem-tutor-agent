@@ -257,33 +257,26 @@
                             </div>
 
                             <div class="form-group">
-                                <label>推理深度 <span class="info-icon" data-info="快速模式适合简单验证；标准模式适合大多数情况；深度模式适合复杂多步问题。">?</span></label>
+                                <label>参考解答 <span class="info-icon" data-info="跳过参考解适合简单问题或快速检查；生成参考解答结果更准确。">?</span></label>
                                 <div class="depth-control">
-                                    <label class="depth-option" data-depth="quick">
-                                        <input type="radio" name="depth" value="quick">
+                                    <label class="depth-option" data-depth="no_ref">
+                                        <input type="radio" name="depth" value="no_ref">
                                         <div class="depth-content">
-                                            <span class="depth-label">快速</span>
-                                            <span class="depth-desc">~1-2 min · 单轮验证</span>
+                                            <span class="depth-label">跳过参考解</span>
+                                            <span class="depth-desc">直接验证，节省时间</span>
                                         </div>
                                     </label>
-                                    <label class="depth-option depth-option-active" data-depth="standard">
-                                        <input type="radio" name="depth" value="standard" checked>
+                                    <label class="depth-option depth-option-active" data-depth="with_ref">
+                                        <input type="radio" name="depth" value="with_ref" checked>
                                         <div class="depth-content">
-                                            <span class="depth-label">标准</span>
-                                            <span class="depth-desc">~2-4 min · 双轮验证</span>
-                                        </div>
-                                    </label>
-                                    <label class="depth-option" data-depth="thorough">
-                                        <input type="radio" name="depth" value="thorough">
-                                        <div class="depth-content">
-                                            <span class="depth-label">深度</span>
-                                            <span class="depth-desc">~4-8 min · 多轮深度验证</span>
+                                            <span class="depth-label">生成参考解</span>
+                                            <span class="depth-desc">更准确，耗时较长</span>
                                         </div>
                                     </label>
                                 </div>
                                 <div class="depth-hint" id="depth-hint">
                                     <span class="depth-hint-icon">ℹ</span>
-                                    <span id="depth-hint-text">标准模式：完整策略链，双轮工具验证</span>
+                                    <span id="depth-hint-text">生成完整参考解答后再逐句验证，结果更准确</span>
                                 </div>
                             </div>
 
@@ -743,9 +736,8 @@
                             <span>默认推理深度</span>
                         </div>
                         <select id="setting-default-depth" class="setting-control">
-                            <option value="quick">快速</option>
-                            <option value="standard" selected>标准</option>
-                            <option value="thorough">深度</option>
+                            <option value="no_ref">跳过参考解答（更快）</option>
+                            <option value="with_ref" selected>包含参考解答（更准）</option>
                         </select>
                     </div>
                     <div class="setting-item">
@@ -1084,9 +1076,8 @@
                     </select>
                     <label>深度</label>
                     <select id="batch-depth" class="input-field">
-                        <option value="quick">快速</option>
-                        <option value="standard" selected>标准</option>
-                        <option value="thorough">深度</option>
+                        <option value="no_ref">跳过参考解答（更快）</option>
+                        <option value="with_ref" selected>包含参考解答（更准）</option>
                     </select>
                     <label>模型</label>
                     <select id="batch-model" class="input-field">

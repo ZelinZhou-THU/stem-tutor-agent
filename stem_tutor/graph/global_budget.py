@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-DEPTH_TOTAL_BUDGETS = {"quick": 198.0, "standard": 360.0, "thorough": 565.0}
+DEPTH_TOTAL_BUDGETS = {"no_ref": 240.0, "with_ref": 360.0}
 
 VERIFY_RESERVE_FRAC = 0.45
 REFERENCE_RESERVE_FRAC = 0.35
@@ -24,7 +24,7 @@ def step_bonus(step_count: int) -> float:
 
 
 def calculate_total_budget(depth: str, step_count: int) -> float:
-    base = DEPTH_TOTAL_BUDGETS.get(depth, DEPTH_TOTAL_BUDGETS["standard"])
+    base = DEPTH_TOTAL_BUDGETS.get(depth, DEPTH_TOTAL_BUDGETS["with_ref"])
     return base + step_bonus(step_count)
 
 
@@ -37,7 +37,7 @@ class GlobalBudgetState:
     step_count: int
     reference_used: float = 0.0
     verify_used: float = 0.0
-    depth: str = "standard"
+    depth: str = "with_ref"
 
     def verify_available(self) -> float:
         pool = self.verify_reserved

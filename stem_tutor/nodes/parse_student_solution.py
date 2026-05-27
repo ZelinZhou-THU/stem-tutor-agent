@@ -71,7 +71,7 @@ def make_parse_student_solution_node(provider: LLMProvider):
         gb_dict = None
         if os.environ.get("STEM_TUTOR_BUDGET_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
             from stem_tutor.graph.global_budget import GlobalBudgetState
-            depth = state.get("budget_metadata", {}).get("depth", "standard")
+            depth = state.get("budget_metadata", {}).get("depth", "with_ref")
             gb = GlobalBudgetState.create(depth, len(steps))
             gb_dict = gb.to_dict()
 

@@ -491,7 +491,7 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
         }
 
     budget_meta = state.get("budget_metadata", {})
-    depth = budget_meta.get("depth", "standard")
+    depth = budget_meta.get("depth", "with_ref")
     complexity = budget_meta.get("complexity", "moderate")
 
     subject_overrides = None

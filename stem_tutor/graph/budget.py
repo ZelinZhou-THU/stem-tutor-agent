@@ -19,26 +19,19 @@ class NodeBudgetConfig:
 
 
 DEPTH_PRESETS: dict[str, dict[str, NodeBudgetConfig]] = {
-    "quick": {
-        "reference": NodeBudgetConfig(60, 0, 0, {"simple": 5, "moderate": 8, "complex": 12}),
-        "verify": NodeBudgetConfig(45, 15, 1, {"simple": 5, "moderate": 8, "complex": 12}),
-        "diagnosis": NodeBudgetConfig(20, 0, 0, {}),
-        "feedback": NodeBudgetConfig(20, 0, 0, {}),
-        "review": NodeBudgetConfig(20, 0, 0, {}),
+    "no_ref": {
+        "reference": NodeBudgetConfig(10, 0, 0, {"simple": 5, "moderate": 8, "complex": 12}),
+        "verify": NodeBudgetConfig(120, 30, 2, {"simple": 8, "moderate": 15, "complex": 20}),
+        "diagnosis": NodeBudgetConfig(30, 0, 0, {}),
+        "feedback": NodeBudgetConfig(30, 0, 0, {}),
+        "review": NodeBudgetConfig(30, 0, 0, {}),
     },
-    "standard": {
+    "with_ref": {
         "reference": NodeBudgetConfig(120, 30, 2, {"simple": 8, "moderate": 15, "complex": 20}),
         "verify": NodeBudgetConfig(90, 20, 2, {"simple": 8, "moderate": 15, "complex": 20}),
         "diagnosis": NodeBudgetConfig(30, 0, 0, {}),
         "feedback": NodeBudgetConfig(30, 0, 0, {}),
         "review": NodeBudgetConfig(30, 0, 0, {}),
-    },
-    "thorough": {
-        "reference": NodeBudgetConfig(180, 45, 3, {"simple": 12, "moderate": 20, "complex": 30}),
-        "verify": NodeBudgetConfig(120, 30, 3, {"simple": 12, "moderate": 20, "complex": 30}),
-        "diagnosis": NodeBudgetConfig(45, 0, 0, {}),
-        "feedback": NodeBudgetConfig(45, 0, 0, {}),
-        "review": NodeBudgetConfig(45, 0, 0, {}),
     },
 }
 
@@ -46,7 +39,7 @@ _BUDGET_TIMEOUT_ENV = "STEM_TUTOR_CURRENT_TOOL_TIMEOUT"
 
 
 def _load_from_preset(depth: str, node_name: str) -> NodeBudgetConfig:
-    preset = DEPTH_PRESETS.get(depth, DEPTH_PRESETS["standard"])
+    preset = DEPTH_PRESETS.get(depth, DEPTH_PRESETS["with_ref"])
     return preset.get(node_name, preset.get("reference"))
 
 
@@ -56,7 +49,7 @@ def load_budget_config(
     subject_overrides: dict | None = None,
 ) -> NodeBudgetConfig:
     env_depth = os.environ.get("STEM_TUTOR_DEPTH", "").strip().lower()
-    effective_depth = env_depth if env_depth in DEPTH_PRESETS else (depth if depth in DEPTH_PRESETS else "standard")
+    effective_depth = env_depth if env_depth in DEPTH_PRESETS else (depth if depth in DEPTH_PRESETS else "with_ref")
 
     config = _load_from_preset(effective_depth, node_name)
 

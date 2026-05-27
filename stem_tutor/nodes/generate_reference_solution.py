@@ -399,10 +399,10 @@ def _build_computation_hints_legacy(tool_calls: list[dict]) -> str:
 def make_generate_reference_solution_node(provider: LLMProvider):
     def generate_reference_solution_node(state: TutorGraphState) -> TutorGraphState:
         if os.environ.get("STEM_TUTOR_DEPTH", "").strip() == "no_ref":
-            state["reference_solution"] = ReferenceSolutionPayload(
-                reference_text="Reference solution unavailable (no_ref mode)",
-                key_assertions=[],
-            )
+            state["reference_solution"] = {
+                "reference_text": "Reference solution unavailable (no_ref mode)",
+                "key_assertions": [],
+            }
             return state
 
         if _is_budget_enabled():

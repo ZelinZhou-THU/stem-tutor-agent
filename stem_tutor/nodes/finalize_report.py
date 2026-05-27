@@ -87,9 +87,12 @@ def finalize_report_node(state: TutorGraphState) -> TutorGraphState:
     except Exception:
         pass
 
-    artifact_path = _write_run_artifact(merged_meta, tool_calls_log)
-    if artifact_path:
-        merged_meta["artifact_path"] = artifact_path
+    try:
+        artifact_path = _write_run_artifact(merged_meta, tool_calls_log)
+        if artifact_path:
+            merged_meta["artifact_path"] = artifact_path
+    except OSError:
+        pass
 
     return {
         "trace": trace,

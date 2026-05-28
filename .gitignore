@@ -35,6 +35,7 @@ htmlcov/
 .cache/
 
 # Build artifacts
+build/
 *.egg-info/
 
 # Compiled files

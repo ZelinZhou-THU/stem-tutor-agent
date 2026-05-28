@@ -14,9 +14,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-where python >nul 2>&1
+where conda >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] python not found.
+    echo [ERROR] conda not found. Please install miniconda: https://docs.anaconda.com/miniconda/
     pause
     exit /b 1
 )
@@ -33,7 +33,7 @@ set PORT=8000
 set TUNNEL_NAME=stem-tutor
 
 echo [1/3] Starting web server on port %PORT% ...
-start /b python -m uvicorn web.app:app --host 127.0.0.1 --port %PORT%
+start /b conda run -n LLM python -m uvicorn web.app:app --host 127.0.0.1 --port %PORT%
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to start web server.
     pause

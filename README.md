@@ -82,11 +82,6 @@ python -m web.app
 
 Visit http://localhost:8000. First startup auto-creates admin account: `admin / admin123`.
 
-> For exact version reproduction, use `requirements.lock`:
-> ```bash
-> pip install -r requirements.lock
-> ```
-
 ### Configuration
 
 Copy `key.env.example` to `key.env` and fill in at least these:

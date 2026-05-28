@@ -82,11 +82,6 @@ python -m web.app
 
 访问 http://localhost:8000。首次启动自动创建管理员账户：`admin / admin123`。
 
-> 如需精确复现环境版本，可使用 `requirements.lock`：
-> ```bash
-> pip install -r requirements.lock
-> ```
-
 <details>
 <summary>📖 更多运行方式</summary>
 

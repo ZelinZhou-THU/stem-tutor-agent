@@ -1,7 +1,10 @@
 ﻿from __future__ import annotations
 
 import json
+import logging
+import os
 import re
+import secrets
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +14,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from fastapi import Body, Depends, FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,10 +23,10 @@ from stem_tutor.subjects.context import get_subject_context
 from stem_tutor.subjects.detector import detect_subject
 from stem_tutor.subjects.loader import SubjectRegistry
 from stem_tutor.taxonomy.errors import lookup_error
-from web.auth import create_access_token, get_admin_user, get_current_user, hash_password, verify_password
+from web.auth import create_access_token, get_admin_user, get_current_user, get_current_user_allow_restricted, hash_password, verify_password
 from web.batch_worker import get_batch_worker
 from web.database import (
-    _ensure_db, create_user, get_user_by_username,
+    _ensure_db, create_user, get_user_by_username, get_user_for_login,
     create_batch, load_batch, update_batch_status, update_batch_item,
     add_batch_items, list_batch_items, list_batches, delete_batch,
     close_pool,
@@ -38,7 +42,18 @@ from web.service import practice_reference_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
 app = FastAPI(title="STEM Tutor", docs_url=None, redoc_url=None, openapi_url=None)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://www.zelin.online", "http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=True,
+)
 
 
 @app.on_event("startup")
@@ -46,8 +61,18 @@ async def startup():
     await _ensure_db()
     admin = await get_user_by_username("admin")
     if not admin:
-        pw_hash = hash_password("admin123")
-        await create_user("admin", pw_hash, is_admin=True)
+        pw = secrets.token_urlsafe(16)
+        pw_hash = hash_password(pw)
+        await create_user("admin", pw_hash, is_admin=True, force_change_password=True)
+        pw_file = Path(__file__).resolve().parent.parent / "data" / "admin_password.txt"
+        pw_file.parent.mkdir(parents=True, exist_ok=True)
+        pw_file.write_text(pw, encoding="utf-8")
+        logging.getLogger("uvicorn").info(
+            "══════════════════════════════════════════════════\n"
+            "  管理员初始密码已生成，已写入密码文件\n"
+            "  请登录后立即修改密码，密码文件: %s\n"
+            "══════════════════════════════════════════════════", pw_file
+        )
     await get_batch_worker().start()
 
 
@@ -63,8 +88,8 @@ async def register(req: RegisterRequest):
     password = req.password
     if len(username) < 2 or len(username) > 32:
         return JSONResponse(status_code=400, content={"detail": "\u7528\u6237\u540d\u9700\u89812-32\u4e2a\u5b57\u7b26"})
-    if len(password) < 4:
-        return JSONResponse(status_code=400, content={"detail": "\u5bc6\u7801\u81f3\u5c114\u4f4d"})
+    if len(password) < 8:
+        return JSONResponse(status_code=400, content={"detail": "\u5bc6\u7801\u81f3\u5c118\u4f4d"})
     existing = await get_user_by_username(username)
     if existing:
         if existing.get("status") == "pending":
@@ -77,32 +102,46 @@ async def register(req: RegisterRequest):
 
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
-    user = await get_user_by_username(req.username.strip())
+    user = await get_user_for_login(req.username.strip())
     if not user or not verify_password(req.password, user["password_hash"]):
         return JSONResponse(status_code=401, content={"detail": "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef"})
     if user.get("status") == "pending":
         return JSONResponse(status_code=403, content={"detail": "账号正在等待管理员审批"})
-    token = create_access_token(user["id"], user["username"], bool(user["is_admin"]))
-    return {"access_token": token, "token_type": "bearer", "user": {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}}
+    force_change = bool(user.get("force_change_password"))
+    token = create_access_token(user["id"], user["username"], bool(user["is_admin"]), restricted=force_change)
+    return {"access_token": token, "token_type": "bearer", "user": {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"]), "force_change_password": force_change}}
 
 
 @app.get("/api/auth/me")
-async def me(user: dict = Depends(get_current_user)):
-    return {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"])}
+async def me(user: dict = Depends(get_current_user_allow_restricted)):
+    return {"id": user["id"], "username": user["username"], "is_admin": bool(user["is_admin"]), "force_change_password": bool(user.get("force_change_password"))}
 
 
 @app.post("/api/user/change-password")
-async def change_password(req: ChangePasswordRequest, user: dict = Depends(get_current_user)):
-    if len(req.new_password) < 4:
-        return JSONResponse(status_code=400, content={"detail": "新密码至少4位"})
-    if not verify_password(req.old_password, user["password_hash"]):
+async def change_password(req: ChangePasswordRequest, user: dict = Depends(get_current_user_allow_restricted)):
+    if len(req.new_password) < 8:
+        return JSONResponse(status_code=400, content={"detail": "新密码至少8位"})
+    from web.database import get_user_password_hash, update_password
+    pw_hash = await get_user_password_hash(user["id"])
+    if not pw_hash or not verify_password(req.old_password, pw_hash):
         return JSONResponse(status_code=400, content={"detail": "当前密码错误"})
     if req.old_password == req.new_password:
         return JSONResponse(status_code=400, content={"detail": "新密码不能与当前密码相同"})
     new_hash = hash_password(req.new_password)
-    from web.database import update_password
     await update_password(user["id"], new_hash)
-    return {"ok": True}
+    pw_file = Path(__file__).resolve().parent.parent / "data" / "admin_password.txt"
+    if pw_file.exists():
+        try:
+            pw_file.unlink()
+        except OSError:
+            pass
+    token = create_access_token(user["id"], user["username"], bool(user["is_admin"]))
+    return {"ok": True, "access_token": token, "token_type": "bearer"}
+
+
+@app.post("/api/auth/logout")
+async def logout(user: dict = Depends(get_current_user)):
+    return {"ok": True, "message": "已退出登录"}
 
 
 _RATE_LIMIT_WINDOW = 60
@@ -110,10 +149,19 @@ _RATE_LIMIT_MAX = 30
 _rate_requests: dict[str, list[float]] = defaultdict(list)
 
 
+def _get_client_ip(request: Request) -> str:
+    host = request.client.host if request.client else "unknown"
+    if host in ("127.0.0.1", "::1"):
+        forwarded = request.headers.get("CF-Connecting-IP") or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    return host
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         now = time.time()
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _get_client_ip(request)
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
             timestamps = _rate_requests[client_ip]
             _rate_requests[client_ip] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
@@ -136,8 +184,19 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(NoCacheStaticMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 INDEX_HTML = BASE_DIR / "templates" / "index.html"
@@ -151,6 +210,37 @@ def _extract_ocr_model_name(warnings: list[str]) -> str | None:
     return None
 
 
+def _is_allowed_upload(image: UploadFile | None) -> bool:
+    if image is None:
+        return False
+    content_type = (image.content_type or "").strip().lower()
+    return content_type in ALLOWED_IMAGE_TYPES
+
+
+def _sniff_upload_mime(image_bytes: bytes) -> str | None:
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes.startswith(b"GIF87a") or image_bytes.startswith(b"GIF89a"):
+        return "image/gif"
+    if image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    return None
+
+
+def _validate_upload_bytes(image: UploadFile, image_bytes: bytes) -> bool:
+    sniffed = _sniff_upload_mime(image_bytes)
+    if sniffed is None:
+        return False
+    declared = (image.content_type or "").strip().lower()
+    if declared and declared not in ALLOWED_IMAGE_TYPES:
+        return False
+    if declared and declared != sniffed:
+        return False
+    return sniffed in ALLOWED_IMAGE_TYPES
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return INDEX_HTML.read_text(encoding="utf-8")
@@ -162,12 +252,17 @@ async def ocr_endpoint(
     model: str = Form("qwen/qwen3.6-plus"),
     user: dict = Depends(get_current_user),
 ):
-    img_bytes = await image.read()
+    img_bytes = await image.read(MAX_UPLOAD_SIZE + 1)
+    if len(img_bytes) > MAX_UPLOAD_SIZE:
+        return JSONResponse(status_code=413, content={"error": "文件大小超过 10MB 限制"})
+    if not _validate_upload_bytes(image, img_bytes):
+        return JSONResponse(status_code=400, content={"error": "仅支持 JPEG/PNG/WebP/GIF 格式图片"})
     try:
         result = ocr_problem_text(img_bytes, provider_name="openai-compatible")
         return JSONResponse(content=result)
     except Exception as exc:
-        return JSONResponse(status_code=500, content={"error": f"OCR 失败：{exc}"})
+        logging.getLogger("stem_tutor.app").exception("OCR failed")
+        return JSONResponse(status_code=500, content={"error": "OCR 处理失败，请稍后重试"})
 
 
 @app.post("/analyze")
@@ -189,7 +284,11 @@ async def analyze(
 
     if problem_image is not None:
         try:
-            img_bytes = await problem_image.read()
+            img_bytes = await problem_image.read(MAX_UPLOAD_SIZE + 1)
+            if len(img_bytes) > MAX_UPLOAD_SIZE:
+                return JSONResponse(status_code=413, content={"error": "图片大小超过 10MB 限制"})
+            if not _validate_upload_bytes(problem_image, img_bytes):
+                return JSONResponse(status_code=400, content={"error": "仅支持 JPEG/PNG/WebP/GIF 格式图片"})
             ocr_result = ocr_problem_text(img_bytes, provider_name="openai-compatible")
             resolved_problem_text = ocr_result["text"] or resolved_problem_text
             ocr_model_name = _extract_ocr_model_name(ocr_result.get("warnings", []))
@@ -207,10 +306,14 @@ async def analyze(
 
     image_bytes: bytes | None = None
     if image is not None:
-        image_bytes = await image.read()
+        image_bytes = await image.read(MAX_UPLOAD_SIZE + 1)
+        if len(image_bytes) > MAX_UPLOAD_SIZE:
+            return JSONResponse(status_code=413, content={"error": "图片大小超过 10MB 限制"})
+        if not _validate_upload_bytes(image, image_bytes):
+            return JSONResponse(status_code=400, content={"error": "仅支持 JPEG/PNG/WebP/GIF 格式图片"})
 
     try:
-        result = await run_stem_tutor(
+        result = run_stem_tutor(
             problem_text=resolved_problem_text,
             raw_student_solution=student_solution,
             source_type=source_type,
@@ -225,7 +328,8 @@ async def analyze(
         )
         return JSONResponse(content=result)
     except Exception as exc:
-        return JSONResponse(status_code=500, content={"error": f"分析失败：{exc}"})
+        logging.getLogger("stem_tutor.app").exception("Analyze failed")
+        return JSONResponse(status_code=500, content={"error": "分析失败，请稍后重试"})
 
 
 @app.post("/analyze/stream")
@@ -246,7 +350,11 @@ async def analyze_stream(
 
     if problem_image is not None:
         try:
-            img_bytes = await problem_image.read()
+            img_bytes = await problem_image.read(MAX_UPLOAD_SIZE + 1)
+            if len(img_bytes) > MAX_UPLOAD_SIZE:
+                return JSONResponse(status_code=413, content={"error": "图片大小超过 10MB 限制"})
+            if not _validate_upload_bytes(problem_image, img_bytes):
+                return JSONResponse(status_code=400, content={"error": "仅支持 JPEG/PNG/WebP/GIF 格式图片"})
             ocr_result = ocr_problem_text(img_bytes, provider_name="openai-compatible")
             resolved_problem_text = ocr_result["text"] or resolved_problem_text
             ocr_model_name = _extract_ocr_model_name(ocr_result.get("warnings", []))
@@ -264,7 +372,11 @@ async def analyze_stream(
 
     image_bytes: bytes | None = None
     if image is not None:
-        image_bytes = await image.read()
+        image_bytes = await image.read(MAX_UPLOAD_SIZE + 1)
+        if len(image_bytes) > MAX_UPLOAD_SIZE:
+            return JSONResponse(status_code=413, content={"error": "图片大小超过 10MB 限制"})
+        if not _validate_upload_bytes(image, image_bytes):
+            return JSONResponse(status_code=400, content={"error": "仅支持 JPEG/PNG/WebP/GIF 格式图片"})
 
     settings = {
         "model": model,
@@ -431,7 +543,8 @@ async def reverify_step_endpoint(
         result = await reverify_step(run_id, step_id, user_id=user["id"])
         return JSONResponse(content=result)
     except Exception as exc:
-        return JSONResponse(status_code=500, content={"success": False, "error": str(exc)})
+        logging.getLogger("stem_tutor.app").exception("Reverify step failed")
+        return JSONResponse(status_code=500, content={"success": False, "error": "验证失败，请稍后重试"})
 
 
 @app.post("/practice/verify")
@@ -440,6 +553,7 @@ async def practice_verify_endpoint(
     student_solution: str = Form(""),
     subject_id: str = Form("calculus"),
     related_weakness_code: str = Form(""),
+    user: dict = Depends(get_current_user),
 ):
     if not problem_text.strip():
         return JSONResponse(status_code=400, content={"error": "请输入题目"})
@@ -483,6 +597,7 @@ async def practice_verify_endpoint(
 async def practice_reference_endpoint(
     problem_text: str = Form(""),
     subject_id: str = Form("calculus"),
+    user: dict = Depends(get_current_user),
 ):
     if not problem_text.strip():
         return JSONResponse(status_code=400, content={"error": "请输入题目"})
@@ -553,7 +668,7 @@ async def report_generate_endpoint(
         except Exception as exc:
             logger.error("[Report] event_generator error: %s", exc, exc_info=True)
             import json as _json
-            yield f"data: {_json.dumps({'type': 'report_error', 'message': f'流式传输失败：{exc}'}, ensure_ascii=False)}\n\n"
+            yield f"data: {_json.dumps({'type': 'report_error', 'message': '流式传输失败，请稍后重试'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),

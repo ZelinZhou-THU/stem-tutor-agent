@@ -8,6 +8,7 @@ import uuid
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from httpx import AsyncClient, ASGITransport
+from jose import jwt
 
 os.environ.setdefault("STEM_TUTOR_JWT_SECRET", "test-secret-key-for-approval-tests")
 
@@ -101,7 +102,7 @@ def test_admin_reject_deletes_user():
             assert len(target) == 1
             reject_resp = await ac.post("/api/admin/users/" + str(target[0]["id"]) + "/reject", headers=headers)
             assert reject_resp.status_code == 200
-            rereg_resp = await ac.post("/api/auth/register", json={"username": name, "password": "newpass"})
+            rereg_resp = await ac.post("/api/auth/register", json={"username": name, "password": "newpass123"})
             assert rereg_resp.status_code == 200
     _run(_test())
 
@@ -155,7 +156,95 @@ def test_change_password_wrong_old():
             login_resp = await ac.post("/api/auth/login", json={"username": name, "password": "correct"})
             token = login_resp.json()["access_token"]
             headers = {"Authorization": "Bearer " + token}
-            resp = await ac.post("/api/user/change-password", json={"old_password": "wrong", "new_password": "newpass"}, headers=headers)
+            resp = await ac.post("/api/user/change-password", json={"old_password": "wrong", "new_password": "newpass123"}, headers=headers)
             assert resp.status_code == 400
             assert "\u5bc6\u7801\u9519\u8bef" in resp.json().get("detail", "")
+    _run(_test())
+
+
+def test_force_change_password_bootstrap_flow():
+    async def _test():
+        from web.app import app
+        from web.auth import ALGORITHM, SECRET_KEY, hash_password
+        from web.database import create_user
+
+        name = _uid()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            await create_user(name, hash_password("oldpass"), is_admin=True, status="active", force_change_password=True)
+
+            login_resp = await ac.post("/api/auth/login", json={"username": name, "password": "oldpass"})
+            assert login_resp.status_code == 200
+            token = login_resp.json()["access_token"]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            assert payload["restricted"] is True
+
+            me_resp = await ac.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+            assert me_resp.status_code == 200
+            assert me_resp.json()["force_change_password"] is True
+
+            change_resp = await ac.post(
+                "/api/user/change-password",
+                json={"old_password": "oldpass", "new_password": "newpass123"},
+                headers={"Authorization": "Bearer " + token},
+            )
+            assert change_resp.status_code == 200
+
+            login_after = await ac.post("/api/auth/login", json={"username": name, "password": "newpass123"})
+            assert login_after.status_code == 200
+            new_payload = jwt.decode(login_after.json()["access_token"], SECRET_KEY, algorithms=[ALGORITHM])
+            assert new_payload["restricted"] is False
+
+    _run(_test())
+
+
+def test_ocr_rejects_non_image_mime():
+    async def _test():
+        from web.app import app
+        from web.auth import create_access_token
+        from web.database import create_user
+
+        uid = await create_user(_uid(), "hashed_pw", status="active")
+        token = create_access_token(uid, "mime_user", is_admin=False)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            resp = await ac.post(
+                "/ocr",
+                files={"image": ("fake.txt", b"not an image", "text/plain")},
+                data={"model": "qwen/qwen3.6-plus"},
+                headers={"Authorization": "Bearer " + token},
+            )
+            assert resp.status_code == 400
+            assert "图片" in resp.json().get("error", "")
+
+    _run(_test())
+
+
+def test_analyze_rejects_non_image_mime():
+    async def _test():
+        from web.app import app
+        from web.auth import create_access_token
+        from web.database import create_user
+
+        uid = await create_user(_uid(), "hashed_pw", status="active")
+        token = create_access_token(uid, "mime_user2", is_admin=False)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            resp = await ac.post(
+                "/analyze",
+                files={"image": ("fake.txt", b"not an image", "text/plain")},
+                data={
+                    "problem_text": "题目",
+                    "student_solution": "步骤",
+                    "source_type": "ocr",
+                    "model": "qwen/qwen3.6-plus",
+                    "subject_id": "calculus",
+                    "mode": "workflow_r1",
+                    "depth": "with_ref",
+                },
+                headers={"Authorization": "Bearer " + token},
+            )
+            assert resp.status_code == 400
+            assert "图片" in resp.json().get("error", "")
+
     _run(_test())

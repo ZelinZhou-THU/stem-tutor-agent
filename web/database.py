@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     is_admin INTEGER DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
+    force_change_password INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
 );
 
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
     status TEXT NOT NULL DEFAULT 'active',
+    force_change_password BOOLEAN DEFAULT FALSE,
     created_at TEXT NOT NULL
 );
 
@@ -245,6 +247,10 @@ async def _ensure_db() -> None:
                     await conn.execute(
                         "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
                     )
+                if "force_change_password" not in col_names:
+                    await conn.execute(
+                        "ALTER TABLE users ADD COLUMN force_change_password BOOLEAN DEFAULT FALSE"
+                    )
         except BaseException:
             await pool.close()
             raise
@@ -258,6 +264,11 @@ async def _ensure_db() -> None:
             if "status" not in col_names:
                 await db.execute(
                     "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+                )
+                await db.commit()
+            if "force_change_password" not in col_names:
+                await db.execute(
+                    "ALTER TABLE users ADD COLUMN force_change_password INTEGER DEFAULT 0"
                 )
                 await db.commit()
     _initialized = True
@@ -390,12 +401,12 @@ def _now_iso() -> str:
 
 # ── User CRUD ──────────────────────────────────────────────────────────
 
-async def create_user(username: str, password_hash: str, is_admin: bool = False, status: str = "active") -> int:
+async def create_user(username: str, password_hash: str, is_admin: bool = False, status: str = "active", force_change_password: bool = False) -> int:
     db = await get_db()
     try:
         cur = await db.execute(
-            "INSERT INTO users (username, password_hash, is_admin, status, created_at) VALUES (?, ?, ?, ?, ?)",
-            (username, password_hash, bool(is_admin) if USE_PG else int(is_admin), status, _now_iso()),
+            "INSERT INTO users (username, password_hash, is_admin, status, force_change_password, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, password_hash, bool(is_admin) if USE_PG else int(is_admin), status, bool(force_change_password) if USE_PG else int(force_change_password), _now_iso()),
         )
         await db.commit()
         return cur.lastrowid
@@ -404,6 +415,18 @@ async def create_user(username: str, password_hash: str, is_admin: bool = False,
 
 
 async def get_user_by_username(username: str) -> dict[str, Any] | None:
+    db = await get_db()
+    try:
+        row = await db.fetchone(
+            "SELECT id, username, is_admin, status, force_change_password, created_at FROM users WHERE username=?",
+            (username,)
+        )
+        return row
+    finally:
+        await db.close()
+
+
+async def get_user_for_login(username: str) -> dict[str, Any] | None:
     db = await get_db()
     try:
         row = await db.fetchone("SELECT * FROM users WHERE username=?", (username,))
@@ -415,8 +438,20 @@ async def get_user_by_username(username: str) -> dict[str, Any] | None:
 async def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     db = await get_db()
     try:
-        row = await db.fetchone("SELECT * FROM users WHERE id=?", (user_id,))
+        row = await db.fetchone(
+            "SELECT id, username, is_admin, status, force_change_password, created_at FROM users WHERE id=?",
+            (user_id,)
+        )
         return row
+    finally:
+        await db.close()
+
+
+async def get_user_password_hash(user_id: int) -> str | None:
+    db = await get_db()
+    try:
+        row = await db.fetchone("SELECT password_hash FROM users WHERE id=?", (user_id,))
+        return row["password_hash"] if row else None
     finally:
         await db.close()
 
@@ -460,7 +495,8 @@ async def update_password(user_id: int, new_password_hash: str) -> bool:
     db = await get_db()
     try:
         cur = await db.execute(
-            "UPDATE users SET password_hash=? WHERE id=?", (new_password_hash, user_id)
+            "UPDATE users SET password_hash=?, force_change_password=? WHERE id=?",
+            (new_password_hash, False if USE_PG else 0, user_id)
         )
         await db.commit()
         return cur.rowcount > 0

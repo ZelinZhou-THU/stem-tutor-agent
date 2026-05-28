@@ -105,21 +105,22 @@ def test_reject_allows_reregister():
         await reject_user(uid)
         uid2 = await create_user(name, "newhash", status="pending")
         assert uid2 is not None
-        user = await get_user_by_username(name)
+        from web.database import get_user_for_login
+        user = await get_user_for_login(name)
         assert user["password_hash"] == "newhash"
     _run(_test())
 
 
 def test_update_password():
     async def _test():
-        from web.database import update_password
+        from web.database import update_password, get_user_password_hash
         from web.auth import hash_password, verify_password
         await _ensure_db()
         uid = await create_user(_uid(), hash_password("oldpass"), status="active")
         new_hash = hash_password("newpass")
         ok = await update_password(uid, new_hash)
         assert ok is True
-        user = await get_user_by_id(uid)
-        assert verify_password("newpass", user["password_hash"]) is True
-        assert verify_password("oldpass", user["password_hash"]) is False
+        pw_hash = await get_user_password_hash(uid)
+        assert verify_password("newpass", pw_hash) is True
+        assert verify_password("oldpass", pw_hash) is False
     _run(_test())

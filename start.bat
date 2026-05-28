@@ -30,9 +30,10 @@ if not exist "key.env" if not exist "..\key.env" (
 )
 
 set PORT=8000
+set TUNNEL_NAME=stem-tutor
 
 echo [1/3] Starting web server on port %PORT% ...
-start /b python -m uvicorn web.app:app --host 0.0.0.0 --port %PORT% --reload
+start /b python -m uvicorn web.app:app --host 127.0.0.1 --port %PORT%
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to start web server.
     pause
@@ -49,10 +50,10 @@ if %errorlevel% neq 0 (
 echo       Server is ready at http://localhost:%PORT%
 
 echo [3/3] Starting Cloudflare Tunnel ...
-echo       Your public URL will appear below:
+echo       Connecting www.zelin.online via tunnel '%TUNNEL_NAME%'
 echo.
 echo ============================================
-cloudflared tunnel --url http://localhost:%PORT% --protocol http2 --retries 5
+cloudflared tunnel run %TUNNEL_NAME% --protocol http2 --retries 5
 echo ============================================
 
 echo.

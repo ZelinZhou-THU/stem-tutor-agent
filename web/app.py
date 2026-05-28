@@ -2,6 +2,8 @@
 
 import json
 import re
+import time
+from collections import defaultdict
 from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -36,7 +38,7 @@ from web.service import practice_reference_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="STEM Tutor")
+app = FastAPI(title="STEM Tutor", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.on_event("startup")
@@ -103,6 +105,25 @@ async def change_password(req: ChangePasswordRequest, user: dict = Depends(get_c
     return {"ok": True}
 
 
+_RATE_LIMIT_WINDOW = 60
+_RATE_LIMIT_MAX = 30
+_rate_requests: dict[str, list[float]] = defaultdict(list)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        now = time.time()
+        client_ip = request.client.host if request.client else "unknown"
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            timestamps = _rate_requests[client_ip]
+            _rate_requests[client_ip] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
+            _rate_requests[client_ip].append(now)
+            if len(_rate_requests[client_ip]) > _RATE_LIMIT_MAX:
+                return JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后重试"})
+        response = await call_next(request)
+        return response
+
+
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -115,6 +136,7 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
         return response
 
 
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(NoCacheStaticMiddleware)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
@@ -138,6 +160,7 @@ async def index():
 async def ocr_endpoint(
     image: UploadFile = File(...),
     model: str = Form("qwen/qwen3.6-plus"),
+    user: dict = Depends(get_current_user),
 ):
     img_bytes = await image.read()
     try:
@@ -279,6 +302,7 @@ async def analyze_stream(
 @app.post("/detect-subject")
 async def detect_subject_endpoint(
     problem_text: str = Form(""),
+    user: dict = Depends(get_current_user),
 ):
     if not problem_text.strip():
         return JSONResponse(status_code=400, content={"error": "请输入题目"})

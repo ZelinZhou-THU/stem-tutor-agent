@@ -52,3 +52,5 @@ docs/
 
 # Runtime data (SQLite database)
 data/
+
+DESIGN_ASYNC.md

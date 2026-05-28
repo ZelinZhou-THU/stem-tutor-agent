@@ -43,7 +43,9 @@ def _is_tool_calling_enabled() -> bool:
         return False
 
 
-def _is_budget_enabled() -> bool:
+def _is_budget_enabled(state: dict | None = None) -> bool:
+    if state is not None and "budget_enabled" in state:
+        return bool(state["budget_enabled"])
     import os
     val = os.environ.get("STEM_TUTOR_BUDGET_ENABLED", "").strip().lower()
     return val in {"1", "true", "yes", "on"}
@@ -398,14 +400,15 @@ def _build_computation_hints_legacy(tool_calls: list[dict]) -> str:
 
 def make_generate_reference_solution_node(provider: LLMProvider):
     def generate_reference_solution_node(state: TutorGraphState) -> TutorGraphState:
-        if os.environ.get("STEM_TUTOR_DEPTH", "").strip() == "no_ref":
+        depth = state.get("budget_metadata", {}).get("depth", "")
+        if depth == "no_ref":
             state["reference_solution"] = {
                 "reference_text": "Reference solution unavailable (no_ref mode)",
                 "key_assertions": [],
             }
             return state
 
-        if _is_budget_enabled():
+        if _is_budget_enabled(state):
             return _run_new_path(provider, state)
 
         problem = state["problem_input"].problem_text

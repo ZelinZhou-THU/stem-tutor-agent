@@ -785,9 +785,7 @@ def run_stem_tutor(
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
 
-    os.environ["STEM_TUTOR_DEPTH"] = depth
-    if depth == "no_ref":
-        os.environ["STEM_TUTOR_BUDGET_ENABLED"] = "true"
+    budget_enabled = depth == "no_ref"
 
     if subject_id == "auto_detect":
         subject_id = detect_subject(
@@ -800,12 +798,7 @@ def run_stem_tutor(
         subject_id = "calculus"
 
     if subject_id:
-        os.environ["STEM_TUTOR_SUBJECT"] = subject_id
-        get_subject_context(subject_id)
-
-    ocr_payload = None
-    if source_type == "ocr" and image_bytes:
-        ocr_payload = base64.b64encode(image_bytes).decode("utf-8")
+        settings.__dict__["subject_id"] = subject_id
 
     problem_input = ProblemInput(
         problem_id=f"web-{uuid4().hex[:8]}",
@@ -840,6 +833,8 @@ def run_stem_tutor(
                     ocr_provider=ocr_provider,
                     fast_provider=fast_provider,
                     verify_provider=verify_provider,
+                    budget_metadata={"depth": depth},
+                    budget_enabled=budget_enabled,
                 )
 
                 response = _shape_response(state)
@@ -1046,9 +1041,7 @@ async def run_stem_tutor_stream(
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
 
-    os.environ["STEM_TUTOR_DEPTH"] = depth
-    if depth == "no_ref":
-        os.environ["STEM_TUTOR_BUDGET_ENABLED"] = "true"
+    budget_enabled = depth == "no_ref"
 
     if subject_id == "auto_detect":
         subject_id = detect_subject(
@@ -1061,7 +1054,7 @@ async def run_stem_tutor_stream(
         subject_id = "calculus"
 
     if subject_id:
-        os.environ["STEM_TUTOR_SUBJECT"] = subject_id
+        settings.__dict__["subject_id"] = subject_id
         get_subject_context(subject_id)
 
     ocr_payload = None
@@ -1121,6 +1114,7 @@ async def run_stem_tutor_stream(
                 "max_attempts": max_attempts,
             },
             "budget_metadata": {"depth": depth},
+            "budget_enabled": budget_enabled,
         }
 
         accumulated_state = dict(initial_state)
@@ -1767,7 +1761,8 @@ async def chat_stream(
         yield f"data: {_json.dumps({'type': 'chat_done', 'message': '回复完成'}, ensure_ascii=False)}\n\n"
 
     except Exception as exc:
-        yield f"data: {_json.dumps({'type': 'chat_error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
+        logger.error("[Chat] event_generator error: %s", exc, exc_info=True)
+        yield f"data: {_json.dumps({'type': 'chat_error', 'message': '对话出错，请稍后重试'}, ensure_ascii=False)}\n\n"
 
 
 _SKILL_CATEGORY_MAP = {
@@ -2217,6 +2212,7 @@ async def practice_verify_stream(
             "all_correct": bool(parsed.get("all_correct")),
         }
     except Exception as exc:
+        logger.error("[Practice] LLM verify error: %s", exc, exc_info=True)
         result = {
             "type": "result",
             "label": "correct",
@@ -2225,7 +2221,7 @@ async def practice_verify_stream(
             "hint": None,
             "all_correct": True,
         }
-        yield f"event: practice_progress\ndata: {_json.dumps({'type': 'error', 'message': f'LLM 验证出错：{exc}，默认标记为正确'}, ensure_ascii=False)}\n\n"
+        yield f"event: practice_progress\ndata: {_json.dumps({'type': 'error', 'message': 'LLM 验证出错，默认标记为正确'}, ensure_ascii=False)}\n\n"
 
     yield f"event: practice_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
 
@@ -2253,9 +2249,10 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
             "tool_call_count": len(tool_calls),
         }
     except Exception as exc:
+        logger.error("[Practice] Reference generation failed: %s", exc, exc_info=True)
         result = {
             "type": "result",
-            "reference_text": "生成参考解答失败：" + str(exc),
+            "reference_text": "生成参考解答失败",
             "key_assertions": [],
             "tool_call_count": 0,
         }
@@ -2353,4 +2350,4 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
         yield f"data: {_json.dumps({'type': 'report_error', 'message': '报告内容解析失败，请重试'}, ensure_ascii=False)}\n\n"
     except Exception as exc:
         logger.error("[Report] Generation failed: %s", exc, exc_info=True)
-        yield f"data: {_json.dumps({'type': 'report_error', 'message': f'生成失败：{exc}'}, ensure_ascii=False)}\n\n"
+        yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"

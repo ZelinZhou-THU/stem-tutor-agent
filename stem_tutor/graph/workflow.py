@@ -111,6 +111,8 @@ def run_tutor_graph(
     ocr_provider: LLMProvider | None = None,
     fast_provider: LLMProvider | None = None,
     verify_provider: LLMProvider | None = None,
+    budget_metadata: dict | None = None,
+    budget_enabled: bool = False,
 ) -> TutorGraphState:
     app = build_tutor_graph(provider, ocr_provider=ocr_provider, fast_provider=fast_provider, verify_provider=verify_provider)
     provider_info = provider.provider_info()
@@ -133,5 +135,7 @@ def run_tutor_graph(
             "node_stats": {},
             "provider_events": [],
         },
+        "budget_metadata": budget_metadata or {},
+        "budget_enabled": budget_enabled,
     }
     return app.invoke(initial_state)

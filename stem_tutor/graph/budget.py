@@ -48,8 +48,7 @@ def load_budget_config(
     node_name: str,
     subject_overrides: dict | None = None,
 ) -> NodeBudgetConfig:
-    env_depth = os.environ.get("STEM_TUTOR_DEPTH", "").strip().lower()
-    effective_depth = env_depth if env_depth in DEPTH_PRESETS else (depth if depth in DEPTH_PRESETS else "with_ref")
+    effective_depth = depth if depth in DEPTH_PRESETS else "with_ref"
 
     config = _load_from_preset(effective_depth, node_name)
 

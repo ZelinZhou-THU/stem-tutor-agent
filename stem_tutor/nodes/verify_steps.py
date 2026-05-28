@@ -32,7 +32,9 @@ def _is_tool_calling_enabled() -> bool:
         return False
 
 
-def _is_budget_enabled() -> bool:
+def _is_budget_enabled(state: dict | None = None) -> bool:
+    if state is not None and "budget_enabled" in state:
+        return bool(state["budget_enabled"])
     val = os.environ.get("STEM_TUTOR_BUDGET_ENABLED", "").strip().lower()
     return val in {"1", "true", "yes", "on"}
 
@@ -956,7 +958,7 @@ def _default_label_step(step) -> VerificationResult:
 
 def make_verify_steps_node(provider: LLMProvider):
     def verify_steps_node(state: TutorGraphState) -> TutorGraphState:
-        if _is_budget_enabled():
+        if _is_budget_enabled(state):
             return _run_new_verify_path(provider, state)
 
         import logging

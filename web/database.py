@@ -888,18 +888,31 @@ async def set_batch_item_run_id(batch_id: str, seq: int, run_id: str) -> None:
 async def claim_next_pending_item(batch_id: str) -> dict | None:
     db = await get_db()
     try:
-        row = await db.fetchone(
-            "SELECT * FROM batch_items WHERE batch_id=? AND status='pending' ORDER BY seq LIMIT 1",
-            (batch_id,),
-        )
+        now = _now_iso()
+        if db._is_pg:
+            row = await db.fetchone(
+                "UPDATE batch_items SET status='running', updated_at=$1 "
+                "WHERE id = (SELECT id FROM batch_items "
+                "WHERE batch_id=$2 AND status='pending' ORDER BY seq LIMIT 1) "
+                "RETURNING *",
+                (now, batch_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE batch_items SET status='running', updated_at=? "
+                "WHERE rowid = (SELECT rowid FROM batch_items "
+                "WHERE batch_id=? AND status='pending' ORDER BY seq LIMIT 1)",
+                (now, batch_id),
+            )
+            await db.commit()
+            row = await db.fetchone(
+                "SELECT * FROM batch_items WHERE batch_id=? AND status='running' ORDER BY seq DESC LIMIT 1",
+                (batch_id,),
+            )
         if not row:
             return None
-        now = _now_iso()
-        await db.execute(
-            "UPDATE batch_items SET status='running', updated_at=? WHERE batch_id=? AND seq=?",
-            (now, batch_id, row["seq"]),
-        )
-        await db.commit()
+        if db._is_pg:
+            await db.commit()
         return row
     finally:
         await db.close()

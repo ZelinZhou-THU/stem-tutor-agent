@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import re
@@ -20,8 +21,8 @@ VALID_SUBJECTS = {
 _SUBJECT_LIST = ", ".join(sorted(VALID_SUBJECTS))
 
 _DETECTION_PROMPT = (
-    "请判断以下数学/物理题目属于哪个学科。只返回学科ID，不要解释。\n"
-    f"可选学科: {_SUBJECT_LIST}\n"
+    "从以下列表中选出最匹配的学科ID，只返回学科ID本身，不要包含任何其他文字。\n"
+    f"可选学科ID: {_SUBJECT_LIST}\n"
     "题目: {problem_text}"
 )
 
@@ -86,5 +87,10 @@ def _extract_subject_id(text: str) -> str | None:
     for subject in VALID_SUBJECTS:
         if subject in cleaned or cleaned in subject:
             return subject
+
+    matches = difflib.get_close_matches(cleaned, VALID_SUBJECTS, n=1, cutoff=0.7)
+    if matches:
+        logging.info("[SubjectDetect] Fuzzy matched '%s' → '%s'", cleaned, matches[0])
+        return matches[0]
 
     return None

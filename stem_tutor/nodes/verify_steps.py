@@ -1107,6 +1107,7 @@ def make_verify_steps_node(provider: LLMProvider):
             tool_calling_enabled = _is_tool_calling_enabled()
             _step_started_at = _time.perf_counter()
             step_tool_calls: list[dict] = []
+            schema_retry_fallback = False
             if tool_calling_enabled:
                 try:
                     raw, step_tool_calls = _verify_step_via_agent(

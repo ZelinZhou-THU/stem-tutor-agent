@@ -52,8 +52,12 @@ echo       Server is ready at http://localhost:%PORT%
 echo [3/3] Starting Cloudflare Tunnel ...
 echo       Connecting www.zelin.online via tunnel '%TUNNEL_NAME%'
 echo.
+
+:: Heartbeat: keep tunnel QUIC connection alive (idle timeout ~60s)
+start /b cmd /c ":heartbeat & timeout /t 25 /nobreak >nul & curl -sf http://127.0.0.1:%PORT%/ >nul 2>&1 & goto heartbeat"
+
 echo ============================================
-cloudflared tunnel --protocol http2 run %TUNNEL_NAME%
+cloudflared tunnel run %TUNNEL_NAME%
 echo ============================================
 
 echo.

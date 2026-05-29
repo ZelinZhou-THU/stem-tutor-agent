@@ -1729,7 +1729,7 @@ async def chat_stream(
         "model": model_name,
         "messages": messages,
         "temperature": 0.5,
-        "max_tokens": 2000,
+        "max_tokens": 8192,
         "stream": True,
     }
 
@@ -1739,6 +1739,7 @@ async def chat_stream(
 
         full_content = ""
         full_reasoning = ""
+        truncated = False
         for line in resp.iter_lines():
             line = line.decode("utf-8")
             if not line.startswith("data:"):
@@ -1748,7 +1749,11 @@ async def chat_stream(
                 break
             try:
                 chunk_data = json.loads(data_str)
-                delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                choices = chunk_data.get("choices", [{}])
+                delta = choices[0].get("delta", {})
+                finish_reason = choices[0].get("finish_reason")
+                if finish_reason == "length":
+                    truncated = True
                 reasoning = delta.get("reasoning_content", "")
                 if reasoning:
                     full_reasoning += reasoning
@@ -1759,6 +1764,11 @@ async def chat_stream(
                     yield f"data: {_json.dumps({'type': 'chat_chunk', 'content': content}, ensure_ascii=False)}\n\n"
             except json.JSONDecodeError:
                 continue
+
+        if truncated:
+            warning = "\n\n⚠ 回答已被 token 限制截断。请分次提问，或更换更长上下文的模型。"
+            full_content += warning
+            yield f"data: {_json.dumps({'type': 'chat_chunk', 'content': warning}, ensure_ascii=False)}\n\n"
 
         assistant_ts = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
         history.append({"role": "assistant", "content": full_content, "ts": assistant_ts, "model": model_name})

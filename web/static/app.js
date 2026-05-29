@@ -3687,6 +3687,12 @@
                             if (data.last_node) {
                                 renderPartial(data.last_node, data);
                             }
+                            if (data.steps && data.steps.length > 0) {
+                                var stepsContainer = $("steps-table-container");
+                                if (stepsContainer && !stepsContainer.innerHTML.trim()) {
+                                    renderStepsPartial(data.steps);
+                                }
+                            }
                             var statusEl = loadingDiv.querySelector(".loading-status");
                             if (statusEl) {
                                 statusEl.style.display = "";

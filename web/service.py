@@ -198,7 +198,13 @@ async def _save_intermediate_state(run_id: str, user_id: int, accumulated_state:
     meta = response.get("run_meta", {})
     meta["failed"] = False
     last_node = accumulated_state.get("_last_completed_node", "")
-    completed_nodes = meta.get("completed_nodes", [])
+
+    completed_nodes = []
+    existing = await database.load_run(run_id, user_id)
+    if existing:
+        existing_meta = existing["data"].get("run_meta", {})
+        completed_nodes = existing_meta.get("completed_nodes", [])
+
     if last_node and last_node not in completed_nodes:
         completed_nodes.append(last_node)
     meta["completed_nodes"] = completed_nodes

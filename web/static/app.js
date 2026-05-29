@@ -2060,7 +2060,7 @@
         var fd = new FormData();
         fd.append("image", file);
         fd.append("model", model);
-        fetch("/ocr", { method: "POST", body: fd })
+                fetch("/ocr", { method: "POST", headers: AuthModule.getAuthHeader(), body: fd })
             .then(function (resp) {
                 if (!resp.ok) {
                     return resp.json().catch(function () { return {}; }).then(function (e) {
@@ -4344,7 +4344,7 @@
                 var formData = new FormData();
                 formData.append("problem_text", problem.problem_text);
                 formData.append("subject_id", subjectId);
-                fetch("/practice/reference", { method: "POST", body: formData })
+                fetch("/practice/reference", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
                     .then(function (resp) {
                         if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
                         return resp;
@@ -4812,7 +4812,7 @@
 
             var self = this;
 
-            fetch("/practice/verify", { method: "POST", body: formData })
+            fetch("/practice/verify", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
                 .then(function (resp) {
                     if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
                     return resp;

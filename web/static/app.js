@@ -5233,10 +5233,13 @@
             container.innerHTML = html;
             if (_expandedBatchId) {
                 _refreshStatus(_expandedBatchId);
-                if (!_pollTimer) _startPoll(_expandedBatchId);
+                var expBatch = data.batches.find(function(b) { return b.id === _expandedBatchId; });
+                if (expBatch && (expBatch.status === "running" || expBatch.status === "pending") && !_pollTimer) {
+                    _startPoll(_expandedBatchId);
+                }
             }
             data.batches.forEach(function(b) {
-                if (b.status === "running" && !_pollTimer) _startPoll(b.id);
+                if (b.status === "running" && b.id !== _currentBatchId && !_pollTimer) _startPoll(b.id);
             });
         }
 
@@ -5278,8 +5281,7 @@
         function remove(batchId) { if (confirm("确定删除此批次？")) _api("DELETE", "/batch/" + batchId).then(function() { _loadList(); }); }
 
         function viewRun(runId) {
-            App.currentRunId = runId;
-            AppRouter.navigate("history");
+            HistoryModule.viewResult(runId);
         }
 
         function viewSummary(batchId) {

@@ -128,7 +128,23 @@ def _verify_step_via_agent(
         user_parts.append(f"\n【预计算结果】\n{computation_hints}\n")
     user_parts.append("\n请判断当前步骤是否正确，最终只返回 JSON。")
 
-    agent_result = agent.invoke("".join(user_parts), max_iterations=2)
+    max_retries = 3
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            agent_result = agent.invoke("".join(user_parts), max_iterations=2)
+            break
+        except Exception as e:
+            last_exc = e
+            if attempt < max_retries - 1:
+                wait = 5 * (attempt + 1)
+                logging.warning(
+                    f"[verify_steps] Agent invoke attempt {attempt + 1}/{max_retries} "
+                    f"failed: {e}, retrying in {wait}s"
+                )
+                _time.sleep(wait)
+            else:
+                raise last_exc
     messages = agent_result.messages
     last_ai = agent.get_last_ai_message(messages)
     if last_ai is None:

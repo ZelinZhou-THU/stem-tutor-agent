@@ -3597,6 +3597,7 @@
         var abortController = null;
 
         function cancelAnalysis() {
+            localStorage.removeItem("stem_tutor_pending_run");
             if (currentBatchId) {
                 fetch("/batch/" + currentBatchId + "/cancel", { method: "POST", headers: AuthModule.getAuthHeader() }).catch(function () {});
             }
@@ -3624,6 +3625,7 @@
                     return readSSEStream(resp.body);
                 })
                 .then(function (data) {
+                    localStorage.removeItem("stem_tutor_pending_run");
                     if (data && data._batchId) {
                         pollBatchUntilComplete(data._batchId);
                     } else if (data) {
@@ -3656,6 +3658,7 @@
 
         function showReconnectingUI(runId) {
             currentRunId = runId;
+            localStorage.setItem("stem_tutor_pending_run", runId);
             var pollInterval = 3000;
             var maxPolls = 600;
             var pollCount = 0;
@@ -3774,6 +3777,7 @@
                         try { var event = JSON.parse(jsonStr); } catch (e) { continue; }
                         if (event.type === "start") {
                             currentRunId = event.run_id || null;
+                            if (event.run_id) localStorage.setItem("stem_tutor_pending_run", event.run_id);
                             if (event.batch_id) { batchId = event.batch_id; currentBatchId = event.batch_id; }
                             var cancelBtn = $("cancel-analysis-btn");
                             if (cancelBtn) cancelBtn.style.display = "";
@@ -3797,6 +3801,7 @@
                                 statusEl3.textContent = event.message || "\u5206\u6790\u7ed3\u679c\u6682\u4e0d\u53ef\u7528\u3002";
                             }
                         } else if (event.type === "cancelled") {
+                            localStorage.removeItem("stem_tutor_pending_run");
                             currentRunId = null;
                             hideLoading();
                             InputPanel.expand();
@@ -3956,6 +3961,23 @@
 
     function init() {
         AuthModule.init();
+        var pendingRunId = localStorage.getItem("stem_tutor_pending_run");
+        if (!pendingRunId) return;
+        fetch("/analyze/status/" + pendingRunId, { headers: AuthModule.getAuthHeader() })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var st = normalizeRunStatus(data.user_status || data.status);
+                if (st === "running" || st === "pending") {
+                    showLoading();
+                    InputPanel.collapse();
+                    showReconnectingUI(pendingRunId);
+                } else {
+                    localStorage.removeItem("stem_tutor_pending_run");
+                }
+            })
+            .catch(function () {
+                localStorage.removeItem("stem_tutor_pending_run");
+            });
     }
 
     /* ===== Result Rendering (global scope for HistoryModule) ===== */

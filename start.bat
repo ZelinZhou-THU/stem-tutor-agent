@@ -33,7 +33,7 @@ set PORT=8000
 set TUNNEL_NAME=stem-tutor
 
 echo [1/3] Starting web server on port %PORT% ...
-start /b conda run -n LLM python -m uvicorn web.app:app --host 127.0.0.1 --port %PORT%
+start "STEM Tutor Server" cmd /k "conda run --no-capture-output -n LLM python -m uvicorn web.app:app --host 127.0.0.1 --port %PORT%"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to start web server.
     pause

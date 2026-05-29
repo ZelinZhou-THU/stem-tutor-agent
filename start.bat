@@ -53,7 +53,7 @@ echo [3/3] Starting Cloudflare Tunnel ...
 echo       Connecting www.zelin.online via tunnel '%TUNNEL_NAME%'
 echo.
 echo ============================================
-cloudflared tunnel run %TUNNEL_NAME% --protocol http2
+cloudflared tunnel --protocol http2 run %TUNNEL_NAME%
 echo ============================================
 
 echo.

@@ -4212,7 +4212,9 @@
             html += '<p><span class="field-label">假设根因：</span>' + esc(d.root_cause_hypothesis) + "</p>";
             html += '<p><span class="field-label">支持证据：</span>' + esc(d.supporting_evidence) + "</p>";
             html += '<p><span class="field-label">置信度：</span>' + (d.confidence * 100).toFixed(0) + "%</p>";
-            html += '<button type="button" class="btn-mastered-toggle" data-error-code="' + esc(d.error_code) + '">标记已掌握</button>';
+            var _md = (typeof MasteryModule !== "undefined") ? MasteryModule.getData() : null;
+            var _mastered = _md && _md.errors && _md.errors[d.error_code] && _md.errors[d.error_code].mastered;
+            html += '<button type="button" class="btn-mastered-toggle' + (_mastered ? ' mastered' : '') + '" data-error-code="' + esc(d.error_code) + '">' + (_mastered ? '已掌握' : '标记已掌握') + '</button>';
             html += "</div>";
             if (typeof MasteryModule !== "undefined" && MasteryModule.recordEncounter) {
                 MasteryModule.recordEncounter(d.error_code);
@@ -4996,33 +4998,46 @@
             }).catch(function () {});
         },
 
+        _loadPromise: null,
+
         loadFromServer: function () {
             var self = this;
-            fetch("/api/user/mastery", { headers: AuthModule.getAuthHeader() })
+            if (this._loadPromise) return this._loadPromise;
+            this._loadPromise = fetch("/api/user/mastery", { headers: AuthModule.getAuthHeader() })
                 .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
                 .then(function (data) {
                     if (data && typeof data === "object") {
                         self._serverData = data;
                         localStorage.setItem(self.STORAGE_KEY, JSON.stringify(data));
                     }
-                }).catch(function () {});
+                }).catch(function () {})
+                .finally(function () { self._loadPromise = null; });
+            return this._loadPromise;
         },
 
         recordEncounter: function (errorCode) {
             if (!errorCode) return;
-            var data = this.getData();
-            if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
-            data.errors[errorCode].total++;
-            data.errors[errorCode].timestamps.push(Date.now());
-            this.saveData(data);
+            var self = this;
+            var doRecord = function () {
+                var data = self.getData();
+                if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
+                data.errors[errorCode].total++;
+                data.errors[errorCode].timestamps.push(Date.now());
+                self.saveData(data);
+            };
+            if (this._loadPromise) { this._loadPromise.then(doRecord); } else { doRecord(); }
         },
 
         toggleMastered: function (errorCode) {
             if (!errorCode) return;
-            var data = this.getData();
-            if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
-            data.errors[errorCode].mastered = !data.errors[errorCode].mastered;
-            this.saveData(data);
+            var self = this;
+            var doToggle = function () {
+                var data = self.getData();
+                if (!data.errors[errorCode]) data.errors[errorCode] = { total: 0, mastered: false, timestamps: [] };
+                data.errors[errorCode].mastered = !data.errors[errorCode].mastered;
+                self.saveData(data);
+            };
+            if (this._loadPromise) { this._loadPromise.then(doToggle); } else { doToggle(); }
         },
 
         recordPractice: function (weaknessCode, correct) {

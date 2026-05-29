@@ -3437,7 +3437,7 @@
             _subjectDetectTimer = setTimeout(function () {
                 fetch("/detect-subject", {
                     method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded" }, AuthModule.getAuthHeader()),
                     body: "problem_text=" + encodeURIComponent(text),
                 })
                     .then(function (resp) { return resp.json(); })

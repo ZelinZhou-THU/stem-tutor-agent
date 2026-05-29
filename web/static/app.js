@@ -5232,10 +5232,12 @@
             });
             container.innerHTML = html;
             if (_expandedBatchId) {
-                _refreshStatus(_expandedBatchId);
                 var expBatch = data.batches.find(function(b) { return b.id === _expandedBatchId; });
-                if (expBatch && (expBatch.status === "running" || expBatch.status === "pending") && !_pollTimer) {
-                    _startPoll(_expandedBatchId);
+                if (expBatch && (expBatch.status === "running" || expBatch.status === "pending")) {
+                    _refreshStatus(_expandedBatchId);
+                    if (!_pollTimer) _startPoll(_expandedBatchId);
+                } else if (expBatch) {
+                    _loadBatchItems(_expandedBatchId);
                 }
             }
             data.batches.forEach(function(b) {
@@ -5243,28 +5245,39 @@
             });
         }
 
+        function _renderItemsHtml(items) {
+            var html = "";
+            (items || []).forEach(function(item) {
+                var icon = {pending:"⏳",running:"🔄",completed:"✅",failed:"❌",cancelled:"🚫"}[item.status] || "⏳";
+                html += '<div class="batch-item-row">';
+                html += '<span class="batch-item-seq">#' + (item.seq + 1) + '</span>';
+                html += '<span>' + icon + '</span>';
+                if (item.status === "completed" && item.run_id) {
+                    html += '<a class="batch-item-link" onclick="QueueModule.viewRun(\'' + item.run_id + '\')">' + esc(item.problem_preview) + '</a>';
+                } else {
+                    html += '<span class="batch-item-preview">' + esc(item.problem_preview) + '</span>';
+                }
+                if (item.error_message) html += '<span style="color:#ff6b6b;font-size:12px">(' + esc(item.error_message) + ')</span>';
+                html += '</div>';
+            });
+            return html;
+        }
+
+        function _loadBatchItems(batchId) {
+            _api("GET", "/batch/" + batchId + "/status").then(function(data) {
+                var el = document.getElementById("batch-items-" + batchId);
+                if (!el) return;
+                el.innerHTML = _renderItemsHtml(data.items) || '<p style="color:var(--text-muted,#888)">暂无题目</p>';
+            });
+        }
+
         function _refreshStatus(batchId) {
             _api("GET", "/batch/" + batchId + "/status").then(function(data) {
                 var el = document.getElementById("batch-items-" + batchId);
                 if (!el) return;
-                var html = "";
-                (data.items || []).forEach(function(item) {
-                    var icon = {pending:"⏳",running:"🔄",completed:"✅",failed:"❌",cancelled:"🚫"}[item.status] || "⏳";
-                    html += '<div class="batch-item-row">';
-                    html += '<span class="batch-item-seq">#' + (item.seq + 1) + '</span>';
-                    html += '<span>' + icon + '</span>';
-                    if (item.status === "completed" && item.run_id) {
-                        html += '<a class="batch-item-link" onclick="QueueModule.viewRun(\'' + item.run_id + '\')">' + esc(item.problem_preview) + '</a>';
-                    } else {
-                        html += '<span class="batch-item-preview">' + esc(item.problem_preview) + '</span>';
-                    }
-                    if (item.error_message) html += '<span style="color:#ff6b6b;font-size:12px">(' + esc(item.error_message) + ')</span>';
-                    html += '</div>';
-                });
-                el.innerHTML = html || '<p style="color:var(--text-muted,#888)">暂无题目</p>';
+                el.innerHTML = _renderItemsHtml(data.items) || '<p style="color:var(--text-muted,#888)">暂无题目</p>';
                 if (data.status !== "running" && data.status !== "pending") {
                     if (_currentBatchId === batchId) _stopPoll();
-                    _loadList();
                 }
             });
         }

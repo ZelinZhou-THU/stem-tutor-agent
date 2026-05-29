@@ -1,4 +1,5 @@
 :root {
+    --card-bg: #ffffff;
     --bg-primary: #fafafa;
     --bg-surface: #ffffff;
     --bg-sidebar: #f8fafc;
@@ -31,6 +32,7 @@
 }
 
 [data-theme="dark"] {
+    --card-bg: #1e293b;
     --bg-primary: #0f172a;
     --bg-surface: #1e293b;
     --bg-sidebar: #1e293b;

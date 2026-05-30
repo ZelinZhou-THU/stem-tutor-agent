@@ -484,7 +484,7 @@ async def chat_stream_endpoint(
         return JSONResponse(status_code=404, content={"error": "分析结果不存在"})
 
     async def event_generator():
-        async for chunk in chat_stream(run_id, message, model_name=model, user_id=user["id"]):
+        async for chunk in chat_stream(run_id, user_id=user["id"], user_message=message, model_name=model):
             yield chunk
 
     return StreamingResponse(

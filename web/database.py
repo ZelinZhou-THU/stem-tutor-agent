@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -200,6 +201,8 @@ CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id, created_at DESC)
 
 _initialized = False
 _pg_pool = None
+_sqlite_conn: "aiosqlite.Connection | None" = None
+_sqlite_lock = asyncio.Lock()
 
 
 def _pg_convert_replace(sql: str) -> str:
@@ -277,10 +280,11 @@ async def _ensure_db() -> None:
 class _DB:
     """统一包装 aiosqlite 和 asyncpg 的数据库连接。"""
 
-    def __init__(self, raw_conn, pool=None):
+    def __init__(self, raw_conn, pool=None, sqlite_cached=False):
         self._raw = raw_conn
         self._pool = pool
         self._is_pg = type(raw_conn).__module__.startswith("asyncpg")
+        self._sqlite_cached = sqlite_cached
         self._pg_stmt = None
         self._pg_sql = None
         self._pg_params = None
@@ -369,6 +373,8 @@ class _DB:
     async def close(self):
         if self._is_pg and self._pool:
             await self._pool.release(self._raw)
+        elif getattr(self, "_sqlite_cached", False):
+            pass
         else:
             await self._raw.close()
 
@@ -383,16 +389,28 @@ async def get_db() -> _DB:
         conn = await asyncpg.connect(PG_URL)
         return _DB(conn)
     else:
-        conn = await aiosqlite.connect(str(DB_PATH))
-        conn.row_factory = aiosqlite.Row
-        return _DB(conn)
+        async with _sqlite_lock:
+            global _sqlite_conn
+            if _sqlite_conn is None:
+                _sqlite_conn = await aiosqlite.connect(str(DB_PATH))
+                _sqlite_conn.row_factory = aiosqlite.Row
+            else:
+                try:
+                    await _sqlite_conn.execute("SELECT 1")
+                except Exception:
+                    _sqlite_conn = await aiosqlite.connect(str(DB_PATH))
+                    _sqlite_conn.row_factory = aiosqlite.Row
+            return _DB(_sqlite_conn, sqlite_cached=True)
 
 
 async def close_pool() -> None:
-    global _pg_pool
+    global _pg_pool, _sqlite_conn
     if _pg_pool is not None:
         await _pg_pool.close()
         _pg_pool = None
+    if _sqlite_conn is not None:
+        await _sqlite_conn.close()
+        _sqlite_conn = None
 
 
 def _now_iso() -> str:

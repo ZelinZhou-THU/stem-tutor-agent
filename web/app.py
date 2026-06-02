@@ -540,7 +540,7 @@ async def reverify_step_endpoint(
     user: dict = Depends(get_current_user),
 ):
     try:
-        result = await reverify_step(run_id, step_id, user_id=user["id"])
+        result = await reverify_step(run_id, user_id=user["id"], step_id=step_id)
         return JSONResponse(content=result)
     except Exception as exc:
         logging.getLogger("stem_tutor.app").exception("Reverify step failed")
@@ -663,7 +663,7 @@ async def report_generate_endpoint(
 
     async def event_generator():
         try:
-            async for chunk in report_stream(data, model_name=model, user_id=user["id"]):
+            async for chunk in report_stream(user_id=user["id"], data=data, model_name=model):
                 yield chunk
         except Exception as exc:
             logger.error("[Report] event_generator error: %s", exc, exc_info=True)

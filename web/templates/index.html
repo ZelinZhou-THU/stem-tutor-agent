@@ -887,6 +887,45 @@
                             </div>
                         </div>
 
+                        <div class="admin-section" id="admin-export-section">
+                            <div class="admin-section-header">
+                                <h4>📤 数据导出</h4>
+                            </div>
+                            <div class="admin-export-form">
+                                <label>学科：
+                                    <select id="export-subject">
+                                        <option value="">全部</option>
+                                        <option value="calculus">微积分</option>
+                                        <option value="mechanics">力学</option>
+                                        <option value="electromagnetism">电磁学</option>
+                                        <option value="optics">光学</option>
+                                        <option value="thermodynamics">热力学</option>
+                                        <option value="quantum">量子力学</option>
+                                        <option value="relativity">相对论</option>
+                                        <option value="linear_algebra">线性代数</option>
+                                    </select>
+                                </label>
+                                <label>时间范围：
+                                    <select id="export-since-days">
+                                        <option value="">全部</option>
+                                        <option value="7">最近 7 天</option>
+                                        <option value="30" selected>最近 30 天</option>
+                                        <option value="90">最近 90 天</option>
+                                        <option value="180">最近 180 天</option>
+                                    </select>
+                                </label>
+                                <label>分析状态：
+                                    <select id="export-status">
+                                        <option value="">全部</option>
+                                        <option value="success">成功</option>
+                                        <option value="failed">失败</option>
+                                        <option value="manual_review_required">需人工复核</option>
+                                    </select>
+                                </label>
+                                <button type="button" class="btn-primary" id="btn-export-problems">导出数据</button>
+                            </div>
+                        </div>
+
                         <div class="admin-section" id="admin-pending-section" style="display:none;">
                             <div class="admin-section-header">
                                 <h4>⏳ 待审批用户</h4>

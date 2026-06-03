@@ -4665,3 +4665,26 @@ textarea {
 #admin-stat-pending-card {
     border-left: 4px solid var(--warning, #ff9800);
 }
+
+.admin-export-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    padding: 8px 0;
+}
+.admin-export-form label {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    color: var(--text-secondary);
+    gap: 4px;
+}
+.admin-export-form select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+}

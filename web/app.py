@@ -867,6 +867,94 @@ async def admin_delete_user(user_id: int, cascade: bool = True, admin: dict = De
         await db.close()
 
 
+@app.get("/api/admin/export/problems")
+async def admin_export_problems(
+    subject: str | None = None,
+    since_days: int | None = None,
+    status: str | None = None,
+    admin: dict = Depends(get_admin_user),
+):
+    from web.database import get_db
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+
+    async def generate():
+        db = await get_db()
+        try:
+            params: list = []
+            where: list[str] = []
+            if subject:
+                where.append("r.subject=?")
+                params.append(subject)
+            if status:
+                where.append("r.status=?")
+                params.append(status)
+            if since_days:
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+                where.append("r.created_at>=?")
+                params.append(cutoff)
+
+            sql = "SELECT r.* FROM runs r"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY r.created_at DESC"
+
+            await db.execute(sql, params)
+            while True:
+                row = await db.fetchone()
+                if row is None:
+                    break
+
+                data = row["data"]
+                if not isinstance(data, dict):
+                    data = _json.loads(data)
+                meta = data.get("run_meta", {})
+                raw = data.get("raw_output", {})
+
+                problem_text = row.get("problem_text", "") or ""
+                if not problem_text:
+                    pi = raw.get("problem_input")
+                    if isinstance(pi, dict):
+                        problem_text = pi.get("problem_text", "")
+
+                student_solution = data.get("raw_student_solution", "") or ""
+
+                error_codes = []
+                for d in data.get("diagnoses", []):
+                    if isinstance(d, dict) and d.get("error_code"):
+                        error_codes.append(d["error_code"])
+
+                source_type = "text"
+                if isinstance(raw.get("problem_input"), dict):
+                    source_type = raw["problem_input"].get("source_type", "text")
+
+                record = {
+                    "id": row["id"],
+                    "source": "run",
+                    "subject": meta.get("subject_id", "") or row.get("subject", ""),
+                    "problem_text": problem_text,
+                    "student_solution": student_solution,
+                    "source_type": source_type,
+                    "analysis": {
+                        "status": data.get("user_status") or data.get("status") or row.get("status", ""),
+                        "error_codes": error_codes,
+                    },
+                    "created_at": row.get("created_at", ""),
+                }
+                yield _json.dumps(record, ensure_ascii=False) + "\n"
+        finally:
+            await db.close()
+
+    today = datetime.now().strftime("%Y%m%d")
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={
+            "Content-Disposition": f'attachment; filename="problems_export_{today}.jsonl"',
+        },
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 

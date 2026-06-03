@@ -2526,6 +2526,7 @@
                 self.renderStats(stats, users);
                 self.renderUsers(users);
                 self.renderPendingUsers(pending);
+                self.renderExport();
                 if (loading) loading.style.display = "none";
                 if (content) content.style.display = "";
                 if (!users.length && empty) empty.style.display = "";
@@ -3187,6 +3188,42 @@
             }).catch(function (err) {
                 var msg = $("confirm-message");
                 if (msg) msg.innerHTML = '<div class="alert alert-error">' + esc(err.message || '删除失败') + '</div>';
+            });
+        },
+
+        renderExport: function () {
+            var btn = $("btn-export-problems");
+            if (!btn || btn._bound) return;
+            btn._bound = true;
+            var self = this;
+            btn.addEventListener("click", function () { self._exportProblems(); });
+        },
+
+        _exportProblems: function () {
+            var params = new URLSearchParams();
+            var subject = $("export-subject").value;
+            var sinceDays = $("export-since-days").value;
+            var status = $("export-status").value;
+            if (subject) params.set("subject", subject);
+            if (sinceDays) params.set("since_days", sinceDays);
+            if (status) params.set("status", status);
+            fetch("/api/admin/export/problems?" + params.toString(), {
+                headers: AuthModule.getAuthHeader()
+            }).then(function (r) {
+                if (!r.ok) return r.json().then(function (d) {
+                    throw new Error(d.detail || d.error || "导出失败");
+                });
+                return r.blob();
+            }).then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement("a");
+                a.href = url;
+                a.download = "problems_export_" + new Date().toISOString().slice(0, 10) + ".jsonl";
+                a.click();
+                URL.revokeObjectURL(url);
+                if (typeof showToast === "function") showToast("数据导出成功", "success");
+            }).catch(function (err) {
+                if (typeof showToast === "function") showToast(err.message || "导出失败", "error");
             });
         }
     };

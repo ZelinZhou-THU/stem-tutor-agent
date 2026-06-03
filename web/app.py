@@ -895,59 +895,67 @@ async def admin_export_problems(
                 where.append("r.created_at>=?")
                 params.append(cutoff)
 
-            sql = "SELECT r.* FROM runs r"
+            base_sql = "SELECT r.* FROM runs r"
             if where:
-                sql += " WHERE " + " AND ".join(where)
-            sql += " ORDER BY r.created_at DESC"
-            params.append(limit)
-            sql += " LIMIT ?"
+                base_sql += " WHERE " + " AND ".join(where)
+            base_sql += " ORDER BY r.created_at DESC"
 
-            rows = await db.fetchall(sql, params)
-            for row in rows:
-                data = row["data"]
-                if data is None:
-                    continue
-                if not isinstance(data, dict):
-                    try:
-                        data = _json.loads(data)
-                    except Exception:
+            actual_limit = min(limit, 100000)
+            batch_size = 2000
+            offset = 0
+            while offset < actual_limit:
+                remaining = actual_limit - offset
+                cur_batch = min(batch_size, remaining)
+                rows = await db.fetchall(base_sql + " LIMIT ? OFFSET ?", params + [cur_batch, offset])
+                if not rows:
+                    break
+                for row in rows:
+                    data = row["data"]
+                    if data is None:
                         continue
                     if not isinstance(data, dict):
-                        continue
-                meta = data.get("run_meta", {})
-                raw = data.get("raw_output", {})
+                        try:
+                            data = _json.loads(data)
+                        except Exception:
+                            logging.getLogger(__name__).warning("Export skipping row %s: data JSON parse failed", row.get("id"))
+                            continue
+                        if not isinstance(data, dict):
+                            continue
+                    meta = data.get("run_meta", {})
+                    raw = data.get("raw_output", {})
 
-                problem_text = row.get("problem_text", "") or ""
-                if not problem_text:
-                    pi = raw.get("problem_input")
-                    if isinstance(pi, dict):
-                        problem_text = pi.get("problem_text", "")
+                    problem_text = row.get("problem_text", "") or ""
+                    if not problem_text:
+                        pi = raw.get("problem_input")
+                        if isinstance(pi, dict):
+                            problem_text = pi.get("problem_text", "")
 
-                student_solution = data.get("raw_student_solution", "") or ""
+                    student_solution = data.get("raw_student_solution", "") or ""
 
-                error_codes = []
-                for d in data.get("diagnoses", []):
-                    if isinstance(d, dict) and d.get("error_code"):
-                        error_codes.append(d["error_code"])
+                    error_codes = []
+                    for d in data.get("diagnoses", []):
+                        if isinstance(d, dict) and d.get("error_code"):
+                            error_codes.append(d["error_code"])
 
-                source_type = "text"
-                if isinstance(raw.get("problem_input"), dict):
-                    source_type = raw["problem_input"].get("source_type", "text")
+                    source_type = "text"
+                    if isinstance(raw.get("problem_input"), dict):
+                        source_type = raw["problem_input"].get("source_type", "text")
 
-                record = {
-                    "id": row["id"],
-                    "source": "run",
-                    "subject": meta.get("subject_id", "") or row.get("subject", ""),
-                    "problem_text": problem_text,
-                    "student_solution": student_solution,
-                    "source_type": source_type,
-                    "analysis": {
-                        "status": data.get("user_status") or data.get("status") or row.get("status", ""),
-                        "error_codes": error_codes,
-                    },
-                    "created_at": row.get("created_at", ""),
-                }
-                yield _json.dumps(record, ensure_ascii=False) + "\n"
+                    record = {
+                        "id": row["id"],
+                        "source": "run",
+                        "subject": meta.get("subject_id", "") or row.get("subject", ""),
+                        "problem_text": problem_text,
+                        "student_solution": student_solution,
+                        "source_type": source_type,
+                        "analysis": {
+                            "status": data.get("user_status") or data.get("status") or row.get("status", ""),
+                            "error_codes": error_codes,
+                        },
+                        "created_at": row.get("created_at", ""),
+                    }
+                    yield _json.dumps(record, ensure_ascii=False) + "\n"
+                offset += len(rows)
         finally:
             await db.close()
 

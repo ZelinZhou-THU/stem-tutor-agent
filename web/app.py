@@ -869,6 +869,7 @@ async def admin_delete_user(user_id: int, cascade: bool = True, admin: dict = De
 
 @app.get("/api/admin/export/problems")
 async def admin_export_problems(
+    user_id: int | None = None,
     subject: str | None = None,
     since_days: int | None = None,
     status: str | None = None,
@@ -884,6 +885,9 @@ async def admin_export_problems(
         try:
             params: list = []
             where: list[str] = []
+            if user_id:
+                where.append("r.user_id=?")
+                params.append(user_id)
             if subject:
                 where.append("r.subject=?")
                 params.append(subject)

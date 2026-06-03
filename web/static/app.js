@@ -3194,6 +3194,16 @@
         renderExport: function () {
             var section = $("admin-export-section");
             if (section) section.style.display = "";
+            var userSelect = $("export-user");
+            if (userSelect) {
+                userSelect.innerHTML = '<option value="">全部用户</option>';
+                (this._users || []).forEach(function (u) {
+                    var opt = document.createElement("option");
+                    opt.value = u.id;
+                    opt.textContent = u.username + " (ID: " + u.id + ")";
+                    userSelect.appendChild(opt);
+                });
+            }
             var btn = $("btn-export-problems");
             if (!btn || btn._bound) return;
             btn._bound = true;
@@ -3207,17 +3217,20 @@
             btn.disabled = true;
             btn.textContent = "导出中...";
             var subjectEl = $("export-subject");
+            var userEl = $("export-user");
             var sinceEl = $("export-since-days");
             var statusEl = $("export-status");
-            if (!subjectEl || !sinceEl || !statusEl) {
+            if (!subjectEl || !userEl || !sinceEl || !statusEl) {
                 btn.disabled = false;
                 btn.textContent = "导出数据";
                 return;
             }
             var params = new URLSearchParams();
+            var userId = userEl.value;
             var subject = subjectEl.value;
             var sinceDays = sinceEl.value;
             var status = statusEl.value;
+            if (userId) params.set("user_id", userId);
             if (subject) params.set("subject", subject);
             if (sinceDays) params.set("since_days", sinceDays);
             if (status) params.set("status", status);

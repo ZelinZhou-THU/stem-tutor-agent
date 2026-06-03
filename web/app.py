@@ -872,11 +872,12 @@ async def admin_export_problems(
     subject: str | None = None,
     since_days: int | None = None,
     status: str | None = None,
+    limit: int = 50000,
     admin: dict = Depends(get_admin_user),
 ):
-    from web.database import get_db
+    from web.database import BEIJING_TZ, get_db
     import json as _json
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     async def generate():
         db = await get_db()
@@ -890,7 +891,7 @@ async def admin_export_problems(
                 where.append("r.status=?")
                 params.append(status)
             if since_days:
-                cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+                cutoff = (datetime.now(BEIJING_TZ) - timedelta(days=since_days)).isoformat()
                 where.append("r.created_at>=?")
                 params.append(cutoff)
 
@@ -898,16 +899,21 @@ async def admin_export_problems(
             if where:
                 sql += " WHERE " + " AND ".join(where)
             sql += " ORDER BY r.created_at DESC"
+            params.append(limit)
+            sql += " LIMIT ?"
 
-            await db.execute(sql, params)
-            while True:
-                row = await db.fetchone()
-                if row is None:
-                    break
-
+            rows = await db.fetchall(sql, params)
+            for row in rows:
                 data = row["data"]
+                if data is None:
+                    continue
                 if not isinstance(data, dict):
-                    data = _json.loads(data)
+                    try:
+                        data = _json.loads(data)
+                    except Exception:
+                        continue
+                    if not isinstance(data, dict):
+                        continue
                 meta = data.get("run_meta", {})
                 raw = data.get("raw_output", {})
 

@@ -3192,6 +3192,8 @@
         },
 
         renderExport: function () {
+            var section = $("admin-export-section");
+            if (section) section.style.display = "";
             var btn = $("btn-export-problems");
             if (!btn || btn._bound) return;
             btn._bound = true;
@@ -3200,6 +3202,10 @@
         },
 
         _exportProblems: function () {
+            var btn = $("btn-export-problems");
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            btn.textContent = "导出中...";
             var params = new URLSearchParams();
             var subject = $("export-subject").value;
             var sinceDays = $("export-since-days").value;
@@ -3218,12 +3224,14 @@
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement("a");
                 a.href = url;
-                a.download = "problems_export_" + new Date().toISOString().slice(0, 10) + ".jsonl";
                 a.click();
                 URL.revokeObjectURL(url);
-                if (typeof showToast === "function") showToast("数据导出成功", "success");
+                ExportModule._showToast("数据导出成功");
             }).catch(function (err) {
-                if (typeof showToast === "function") showToast(err.message || "导出失败", "error");
+                ExportModule._showToast("导出失败: " + (err.message || "未知错误"));
+            }).then(function () {
+                btn.disabled = false;
+                btn.textContent = "导出数据";
             });
         }
     };

@@ -3206,10 +3206,18 @@
             if (!btn || btn.disabled) return;
             btn.disabled = true;
             btn.textContent = "导出中...";
+            var subjectEl = $("export-subject");
+            var sinceEl = $("export-since-days");
+            var statusEl = $("export-status");
+            if (!subjectEl || !sinceEl || !statusEl) {
+                btn.disabled = false;
+                btn.textContent = "导出数据";
+                return;
+            }
             var params = new URLSearchParams();
-            var subject = $("export-subject").value;
-            var sinceDays = $("export-since-days").value;
-            var status = $("export-status").value;
+            var subject = subjectEl.value;
+            var sinceDays = sinceEl.value;
+            var status = statusEl.value;
             if (subject) params.set("subject", subject);
             if (sinceDays) params.set("since_days", sinceDays);
             if (status) params.set("status", status);
@@ -3224,8 +3232,9 @@
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement("a");
                 a.href = url;
+                a.download = "problems_export_" + new Date().toISOString().slice(0, 10) + ".jsonl";
                 a.click();
-                URL.revokeObjectURL(url);
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
                 ExportModule._showToast("数据导出成功");
             }).catch(function (err) {
                 ExportModule._showToast("导出失败: " + (err.message || "未知错误"));

@@ -27,6 +27,30 @@ error_taxonomy:
     category: "Condition Misuse"
     short_desc: "忽略了几何或运动学约束条件。"
     cues: ["constraint", "约束", "绳子", "光滑", "无摩擦"]
+  SIGN_ARITHMETIC_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "符号或算术化简错误。"
+    cues: ["minus", "sign", "simplify"]
+  TRANSCRIPTION_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "抄写或转录错误，如抄漏系数/符号/指数。"
+    cues: ["transcription", "copy", "omit", "missing digit", "scribal"]
+  UNSUPPORTED_JUMP:
+    category: "Reasoning Quality Issues"
+    short_desc: "步骤缺乏充分的推理依据。"
+    cues: ["therefore", "obvious", "skip"]
+  DOMAIN_CONDITION_IGNORED:
+    category: "Theorem/Condition Misuse"
+    short_desc: "忽略了定义域或定理前提条件。"
+    cues: ["domain", "condition", "precondition"]
+  COEFFICIENT_OMISSION:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "遗漏了系数或常数因子。"
+    cues: ["coefficient", "factor", "missing", "omitted"]
+  FINAL_CALCULATION_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "最终数值计算错误。"
+    cues: ["arithmetic", "calculation", "numeric"]
   NOTATION_UNCLEAR:
     category: "Reasoning Quality Issues"
     short_desc: "符号表达模糊或不清晰。"

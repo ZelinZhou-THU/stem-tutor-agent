@@ -78,20 +78,20 @@ def _error_step_recall(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -
     return hit / len(gold_error_steps)
 
 
-def _taxonomy_category_hit(pred: list[dict[str, Any]], gold_codes: list[str]) -> float:
+def _taxonomy_category_hit(pred: list[dict[str, Any]], gold_codes: list[str], subject_id: str = "calculus") -> float:
     if not gold_codes:
         return 1.0
     gold_categories = {
         entry.category
         for code in gold_codes
-        if (entry := lookup_error(code)) is not None
+        if (entry := lookup_error(code, subject_id=subject_id)) is not None
     }
     if not gold_categories:
         return 0.0
     pred_categories = {
         entry.category
         for item in pred
-        if (entry := lookup_error(item.get("error_code", ""))) is not None
+        if (entry := lookup_error(item.get("error_code", ""), subject_id=subject_id)) is not None
     }
     hit = len(gold_categories.intersection(pred_categories))
     return hit / len(gold_categories)
@@ -117,10 +117,11 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
     for case in cases:
         problem = ProblemInput(**case["problem_input"])
         raw_solution = case["raw_student_solution"]
+        case_subject_id = case.get("subject_id") or "calculus"
         if mode == "workflow_r1":
-            out = run_tutor_graph(provider, problem, raw_solution)
+            out = run_tutor_graph(provider, problem, raw_solution, subject_id=case_subject_id)
         elif mode.startswith("baseline"):
-            out = run_single_prompt_baseline(provider, problem, raw_solution, mode_name=mode)
+            out = run_single_prompt_baseline(provider, problem, raw_solution, mode_name=mode, subject_id=case_subject_id)
         else:
             raise ValueError(f"Unsupported evaluation mode: {mode}")
 
@@ -139,7 +140,7 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
         verify_acc = _verification_accuracy(pred_verify, case.get("gold_verification", []))
         diag_hit = _diagnosis_hit(pred_diag, case.get("gold_diagnosis_codes", []))
         error_step_recall = _error_step_recall(pred_verify, case.get("gold_verification", []))
-        taxonomy_category_hit = _taxonomy_category_hit(pred_diag, case.get("gold_diagnosis_codes", []))
+        taxonomy_category_hit = _taxonomy_category_hit(pred_diag, case.get("gold_diagnosis_codes", []), subject_id=case_subject_id)
         pred_first_error = _first_error_step(pred_verify)
         expected_first_error = case.get("gold_first_error_step")
         first_error_hit = 1.0 if expected_first_error == pred_first_error else 0.0

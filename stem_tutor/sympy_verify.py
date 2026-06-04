@@ -273,7 +273,8 @@ def _latex_to_sympy(text: str) -> str:
 def _get_sympy_rules() -> tuple[list[str], list[tuple[str, str]]]:
     try:
         from stem_tutor.subjects.context import get_subject_context
-        ctx = get_subject_context()
+        from stem_tutor.prompts.templates import _current_subject_id
+        ctx = get_subject_context(_current_subject_id())
         return ctx.sympy_strip_prefixes, ctx.sympy_derivative_patterns
     except Exception:
         return (

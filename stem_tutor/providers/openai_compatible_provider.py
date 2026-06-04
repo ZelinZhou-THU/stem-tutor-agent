@@ -131,7 +131,8 @@ class OpenAICompatibleProvider(LLMProvider):
 
     def _get_system_prompt(self) -> str:
         try:
-            ctx = get_subject_context()
+            from stem_tutor.prompts.templates import _current_subject_id
+            ctx = get_subject_context(_current_subject_id())
             return ctx.prompts["system_role"].replace("{subject_name}", ctx.display_name)
         except Exception:
             return "你是一个精确的微积分辅导 JSON API。所有输出请使用中文（简体中文）。数学表达式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。"

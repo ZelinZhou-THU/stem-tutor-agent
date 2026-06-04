@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json as _json
+import threading
 
 from stem_tutor.subjects.context import get_subject_context
 
@@ -9,10 +10,20 @@ _MATH_FORMAT_HINT = (
     "例如：$f'(x) = 2x$，$$\\int_0^1 x^2 dx = \\frac{1}{3}$$\n"
 )
 
+_active_subject: threading.local = threading.local()
+
+
+def set_active_subject(subject_id: str) -> None:
+    _active_subject.value = subject_id
+
+
+def _current_subject_id() -> str:
+    return getattr(_active_subject, "value", None) or "calculus"
+
 
 def _get_prompts() -> dict[str, str]:
     try:
-        ctx = get_subject_context()
+        ctx = get_subject_context(_current_subject_id())
         return ctx.prompts
     except Exception:
         return _fallback_prompts()
@@ -42,7 +53,7 @@ def _fallback_prompts() -> dict[str, str]:
 
 def _subject_name() -> str:
     try:
-        ctx = get_subject_context()
+        ctx = get_subject_context(_current_subject_id())
         return ctx.display_name
     except Exception:
         return "微积分"

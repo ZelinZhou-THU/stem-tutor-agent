@@ -25,6 +25,48 @@ def _default_fallback() -> dict[str, TaxonomyEntry]:
             short_desc="变量代换前后不一致。",
             cues=("u-sub", "substitution", "variable mismatch"),
         ),
+        "PRODUCT_RULE_MISUSE": TaxonomyEntry(
+            code="PRODUCT_RULE_MISUSE",
+            category="Differentiation Errors",
+            short_desc="乘法法则 (uv)' = u'v + uv' 应用错误。",
+            cues=("product rule", "product", "multiplication", "乘法法则"),
+        ),
+        "QUOTIENT_RULE_MISUSE": TaxonomyEntry(
+            code="QUOTIENT_RULE_MISUSE",
+            category="Differentiation Errors",
+            short_desc="除法法则 (u/v)' 应用错误。",
+            cues=("quotient rule", "division", "quotient", "除法法则"),
+        ),
+        "IMPLICIT_DIFFERENTIATION_ERROR": TaxonomyEntry(
+            code="IMPLICIT_DIFFERENTIATION_ERROR",
+            category="Differentiation Errors",
+            short_desc="隐函数求导时遗漏了 dy/dx 项。",
+            cues=("implicit", "dy/dx", "隐函数"),
+        ),
+        "INTEGRATION_BOUNDARY_ERROR": TaxonomyEntry(
+            code="INTEGRATION_BOUNDARY_ERROR",
+            category="Integration Errors",
+            short_desc="定积分换元后未更新积分限。",
+            cues=("boundary", "limit", "积分限", "换元", "substitution"),
+        ),
+        "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT": TaxonomyEntry(
+            code="INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            category="Integration Errors",
+            short_desc="分部积分中 u 和 dv 的选取不当。",
+            cues=("integration by parts", "分部积分", "u dv"),
+        ),
+        "PARTIAL_FRACTIONS_DECOMPOSITION_ERROR": TaxonomyEntry(
+            code="PARTIAL_FRACTIONS_DECOMPOSITION_ERROR",
+            category="Integration Errors",
+            short_desc="部分分式分解形式错误。",
+            cues=("partial fraction", "部分分式", "decomposition"),
+        ),
+        "INTEGRATION_CONSTANT_OMISSION": TaxonomyEntry(
+            code="INTEGRATION_CONSTANT_OMISSION",
+            category="Algebraic Manipulation Errors",
+            short_desc="不定积分遗漏了常数 C。",
+            cues=("constant", "+C", "constant of integration"),
+        ),
         "SIGN_ARITHMETIC_ERROR": TaxonomyEntry(
             code="SIGN_ARITHMETIC_ERROR",
             category="Algebraic Manipulation Errors",
@@ -76,17 +118,20 @@ def _default_fallback() -> dict[str, TaxonomyEntry]:
     }
 
 
-def _get_taxonomy() -> dict[str, TaxonomyEntry]:
+def get_effective_taxonomy(subject_id: str = "calculus") -> dict[str, TaxonomyEntry]:
     try:
         from stem_tutor.subjects.context import get_subject_context
-        ctx = get_subject_context()
+        ctx = get_subject_context(subject_id)
         return ctx.error_taxonomy
     except Exception:
         return _default_fallback()
 
 
-ERROR_TAXONOMY: dict[str, TaxonomyEntry] = _get_taxonomy()
+# Kept for backward compatibility; defaults to calculus.
+ERROR_TAXONOMY: dict[str, TaxonomyEntry] = get_effective_taxonomy("calculus")
 
 
-def lookup_error(code: str) -> TaxonomyEntry | None:
-    return ERROR_TAXONOMY.get(code)
+def lookup_error(code: str, subject_id: str | None = None) -> TaxonomyEntry | None:
+    if subject_id is None:
+        return ERROR_TAXONOMY.get(code)
+    return get_effective_taxonomy(subject_id).get(code)

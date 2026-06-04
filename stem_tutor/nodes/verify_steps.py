@@ -53,13 +53,14 @@ def _verify_step_via_agent(
     reference_answer_hint: str = "",
     computation_hints: str = "",
     model_name: str | None = None,
+    subject_id: str = "calculus",
 ) -> tuple[dict, list[dict]]:
     from stem_tutor.graph.agent_subgraph import AgentSubgraph, parse_json_from_text
     from stem_tutor.settings import is_dual_model_enabled, load_provider_settings
     from stem_tutor.subjects.context import get_subject_context
 
     settings = load_provider_settings()
-    ctx = get_subject_context()
+    ctx = get_subject_context(subject_id)
     display_name = ctx.display_name
 
     system_prompt = (
@@ -160,9 +161,9 @@ def _verify_step_via_agent(
     return raw, agent_result.tool_calls
 
 
-def _get_rule_adjustments() -> list[dict[str, Any]]:
+def _get_rule_adjustments(subject_id: str = "calculus") -> list[dict[str, Any]]:
     try:
-        ctx = get_subject_context()
+        ctx = get_subject_context(subject_id)
         return ctx.rule_adjustments
     except Exception:
         return [
@@ -193,8 +194,8 @@ def _check_conditions(step_text: str, conditions: list[dict[str, str]]) -> bool:
     return True
 
 
-def _rule_based_adjustment(step_text: str) -> tuple[VerificationLabel | None, str, list[str]]:
-    rule_adjustments = _get_rule_adjustments()
+def _rule_based_adjustment(step_text: str, subject_id: str = "calculus") -> tuple[VerificationLabel | None, str, list[str]]:
+    rule_adjustments = _get_rule_adjustments(subject_id)
     for rule in rule_adjustments:
         if _check_conditions(step_text, rule["conditions"]):
             label_str = rule.get("label", "")
@@ -430,7 +431,7 @@ def _strategy_agent_verify(
     step_text, prev_text, reference_text, problem_text,
     full_solution, step_id, total_steps, assertions,
     final_answer_status, reference_answer_hint,
-    computation_hints, provider, budget, **kwargs
+    computation_hints, provider, budget, subject_id="calculus", **kwargs
 ):
     from stem_tutor.graph.strategy import StrategyOutcome
     if not budget.can_make_tool_call():
@@ -446,6 +447,7 @@ def _strategy_agent_verify(
             full_solution=full_solution, prev_text=prev_text, next_text=kwargs.get("next_text", ""),
             assertions=assertions, final_answer_status=final_answer_status,
             reference_answer_hint=reference_answer_hint, computation_hints=computation_hints,
+            subject_id=subject_id,
         )
 
     for tc in step_tool_calls:
@@ -484,6 +486,7 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
     from stem_tutor.graph.budget import NodeBudgetManager, load_budget_config
     from stem_tutor.graph.strategy import StrategyChain
 
+    subject_id = state.get("subject_id", "calculus")
     problem_text = state["problem_input"].problem_text
     reference_text = state["reference_solution"]["reference_text"]
     assertions = state["reference_solution"].get("key_assertions", [])
@@ -518,7 +521,7 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
 
     subject_overrides = None
     try:
-        ctx = get_subject_context()
+        ctx = get_subject_context(subject_id)
         subject_overrides = ctx.budget_overrides
     except Exception:
         pass
@@ -630,7 +633,9 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
             violated_principles=["verification_budget_limited"],
         )
 
-    def _verify_single_step_budget(idx: int, step, step_budget: NodeBudgetManager, prev_result: VerificationResult | None = None) -> tuple[VerificationResult, list[str], dict, bool, list[dict]]:
+    def _verify_single_step_budget(idx: int, step, step_budget: NodeBudgetManager, prev_result: VerificationResult | None = None, subject_id: str = "calculus") -> tuple[VerificationResult, list[str], dict, bool, list[dict]]:
+        from stem_tutor.prompts.templates import set_active_subject
+        set_active_subject(subject_id)
         prev_text = normal_steps[idx - 1].normalized_text if idx > 0 else ""
         next_text = normal_steps[idx + 1].normalized_text if idx < len(normal_steps) - 1 else ""
 
@@ -665,11 +670,12 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
             computation_hints=effective_computation_hints,
             provider=provider,
             next_text=next_text,
+            subject_id=subject_id,
         )
 
         result = _outcome_to_verification_result(outcome, step.step_id)
 
-        adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text)
+        adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text, subject_id)
         if adjusted_label is not None:
             if result.label != adjusted_label:
                 final_conf = min(result.confidence, 0.6)
@@ -715,7 +721,7 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
 
             if current_step_budget >= 15 and not is_critical:
                 result, sub_flags, sub_meta, is_low_conf, step_tool_calls = _verify_single_step_budget(
-                    idx, step, node_budget, prev_result=prev_result,
+                    idx, step, node_budget, prev_result=prev_result, subject_id=subject_id,
                 )
                 results.append(result)
                 flags.extend(sub_flags)
@@ -754,7 +760,7 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
                 logging.info(f"[verify_steps] [budget] Level 1 (quick-LLM) for step {step.step_id}")
 
             elif current_step_budget >= 3:
-                result = _rule_based_fallback_verify(step)
+                result = _rule_based_fallback_verify(step, subject_id)
                 results.append(result)
                 if result.confidence < LOW_CONF_THRESHOLD:
                     low_conf_count += 1
@@ -789,8 +795,10 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
 
         def _verify_parallel(idx_step):
             idx, step = idx_step
+            from stem_tutor.prompts.templates import set_active_subject
+            set_active_subject(subject_id)
             step_budget = NodeBudgetManager(config=config, complexity=complexity)
-            return _verify_single_step_budget(idx, step, step_budget)
+            return _verify_single_step_budget(idx, step, step_budget, subject_id=subject_id)
 
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             future_to_idx = {
@@ -897,8 +905,8 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
     return return_state
 
 
-def _rule_based_fallback_verify(step) -> VerificationResult:
-    adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text)
+def _rule_based_fallback_verify(step, subject_id: str = "calculus") -> VerificationResult:
+    adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text, subject_id)
     if adjusted_label is not None:
         return VerificationResult(
             step_id=step.step_id,
@@ -978,11 +986,13 @@ def _default_label_step(step) -> VerificationResult:
 
 def make_verify_steps_node(provider: LLMProvider):
     def verify_steps_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         if _is_budget_enabled(state):
             return _run_new_verify_path(provider, state)
 
         import logging
-
         problem_text = state["problem_input"].problem_text
         reference_text = state["reference_solution"]["reference_text"]
         assertions = state["reference_solution"].get("key_assertions", [])
@@ -1059,6 +1069,8 @@ def make_verify_steps_node(provider: LLMProvider):
             final_answer_status = "CORRECT" if final_answer_correct else "INCORRECT"
 
         def _verify_single_step(idx: int, step) -> tuple[VerificationResult, list[str], dict, bool, list[dict]]:
+            from stem_tutor.prompts.templates import set_active_subject
+            set_active_subject(subject_id)
             prev_text = normal_steps[idx - 1].normalized_text if idx > 0 else ""
             next_text = normal_steps[idx + 1].normalized_text if idx < len(normal_steps) - 1 else ""
 
@@ -1128,6 +1140,7 @@ def make_verify_steps_node(provider: LLMProvider):
                         reference_answer_hint=reference_answer_hint,
                         computation_hints=computation_hints,
                         model_name=getattr(provider, "model_name", None),
+                        subject_id=subject_id,
                     )
                     logging.info(f"[verify_steps] Step {step.step_id} verified via tool-calling agent")
                 except Exception as e:
@@ -1182,7 +1195,7 @@ def make_verify_steps_node(provider: LLMProvider):
                 started_at=_step_started_at,
             )
 
-            adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text)
+            adjusted_label, adjusted_evidence, adjusted_principles = _rule_based_adjustment(step.normalized_text, subject_id)
             final_label = payload.label
             final_conf = payload.confidence
             final_evidence = payload.evidence

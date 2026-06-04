@@ -10,23 +10,23 @@ from stem_tutor.graph.state import TutorGraphState
 from stem_tutor.prompts.templates import review_problem_prompt
 from stem_tutor.providers.base import LLMProvider
 from stem_tutor.subjects.context import get_subject_context
-from stem_tutor.taxonomy.errors import ERROR_TAXONOMY
+from stem_tutor.taxonomy.errors import get_effective_taxonomy
 
 _log = logging.getLogger(__name__)
 
 
-def _get_topic_keywords() -> dict[str, list[str]]:
+def _get_topic_keywords(subject_id: str = "calculus") -> dict[str, list[str]]:
     try:
-        ctx = get_subject_context()
+        ctx = get_subject_context(subject_id)
         return ctx.topic_keywords
     except Exception:
         return {}
 
 
-def _infer_topic_tags(problem_text: str, reference_text: str) -> list[str]:
+def _infer_topic_tags(problem_text: str, reference_text: str, subject_id: str = "calculus") -> list[str]:
     combined = (problem_text + " " + reference_text).lower()
     tags = []
-    topic_keywords = _get_topic_keywords()
+    topic_keywords = _get_topic_keywords(subject_id)
     for tag, keywords in topic_keywords.items():
         if any(kw in combined for kw in keywords):
             tags.append(tag)
@@ -35,6 +35,9 @@ def _infer_topic_tags(problem_text: str, reference_text: str) -> list[str]:
 
 def make_generate_review_problems_node(provider: LLMProvider):
     def generate_review_problems_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         try:
             return _generate_review_problems_inner(state, provider)
         except Exception as exc:
@@ -63,7 +66,8 @@ def _generate_review_problems_inner(state: TutorGraphState, provider: LLMProvide
         problem_text = state["problem_input"].problem_text
         ref_solution = state.get("reference_solution", {})
         ref_text = ref_solution.get("reference_text", "") if ref_solution else ""
-        topic_tags = _infer_topic_tags(problem_text, ref_text)
+        subject_id = state.get("subject_id", "calculus")
+        topic_tags = _infer_topic_tags(problem_text, ref_text, subject_id)
 
     verification_results = state.get("verification_results", [])
     all_correct = all(v.label.value == "correct" for v in verification_results) if verification_results else False
@@ -98,9 +102,11 @@ def _generate_review_problems_inner(state: TutorGraphState, provider: LLMProvide
     )
 
     safe_problems: list[ReviewProblem] = []
+    subject_id = state.get("subject_id", "calculus")
+    effective_taxonomy = get_effective_taxonomy(subject_id)
     for p in problems:
         code = p.related_weakness_code
-        if code not in ERROR_TAXONOMY:
+        if code not in effective_taxonomy:
             if "review_unknown_weakness_code" not in flags:
                 flags.append("review_unknown_weakness_code")
             code = "NOTATION_UNCLEAR"

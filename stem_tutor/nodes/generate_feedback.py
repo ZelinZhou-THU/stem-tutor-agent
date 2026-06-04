@@ -11,6 +11,9 @@ from stem_tutor.providers.base import LLMProvider
 
 def make_generate_feedback_node(provider: LLMProvider):
     def generate_feedback_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         diagnoses = state.get("diagnosis_results", [])
         first_error = diagnoses[0] if diagnoses else None
         concepts = list({d.error_code for d in diagnoses})[:3]

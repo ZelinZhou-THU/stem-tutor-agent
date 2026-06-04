@@ -51,13 +51,13 @@ def _is_budget_enabled(state: dict | None = None) -> bool:
     return val in {"1", "true", "yes", "on"}
 
 
-def _generate_via_agent(problem_text: str, model_name: str | None = None, max_tool_rounds: int | None = None) -> tuple[dict, list[dict]]:
+def _generate_via_agent(problem_text: str, model_name: str | None = None, max_tool_rounds: int | None = None, subject_id: str = "calculus") -> tuple[dict, list[dict]]:
     from stem_tutor.graph.agent_subgraph import AgentSubgraph, parse_json_from_text
     from stem_tutor.settings import is_dual_model_enabled, load_provider_settings, reference_max_tool_rounds
     from stem_tutor.subjects.context import get_subject_context
 
     settings = load_provider_settings()
-    ctx = get_subject_context()
+    ctx = get_subject_context(subject_id)
     display_name = ctx.display_name
     max_rounds = max_tool_rounds if max_tool_rounds is not None else reference_max_tool_rounds()
 
@@ -146,7 +146,8 @@ def _strategy_tool_agent(problem, provider, state, budget, **kwargs):
 
     with budget.tool_execution_context() as timeout:
         remaining_rounds = budget._config.max_tool_rounds - budget._tool_rounds_used
-        raw, tool_calls = _generate_via_agent(problem, max_tool_rounds=max(1, remaining_rounds))
+        subject_id = state.get("subject_id", "calculus") if isinstance(state, dict) else "calculus"
+        raw, tool_calls = _generate_via_agent(problem, max_tool_rounds=max(1, remaining_rounds), subject_id=subject_id)
 
     for tc in tool_calls:
         elapsed = tc.get("elapsed_seconds", timeout)
@@ -195,7 +196,8 @@ def _strategy_template(problem, provider, state, budget, **kwargs):
     from stem_tutor.graph.strategy import StrategyOutcome
     try:
         from stem_tutor.subjects.context import get_subject_context
-        ctx = get_subject_context()
+        subject_id = state.get("subject_id", "calculus") if isinstance(state, dict) else "calculus"
+        ctx = get_subject_context(subject_id)
         template = ctx.mock_reference_solution
         return StrategyOutcome(
             template, "minimal", 0.2,
@@ -250,7 +252,8 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     subject_overrides = None
     try:
         from stem_tutor.subjects.context import get_subject_context
-        ctx = get_subject_context()
+        subject_id = state.get("subject_id", "calculus")
+        ctx = get_subject_context(subject_id)
         subject_overrides = ctx.budget_overrides
     except Exception:
         pass
@@ -400,6 +403,9 @@ def _build_computation_hints_legacy(tool_calls: list[dict]) -> str:
 
 def make_generate_reference_solution_node(provider: LLMProvider):
     def generate_reference_solution_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         depth = state.get("budget_metadata", {}).get("depth", "")
         if depth == "no_ref":
             state["reference_solution"] = {
@@ -447,7 +453,8 @@ def make_generate_reference_solution_node(provider: LLMProvider):
             logging.info("[generate_reference_solution] Using tool-calling agent mode")
             try:
                 model_name = getattr(provider, "model_name", None)
-                raw, agent_tool_calls = _generate_via_agent(problem, model_name=model_name)
+                subject_id = state.get("subject_id", "calculus")
+                raw, agent_tool_calls = _generate_via_agent(problem, model_name=model_name, subject_id=subject_id)
                 logging.info(f"[generate_reference_solution] Agent raw result keys: {list(raw.keys())}")
             except Exception as e:
                 logging.warning(f"[generate_reference_solution] Agent failed, falling back to standard: {e}")

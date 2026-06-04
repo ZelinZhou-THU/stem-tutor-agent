@@ -27,6 +27,42 @@ error_taxonomy:
     category: "Reasoning Quality Issues"
     short_desc: "步骤缺乏充分的推理依据。"
     cues: ["therefore", "obvious", "skip"]
+  PRODUCT_RULE_MISUSE:
+    category: "Differentiation Errors"
+    short_desc: "乘法法则 (uv)' = u'v + uv' 应用错误。"
+    cues: ["product rule", "product", "multiplication", "乘法法则"]
+  QUOTIENT_RULE_MISUSE:
+    category: "Differentiation Errors"
+    short_desc: "除法法则 (u/v)' 应用错误。"
+    cues: ["quotient rule", "division", "quotient", "除法法则"]
+  IMPLICIT_DIFFERENTIATION_ERROR:
+    category: "Differentiation Errors"
+    short_desc: "隐函数求导时遗漏了 dy/dx 项。"
+    cues: ["implicit", "dy/dx", "隐函数"]
+  INTEGRATION_BOUNDARY_ERROR:
+    category: "Integration Errors"
+    short_desc: "定积分换元后未更新积分限。"
+    cues: ["boundary", "limit", "积分限", "换元", "substitution"]
+  INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT:
+    category: "Integration Errors"
+    short_desc: "分部积分中 u 和 dv 的选取不当。"
+    cues: ["integration by parts", "分部积分", "u dv"]
+  PARTIAL_FRACTIONS_DECOMPOSITION_ERROR:
+    category: "Integration Errors"
+    short_desc: "部分分式分解形式错误。"
+    cues: ["partial fraction", "部分分式", "decomposition"]
+  INTEGRATION_CONSTANT_OMISSION:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "不定积分遗漏了常数 C。"
+    cues: ["constant", "+C", "constant of integration"]
+  COEFFICIENT_OMISSION:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "遗漏了系数或常数因子。"
+    cues: ["coefficient", "factor", "missing", "omitted"]
+  FINAL_CALCULATION_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "最终数值计算错误。"
+    cues: ["arithmetic", "calculation", "numeric"]
   TRANSCRIPTION_ERROR:
     category: "Algebraic Manipulation Errors"
     short_desc: "抄写或转录错误，如抄漏系数/符号/指数。"

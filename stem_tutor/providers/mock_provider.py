@@ -17,7 +17,8 @@ class MockProvider(LLMProvider):
 
     def _get_mock_data(self) -> dict[str, Any]:
         try:
-            ctx = get_subject_context()
+            from stem_tutor.prompts.templates import _current_subject_id
+            ctx = get_subject_context(_current_subject_id())
             return {
                 "reference_solution": ctx.mock_reference_solution,
                 "review_problems": ctx.mock_review_problems,

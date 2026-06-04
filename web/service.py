@@ -378,7 +378,8 @@ def _shape_response(state: dict) -> dict:
     shaped_diagnoses = []
     for d in diagnoses:
         error_code = _get_attr(d, "error_code", "")
-        entry = lookup_error(error_code)
+        subject_id = run_meta.get("subject_id") or "calculus"
+        entry = lookup_error(error_code, subject_id=subject_id)
         shaped_diagnoses.append({
             "step_id": _get_attr(d, "step_id", ""),
             "error_code": error_code,
@@ -492,8 +493,9 @@ def _build_partial(node_name: str, node_output: dict, accumulated_state: dict) -
         if not diagnoses:
             return None
         shaped = []
+        subject_id = (accumulated_state.get("run_meta") or {}).get("subject_id") or "calculus"
         for d in diagnoses:
-            entry = lookup_error(d.error_code)
+            entry = lookup_error(d.error_code, subject_id=subject_id)
             shaped.append({
                 "step_id": d.step_id,
                 "error_code": d.error_code,
@@ -800,11 +802,13 @@ def run_stem_tutor(
             api_key=settings.api_key,
             model=settings.detection_model_name,
         )
-    elif subject_id and subject_id not in VALID_SUBJECTS:
+    if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
 
     if subject_id:
         settings.__dict__["subject_id"] = subject_id
+        from stem_tutor.prompts.templates import set_active_subject
+        set_active_subject(subject_id)
 
     problem_input = ProblemInput(
         problem_id=f"web-{uuid4().hex[:8]}",
@@ -821,7 +825,7 @@ def run_stem_tutor(
         try:
             if mode.startswith("baseline"):
                 provider = create_provider(provider_name, settings, model_group="reasoning")
-                state = run_single_prompt_baseline(provider, problem_input, raw_student_solution, mode_name=mode)
+                state = run_single_prompt_baseline(provider, problem_input, raw_student_solution, mode_name=mode, subject_id=subject_id)
                 response = _shape_response(state)
             else:
                 provider = create_provider(provider_name, settings, model_group="reasoning")
@@ -841,6 +845,7 @@ def run_stem_tutor(
                     verify_provider=verify_provider,
                     budget_metadata={"depth": depth},
                     budget_enabled=budget_enabled,
+                    subject_id=subject_id,
                 )
 
                 response = _shape_response(state)
@@ -940,8 +945,9 @@ def _serialize_partial(node_name: str, state: dict) -> dict | None:
     if node_name == "diagnose_error":
         diagnoses = state.get("diagnosis_results", [])
         shaped = []
+        subject_id = (state.get("run_meta") or {}).get("subject_id") or "calculus"
         for d in diagnoses:
-            entry = lookup_error(d.error_code)
+            entry = lookup_error(d.error_code, subject_id=subject_id)
             shaped.append({
                 "step_id": d.step_id,
                 "error_code": d.error_code,
@@ -1056,12 +1062,14 @@ async def run_stem_tutor_stream(
             api_key=settings.api_key,
             model=settings.detection_model_name,
         )
-    elif subject_id and subject_id not in VALID_SUBJECTS:
+    if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
 
     if subject_id:
         settings.__dict__["subject_id"] = subject_id
-        get_subject_context(subject_id)
+        get_subject_context(subject_id)  # warmup the subject context cache
+        from stem_tutor.prompts.templates import set_active_subject
+        set_active_subject(subject_id)
 
     ocr_payload = None
     if source_type == "ocr" and image_bytes:
@@ -1121,6 +1129,7 @@ async def run_stem_tutor_stream(
             },
             "budget_metadata": {"depth": depth},
             "budget_enabled": budget_enabled,
+            "subject_id": subject_id,
         }
 
         accumulated_state = dict(initial_state)
@@ -1131,7 +1140,7 @@ async def run_stem_tutor_stream(
         try:
             if mode.startswith("baseline"):
                 provider = create_provider(provider_name, settings, model_group="reasoning")
-                state = run_single_prompt_baseline(provider, problem_input, raw_student_solution, mode_name=mode)
+                state = run_single_prompt_baseline(provider, problem_input, raw_student_solution, mode_name=mode, subject_id=subject_id)
                 state["run_meta"] = {**initial_state["run_meta"], **state.get("run_meta", {})}
                 response = _shape_response(state)
                 accumulated_state = dict(state)
@@ -1955,7 +1964,7 @@ async def get_report_data(
             if not category_zh:
                 continue
 
-            entry = lookup_error(error_code)
+            entry = lookup_error(error_code, subject_id=subject_id if subject_id != "unknown" else "calculus")
             if entry and error_code not in taxonomy_summary:
                 taxonomy_summary[error_code] = entry.short_desc
 
@@ -2177,6 +2186,17 @@ async def practice_verify_stream(
 ):
     import json as _json
 
+    from stem_tutor.subjects.context import get_subject_context
+    from stem_tutor.prompts.templates import set_active_subject
+
+    if not subject_id or subject_id not in {"calculus", "linear_algebra", "mechanics", "relativity", "optics", "quantum", "electromagnetism", "thermodynamics"}:
+        subject_id = "calculus"
+    set_active_subject(subject_id)
+    try:
+        subject_display = get_subject_context(subject_id).display_name
+    except Exception:
+        subject_display = "数学/物理"
+
     settings = load_provider_settings()
     model = settings.resolve_model_name("fast")
     url = f"{settings.base_url}/chat/completions"
@@ -2185,7 +2205,7 @@ async def practice_verify_stream(
     yield f"event: practice_progress\ndata: {_json.dumps({'type': 'progress', 'node': 'verify', 'message': '正在验证解答...'}, ensure_ascii=False)}\n\n"
 
     prompt = (
-        "你是一位严格的数学/物理教师。请判断学生的解答是否正确。\n\n"
+        f"你是一位严格的{subject_display}教师。请判断学生的解答是否正确。\n\n"
         f"题目：{problem_text}\n\n"
         f"学生解答：{student_solution}\n\n"
         "请按以下 JSON 格式回复（不要有其他文字）：\n"
@@ -2248,6 +2268,11 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
 
     from stem_tutor.graph.agent_subgraph import parse_json_from_text
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
+    from stem_tutor.prompts.templates import set_active_subject
+
+    if not subject_id or subject_id not in {"calculus", "linear_algebra", "mechanics", "relativity", "optics", "quantum", "electromagnetism", "thermodynamics"}:
+        subject_id = "calculus"
+    set_active_subject(subject_id)
 
     yield f"event: reference_progress\ndata: {_json.dumps({'type': 'progress', 'message': '正在生成参考解答（使用工具验证）...'}, ensure_ascii=False)}\n\n"
 
@@ -2256,7 +2281,7 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     try:
         raw, tool_calls = await loop.run_in_executor(
             None,
-            lambda: _generate_via_agent(problem_text),
+            lambda: _generate_via_agent(problem_text, subject_id=subject_id),
         )
         result = {
             "type": "result",

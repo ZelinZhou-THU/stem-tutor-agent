@@ -10,18 +10,14 @@ from stem_tutor.graph.observability import record_provider_call
 from stem_tutor.graph.state import TutorGraphState
 from stem_tutor.prompts.templates import diagnosis_prompt
 from stem_tutor.providers.base import LLMProvider
-from stem_tutor.taxonomy.errors import ERROR_TAXONOMY, TaxonomyEntry, lookup_error
+from stem_tutor.taxonomy.errors import lookup_error
 
 MAX_DIAGNOSIS_WORKERS = 3
 
 
-def _get_current_taxonomy() -> dict:
-    try:
-        from stem_tutor.subjects.context import get_subject_context
-        ctx = get_subject_context()
-        return ctx.error_taxonomy
-    except Exception:
-        return dict(ERROR_TAXONOMY)
+def _get_current_taxonomy(subject_id: str = "calculus") -> dict:
+    from stem_tutor.taxonomy.errors import get_effective_taxonomy
+    return get_effective_taxonomy(subject_id)
 
 
 def _diagnose_single_step(
@@ -34,7 +30,10 @@ def _diagnose_single_step(
     run_meta: dict,
     problem_text: str = "",
     reference_solution: str = "",
+    subject_id: str = "calculus",
 ) -> tuple[ErrorDiagnosis | None, list[str], dict]:
+    from stem_tutor.prompts.templates import set_active_subject
+    set_active_subject(subject_id)
     prompt = diagnosis_prompt(step_text, evidence, allowed_codes,
                                problem_text=problem_text, reference_solution=reference_solution)
     import time as _time
@@ -66,7 +65,9 @@ def _diagnose_single_step(
         started_at=_started_at,
     )
 
-    if payload.error_code not in ERROR_TAXONOMY:
+    from stem_tutor.taxonomy.errors import get_effective_taxonomy
+    effective_taxonomy = get_effective_taxonomy(subject_id)
+    if payload.error_code not in effective_taxonomy:
         if "diagnosis_unknown_error_code" not in flags:
             flags.append("diagnosis_unknown_error_code")
         payload = DiagnosisPayload(
@@ -76,7 +77,7 @@ def _diagnose_single_step(
             confidence=min(payload.confidence, 0.5),
         )
 
-    entry = lookup_error(payload.error_code)
+    entry = lookup_error(payload.error_code, subject_id=subject_id)
     category = entry.category if entry else "Unknown"
     diagnosis = ErrorDiagnosis(
         step_id=step_id,
@@ -91,9 +92,12 @@ def _diagnose_single_step(
 
 def make_diagnose_error_node(provider: LLMProvider):
     def diagnose_error_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         step_map = {s.step_id: s for s in state["normalized_steps"]}
         diagnoses: list[ErrorDiagnosis] = []
-        taxonomy = _get_current_taxonomy()
+        taxonomy = _get_current_taxonomy(subject_id)
         allowed_codes = list(taxonomy.keys())
         flags = list(state.get("uncertainty_flags", []))
         run_meta = dict(state.get("run_meta", {}))
@@ -113,6 +117,7 @@ def make_diagnose_error_node(provider: LLMProvider):
                 result, flags, run_meta = _diagnose_single_step(
                     step_text, step_id, evidence, allowed_codes, provider, flags, run_meta,
                     problem_text=problem_text, reference_solution=reference_text,
+                    subject_id=subject_id,
                 )
                 if result is not None:
                     diagnoses.append(result)
@@ -125,7 +130,7 @@ def make_diagnose_error_node(provider: LLMProvider):
                         _diagnose_single_step,
                         step_text, step_id, evidence, allowed_codes, provider,
                         list(flags), dict(run_meta),
-                        problem_text, reference_text,
+                        problem_text, reference_text, subject_id,
                     )
                     futures[fut] = step_id
 

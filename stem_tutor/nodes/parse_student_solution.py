@@ -34,6 +34,9 @@ def _rule_based_parse(raw: str) -> tuple[list[SolutionStep], list[str]]:
 
 def make_parse_student_solution_node(provider: LLMProvider):
     def parse_student_solution_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         raw = state.get("raw_student_solution", "")
         steps: list[SolutionStep] = []
         warnings: list[str] = []

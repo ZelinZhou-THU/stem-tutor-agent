@@ -7,6 +7,9 @@ from stem_tutor.providers.base import LLMProvider
 
 def make_ocr_preprocess_node(provider: LLMProvider):
     def ocr_preprocess_node(state: TutorGraphState) -> TutorGraphState:
+        from stem_tutor.prompts.templates import set_active_subject
+        subject_id = state.get("subject_id", "calculus")
+        set_active_subject(subject_id)
         problem = state["problem_input"]
         flags = list(state.get("uncertainty_flags", []))
         warnings = list(state.get("parse_warnings", []))

@@ -4,20 +4,20 @@ from typing import Any
 
 from stem_tutor.domain.models import ProblemInput
 from stem_tutor.providers.base import LLMProvider
-from stem_tutor.taxonomy.errors import ERROR_TAXONOMY
+from stem_tutor.taxonomy.errors import get_effective_taxonomy
 
 
-def _get_error_codes_with_descriptions() -> str:
+def _get_error_codes_with_descriptions(subject_id: str = "calculus") -> str:
     parts = []
-    for code, entry in ERROR_TAXONOMY.items():
+    for code, entry in get_effective_taxonomy(subject_id).items():
         parts.append(f"- {code}: {entry.short_desc}")
     return "\n".join(parts)
 
 
-def _get_subject_name() -> str:
+def _get_subject_name(subject_id: str = "calculus") -> str:
     try:
         from stem_tutor.subjects.context import get_subject_context
-        return get_subject_context().display_name
+        return get_subject_context(subject_id).display_name
     except Exception:
         return "学科"
 
@@ -27,6 +27,7 @@ def run_single_prompt_baseline(
     problem_input: ProblemInput,
     raw_student_solution: str,
     mode_name: str,
+    subject_id: str = "calculus",
 ) -> dict[str, Any]:
     schema_hint = (
         '{"verification_results": [{"step_id": "S1", "label": "correct|incorrect_math|inconsistent_or_unsupported|unclear", '
@@ -39,8 +40,8 @@ def run_single_prompt_baseline(
         '"uncertainty_flags": ["string"]}'
     )
 
-    subject_name = _get_subject_name()
-    error_codes = _get_error_codes_with_descriptions()
+    subject_name = _get_subject_name(subject_id)
+    error_codes = _get_error_codes_with_descriptions(subject_id)
 
     prompt = (
         f"你是一位经验丰富的{subject_name}阅卷老师。请仔细分析学生的解题过程，"

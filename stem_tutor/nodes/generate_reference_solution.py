@@ -97,7 +97,7 @@ def _generate_via_agent(problem_text: str, model_name: str | None = None, max_to
         base_url=settings.base_url,
         model_name=resolved_model,
         system_prompt=system_prompt,
-        max_tokens=4000,
+        max_tokens=16000,
         tool_model_name=tool_model,
     )
 

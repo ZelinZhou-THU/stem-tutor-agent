@@ -124,16 +124,24 @@ def final_answer_verification_prompt(problem_text: str, student_answer: str) -> 
     ) + _MATH_FORMAT_HINT
 
 
-def diagnosis_prompt(step_text: str, evidence: str, taxonomy_codes: list[str]) -> str:
+def diagnosis_prompt(step_text: str, evidence: str, taxonomy_codes: list[str],
+                      problem_text: str = "", reference_solution: str = "") -> str:
     prompts = _get_prompts()
     codes = ", ".join(taxonomy_codes)
-    return (
-        "请诊断学生错误的根本原因，使用一个错误类型代码。\n"
-        f"可选代码: {codes}\n"
-        f"学生步骤: {step_text}\n"
-        f"错误证据: {evidence}\n"
-        + _inject_template(prompts["diagnosis_extra"]) + "\n"
-    ) + _MATH_FORMAT_HINT
+    parts = [
+        "请诊断学生错误的根本原因，使用一个错误类型代码。\n",
+        f"可选代码: {codes}\n",
+    ]
+    if problem_text:
+        parts.append(f"题目: {problem_text}\n")
+    if reference_solution:
+        parts.append(f"参考解答: {reference_solution}\n")
+    parts.extend([
+        f"学生步骤: {step_text}\n",
+        f"错误证据: {evidence}\n",
+        _inject_template(prompts["diagnosis_extra"]) + "\n",
+    ])
+    return "".join(parts) + _MATH_FORMAT_HINT
 
 
 def feedback_prompt(first_error_step: str | None, cause: str | None, concepts: list[str], problem_text: str = "") -> str:

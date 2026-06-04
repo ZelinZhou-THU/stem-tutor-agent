@@ -27,7 +27,7 @@ DEPTH_PRESETS: dict[str, dict[str, NodeBudgetConfig]] = {
         "review": NodeBudgetConfig(30, 0, 0, {}),
     },
     "with_ref": {
-        "reference": NodeBudgetConfig(120, 30, 2, {"simple": 8, "moderate": 15, "complex": 20}),
+        "reference": NodeBudgetConfig(120, 120, 4, {"simple": 8, "moderate": 15, "complex": 20}),
         "verify": NodeBudgetConfig(90, 20, 2, {"simple": 8, "moderate": 15, "complex": 20}),
         "diagnosis": NodeBudgetConfig(30, 0, 0, {}),
         "feedback": NodeBudgetConfig(30, 0, 0, {}),

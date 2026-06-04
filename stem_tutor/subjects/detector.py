@@ -27,7 +27,7 @@ _DETECTION_PROMPT = (
 )
 
 _DEFAULT_SUBJECT = "calculus"
-_DETECTION_TIMEOUT = 5
+_DETECTION_TIMEOUT = 30
 
 
 def detect_subject(problem_text: str, base_url: str, api_key: str, model: str = "GLM-4-FlashX") -> str:

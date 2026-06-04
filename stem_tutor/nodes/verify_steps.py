@@ -153,6 +153,10 @@ def _verify_step_via_agent(
     raw = parse_json_from_text(last_ai.content)
     if "label" not in raw:
         raise ValueError(f"No 'label' in agent response: {list(raw.keys())}")
+    _VALID_LABELS = {"correct", "incorrect_math", "inconsistent_or_unsupported", "unclear"}
+    if raw.get("label") not in _VALID_LABELS:
+        raw["label"] = "unclear"
+        raw["evidence"] = raw.get("evidence", "") + " [LLM 返回了非标准标签，已降级为 unclear]"
     return raw, agent_result.tool_calls
 
 

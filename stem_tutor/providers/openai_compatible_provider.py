@@ -427,6 +427,10 @@ class OpenAICompatibleProvider(LLMProvider):
                 "violated_principles": [],
             },
         )
+        _VALID_LABELS = {"correct", "incorrect_math", "inconsistent_or_unsupported", "unclear"}
+        if raw.get("label") not in _VALID_LABELS:
+            raw["label"] = "unclear"
+            raw["evidence"] = raw.get("evidence", "") + " [LLM 返回了非标准标签，已降级为 unclear]"
         meta = self.get_last_call_meta()
         _log(f"verify_step RESULT raw_keys={list(raw.keys()) if isinstance(raw, dict) else 'not dict'} meta={meta}")
         return self.validate_or_fallback(

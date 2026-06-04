@@ -61,6 +61,12 @@ def _default_fallback() -> dict[str, TaxonomyEntry]:
             short_desc="最终数值计算错误。",
             cues=("arithmetic", "calculation", "numeric"),
         ),
+        "TRANSCRIPTION_ERROR": TaxonomyEntry(
+            code="TRANSCRIPTION_ERROR",
+            category="Algebraic Manipulation Errors",
+            short_desc="抄写或转录错误，如抄漏系数/符号/指数。",
+            cues=("transcription", "copy", "omit", "missing digit", "scribal"),
+        ),
         "NOTATION_UNCLEAR": TaxonomyEntry(
             code="NOTATION_UNCLEAR",
             category="Reasoning Quality Issues",

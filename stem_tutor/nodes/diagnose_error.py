@@ -32,8 +32,11 @@ def _diagnose_single_step(
     provider: LLMProvider,
     flags: list[str],
     run_meta: dict,
+    problem_text: str = "",
+    reference_solution: str = "",
 ) -> tuple[ErrorDiagnosis | None, list[str], dict]:
-    prompt = diagnosis_prompt(step_text, evidence, allowed_codes)
+    prompt = diagnosis_prompt(step_text, evidence, allowed_codes,
+                               problem_text=problem_text, reference_solution=reference_solution)
     import time as _time
     _started_at = _time.perf_counter()
     raw = provider.diagnose_error(prompt)
@@ -95,6 +98,9 @@ def make_diagnose_error_node(provider: LLMProvider):
         flags = list(state.get("uncertainty_flags", []))
         run_meta = dict(state.get("run_meta", {}))
 
+        problem_text = state["problem_input"].problem_text
+        reference_text = state["reference_solution"].get("reference_text", "")
+
         incorrect_steps = []
         for v in state["verification_results"]:
             if v.label == VerificationLabel.CORRECT:
@@ -106,6 +112,7 @@ def make_diagnose_error_node(provider: LLMProvider):
             for step_text, step_id, evidence in incorrect_steps:
                 result, flags, run_meta = _diagnose_single_step(
                     step_text, step_id, evidence, allowed_codes, provider, flags, run_meta,
+                    problem_text=problem_text, reference_solution=reference_text,
                 )
                 if result is not None:
                     diagnoses.append(result)
@@ -118,6 +125,7 @@ def make_diagnose_error_node(provider: LLMProvider):
                         _diagnose_single_step,
                         step_text, step_id, evidence, allowed_codes, provider,
                         list(flags), dict(run_meta),
+                        problem_text, reference_text,
                     )
                     futures[fut] = step_id
 

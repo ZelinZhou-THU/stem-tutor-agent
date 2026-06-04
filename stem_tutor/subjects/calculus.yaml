@@ -27,6 +27,10 @@ error_taxonomy:
     category: "Reasoning Quality Issues"
     short_desc: "步骤缺乏充分的推理依据。"
     cues: ["therefore", "obvious", "skip"]
+  TRANSCRIPTION_ERROR:
+    category: "Algebraic Manipulation Errors"
+    short_desc: "抄写或转录错误，如抄漏系数/符号/指数。"
+    cues: ["transcription", "copy", "omit", "missing digit", "scribal"]
   NOTATION_UNCLEAR:
     category: "Reasoning Quality Issues"
     short_desc: "符号表达模糊或不清晰。"
@@ -95,8 +99,8 @@ rule_adjustments:
 
 budget_overrides:
   reference:
-    tool_budget_seconds: 35
-    max_tool_rounds: 2
+    tool_budget_seconds: 120
+    max_tool_rounds: 4
   verify:
     tool_budget_seconds: 25
     max_tool_rounds: 2

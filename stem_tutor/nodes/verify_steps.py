@@ -497,9 +497,22 @@ def _run_new_verify_path(provider: LLMProvider, state: TutorGraphState) -> Tutor
 
     logging.info(f"[verify_steps] [budget] Starting verification, reference_text length: {len(reference_text)}")
 
-    if reference_text.startswith("Reference solution unavailable"):
-        logging.warning("[verify_steps] [budget] Reference solution generation failed")
+    from stem_tutor.nodes.generate_reference_solution import (
+        _is_degraded as _ref_is_degraded,
+        _looks_like_meta_thinking as _ref_is_meta,
+    )
+    if (
+        reference_text.startswith("Reference solution unavailable")
+        or _ref_is_degraded(reference_text)
+        or _ref_is_meta(reference_text)
+    ):
+        logging.warning(
+            f"[verify_steps] [budget] Reference solution is degraded "
+            f"(len={len(reference_text)}, startswith_unavailable={reference_text.startswith('Reference solution unavailable')})"
+        )
         flags.append("reference_solution_failed")
+        if "reference_quality_degraded" not in flags:
+            flags.append("reference_quality_degraded")
 
     steps = state["normalized_steps"]
     if not steps:
@@ -1003,9 +1016,22 @@ def make_verify_steps_node(provider: LLMProvider):
 
         logging.info(f"[verify_steps] Starting verification, reference_text length: {len(reference_text)}")
 
-        if reference_text.startswith("Reference solution unavailable"):
-            logging.warning("[verify_steps] Reference solution generation failed, will verify without reference")
+        from stem_tutor.nodes.generate_reference_solution import (
+            _is_degraded as _ref_is_degraded,
+            _looks_like_meta_thinking as _ref_is_meta,
+        )
+        if (
+            reference_text.startswith("Reference solution unavailable")
+            or _ref_is_degraded(reference_text)
+            or _ref_is_meta(reference_text)
+        ):
+            logging.warning(
+                f"[verify_steps] Reference solution is degraded "
+                f"(len={len(reference_text)}, startswith_unavailable={reference_text.startswith('Reference solution unavailable')})"
+            )
             flags.append("reference_solution_failed")
+            if "reference_quality_degraded" not in flags:
+                flags.append("reference_quality_degraded")
         else:
             logging.info("[verify_steps] Reference solution available")
 

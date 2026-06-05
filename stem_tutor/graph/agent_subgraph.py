@@ -155,11 +155,17 @@ class AgentSubgraph:
             if not isinstance(last_msg, AIMessage):
                 return END
 
-            # Early stop: 如果 AI 消息包含成功锚点，直接结束
-            if isinstance(last_msg, AIMessage) and last_msg.content:
-                content = last_msg.content
-                if "FINAL_ANSWER=" in content or "CHECK_PASS=true" in content:
-                    logger.info("[AgentSubgraph] Detected success anchor, forcing END")
+            # Early stop: only if the AI message itself is schema-valid JSON.
+            # We previously checked for anchor substrings in the AI's prose,
+            # which caused the agent to exit before producing the schema
+            # required by the caller (e.g. {"reference_text": "..."}).
+            if last_msg.content:
+                parsed = parse_json_from_text(last_msg.content)
+                if any(
+                    key in parsed
+                    for key in ("reference_text", "label", "error_code", "steps", "review_problems", "feedback", "concise_summary")
+                ):
+                    logger.info("[AgentSubgraph] Detected schema-valid output, forcing END")
                     return END
 
             tool_rounds = sum(1 for m in state["messages"] if isinstance(m, ToolMessage))
@@ -225,7 +231,14 @@ class AgentSubgraph:
             termination_reason = "timeout"
         elif tool_rounds >= iterations:
             termination_reason = "max_rounds"
-        elif any("FINAL_ANSWER=" in (m.content or "") or "CHECK_PASS=true" in (m.content or "") for m in messages if isinstance(m, AIMessage)):
+        # Only mark as success_anchor if a tool message actually emitted
+        # the required anchors. (Was: matched AI prose, causing false
+        # positives on meta-thinking replies.)
+        elif any(
+            ("FINAL_ANSWER=" in (m.content or "") and "KEY_RESULT=" in (m.content or ""))
+            for m in messages
+            if isinstance(m, ToolMessage)
+        ):
             termination_reason = "success_anchor"
         logger.info(
             f"[AgentSubgraph] Completed in {elapsed:.2f}s, "
@@ -310,7 +323,15 @@ class AgentSubgraph:
             termination_reason = "timeout"
         elif tool_rounds >= max_iterations:
             termination_reason = "max_rounds"
-        elif any("FINAL_ANSWER=" in (m.content or "") or "CHECK_PASS=true" in (m.content or "") for m in phase1_messages if isinstance(m, AIMessage)):
+        # Only call this "success_anchor" if the tool output actually contained
+        # the required anchors. Previously this also fired when the AI quoted
+        # anchors in its prose, which caused the caller to mistake a
+        # meta-thinking reply for a completed reference solution.
+        elif any(
+            ("FINAL_ANSWER=" in (m.content or "") and "KEY_RESULT=" in (m.content or ""))
+            for m in phase1_messages
+            if isinstance(m, ToolMessage)
+        ):
             termination_reason = "success_anchor"
         logger.info(
             f"[AgentSubgraph] Dual-mode completed in {elapsed:.2f}s, "
@@ -354,6 +375,14 @@ def _extract_anchors(text: str) -> str:
 
 
 def parse_json_from_text(text: str) -> dict[str, Any]:
+    """Best-effort JSON object extraction from LLM output.
+
+    Returns an empty dict on failure. Callers must explicitly check for the
+    schema keys they expect. We deliberately do NOT return a sentinel like
+    ``{"raw_text": text}`` because that anti-pattern made one caller
+    (``_generate_via_agent``) treat arbitrary LLM prose as the user-visible
+    reference solution.
+    """
     if not text:
         return {}
     raw = text.strip()
@@ -370,7 +399,8 @@ def parse_json_from_text(text: str) -> dict[str, Any]:
 
     start = raw.find("{")
     if start < 0:
-        return {"raw_text": text}
+        logger.warning(f"[parse_json_from_text] No JSON object found in agent output: {raw[:200]}")
+        return {}
 
     depth = 0
     in_string = False
@@ -394,28 +424,17 @@ def parse_json_from_text(text: str) -> dict[str, Any]:
             depth -= 1
             if depth == 0:
                 candidate = raw[start : i + 1]
-                try:
-                    parsed = json.loads(candidate)
-                    if isinstance(parsed, dict):
-                        return parsed
-                except json.JSONDecodeError:
-                    pass
-                fixed = _fix_json_control_chars(candidate)
-                try:
-                    parsed = json.loads(fixed)
-                    if isinstance(parsed, dict):
-                        return parsed
-                except json.JSONDecodeError:
-                    pass
-                fixed2 = _fix_json_escapes(fixed)
-                try:
-                    parsed = json.loads(fixed2)
-                    if isinstance(parsed, dict):
-                        return parsed
-                except json.JSONDecodeError:
-                    pass
-                break
-    return {"raw_text": text}
+                for transform in (lambda c: c, _fix_json_control_chars, _fix_json_escapes):
+                    try:
+                        parsed = json.loads(transform(candidate))
+                        if isinstance(parsed, dict):
+                            return parsed
+                    except json.JSONDecodeError:
+                        continue
+                logger.warning(f"[parse_json_from_text] All parse attempts failed: {raw[:200]}")
+                return {}
+    logger.warning(f"[parse_json_from_text] Unterminated JSON object: {raw[:200]}")
+    return {}
 
 
 def _fix_json_escapes(text: str) -> str:

@@ -4426,11 +4426,68 @@
         section.style.display = "";
     }
 
+    function _loadReferenceAnswer(idx, toggleBtn, regenBtn, contentEl) {
+        var card = toggleBtn ? toggleBtn.closest(".review-card") : (regenBtn ? regenBtn.closest(".review-card") : null);
+        var problems = _renderReviewProblems || [];
+        var problem = problems[idx];
+        if (!problem) return;
+        var subjectId = "calculus";
+        if (_lastResult && _lastResult.run_meta && _lastResult.run_meta.subject_id) {
+            subjectId = _lastResult.run_meta.subject_id;
+        }
+        var subjectSelect = $("subject-select");
+        if (subjectSelect && subjectSelect.value) subjectId = subjectSelect.value;
+
+        if (toggleBtn) toggleBtn.disabled = true;
+        if (regenBtn) regenBtn.disabled = true;
+        contentEl.innerHTML = '<p class="reference-answer-spinner"><span class="spinner-small"></span> 正在生成参考解答（使用计算工具验证）...</p>';
+
+        var formData = new FormData();
+        formData.append("problem_text", problem.problem_text);
+        formData.append("subject_id", subjectId);
+
+        fetch("/practice/reference", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
+            .then(function (resp) {
+                if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
+                return resp;
+            })
+            .then(function (resp) { return _readReferenceSSE(resp); })
+            .then(function (result) {
+                if (result.reference_text) {
+                    contentEl.innerHTML = '<div class="reference-answer-body">' + marked.parse(result.reference_text) + "</div>";
+                    if (result.key_assertions && result.key_assertions.length) {
+                        var ah = "<p class=\"reference-answer-assertions-title\">关键断言：</p><ul>";
+                        result.key_assertions.forEach(function (a) { ah += "<li>" + esc(a) + "</li>"; });
+                        ah += "</ul>";
+                        contentEl.innerHTML += ah;
+                    }
+                    renderAllMath(contentEl);
+                } else {
+                    contentEl.innerHTML = '<p class="reference-answer-error">生成失败，请使用下方"重新生成解答"按钮重试。</p>';
+                }
+                contentEl.setAttribute("data-loaded", "1");
+            })
+            .catch(function (err) {
+                contentEl.innerHTML = '<p class="reference-answer-error">' + esc(err.message || "请求失败") + '</p><p class="reference-answer-hint">请使用下方"重新生成解答"按钮重试。</p>';
+            })
+            .then(function () {
+                if (toggleBtn) toggleBtn.disabled = false;
+                if (regenBtn) {
+                    regenBtn.disabled = false;
+                    regenBtn.style.display = "";
+                }
+            });
+    }
+
+    var _renderReviewProblems = null;
+    function _setRenderReviewProblems(p) { _renderReviewProblems = p; }
+
     function renderReview(problems) {
         var section = $("review-section");
         var container = $("review-container");
-        var runId = (typeof _lastResult !== "undefined" && _lastResult && _lastResult.run_meta) 
+        var runId = (typeof _lastResult !== "undefined" && _lastResult && _lastResult.run_meta)
                     ? _lastResult.run_meta.run_id : null;
+        _setRenderReviewProblems(problems || []);
 
         if (!problems || !problems.length) {
             if (runId) {
@@ -4467,6 +4524,7 @@
             html += '<button type="button" class="btn-secondary btn-sm btn-show-reference" data-index="' + i + '">查看解答</button>';
             html += '<div class="reference-answer-area" id="reference-answer-' + i + '" style="display:none;">';
             html += '<div class="reference-answer-content" id="reference-answer-content-' + i + '"></div>';
+            html += '<button type="button" class="btn-regenerate-reference" data-index="' + i + '" style="display:none;">↻ 重新生成解答</button>';
             html += "</div>";
             html += '<div class="practice-area" id="practice-area-' + i + '" style="display:none;">';
             html += '<textarea class="practice-input" rows="3" placeholder="输入你的解答..."></textarea>';
@@ -4533,6 +4591,7 @@
                 var idx = parseInt(this.getAttribute("data-index"), 10);
                 var area = $("reference-answer-" + idx);
                 var contentEl = $("reference-answer-content-" + idx);
+                var regenBtn = this.parentElement.querySelector(".btn-regenerate-reference");
                 if (area.style.display !== "none" && contentEl.getAttribute("data-loaded")) {
                     area.style.display = "none";
                     this.textContent = "查看解答";
@@ -4541,39 +4600,22 @@
                 area.style.display = "";
                 this.textContent = "收起解答";
                 if (contentEl.getAttribute("data-loaded")) return;
-                contentEl.innerHTML = '<p class="reference-answer-spinner"><span class="spinner-small"></span> 正在生成参考解答（使用计算工具验证）...</p>';
-                var problem = problems[idx];
-                var subjectId = "calculus";
-                if (_lastResult && _lastResult.run_meta && _lastResult.run_meta.subject_id) subjectId = _lastResult.run_meta.subject_id;
-                var subjectSelect = $("subject-select");
-                if (subjectSelect && subjectSelect.value) subjectId = subjectSelect.value;
-                var formData = new FormData();
-                formData.append("problem_text", problem.problem_text);
-                formData.append("subject_id", subjectId);
-                fetch("/practice/reference", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
-                    .then(function (resp) {
-                        if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
-                        return resp;
-                    })
-                    .then(function (resp) { return _readReferenceSSE(resp); })
-                    .then(function (result) {
-                        if (result.reference_text) {
-                            contentEl.innerHTML = '<div class="reference-answer-body">' + marked.parse(result.reference_text) + "</div>";
-                            if (result.key_assertions && result.key_assertions.length) {
-                                var ah = "<p class=\"reference-assertions-title\">关键断言：</p><ul>";
-                                result.key_assertions.forEach(function (a) { ah += "<li>" + esc(a) + "</li>"; });
-                                ah += "</ul>";
-                                contentEl.innerHTML += ah;
-                            }
-                            renderAllMath(contentEl);
-                        } else {
-                            contentEl.innerHTML = '<p class="reference-answer-error">生成失败，请重试。</p>';
-                        }
-                        contentEl.setAttribute("data-loaded", "1");
-                    })
-                    .catch(function (err) {
-                        contentEl.innerHTML = '<p class="reference-answer-error">' + esc(err.message || "请求失败") + "</p>";
-                    });
+                _loadReferenceAnswer(idx, this, regenBtn, contentEl);
+            });
+        });
+
+        container.querySelectorAll(".btn-regenerate-reference").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var idx = parseInt(this.getAttribute("data-index"), 10);
+                var card = this.closest(".review-card");
+                var contentEl = $("reference-answer-content-" + idx);
+                var area = $("reference-answer-" + idx);
+                var toggleBtn = card.querySelector(".btn-show-reference");
+                if (area.style.display === "none") {
+                    area.style.display = "";
+                    if (toggleBtn) toggleBtn.textContent = "收起解答";
+                }
+                _loadReferenceAnswer(idx, toggleBtn, this, contentEl);
             });
         });
 

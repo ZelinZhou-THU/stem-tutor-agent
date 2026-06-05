@@ -1535,6 +1535,65 @@ async def reverify_step(run_id: str, user_id: int, step_id: str) -> dict:
         }
 
 
+async def regenerate_reference(run_id: str, user_id: int):
+    """SSE stream that re-runs the reference solution for an existing run
+    and persists the new value to the database. Mirrors the schema of
+    practice_reference_stream so the client can reuse _readReferenceSSE.
+    """
+    import asyncio
+    import json as _json
+    from stem_tutor.nodes.generate_reference_solution import _generate_via_agent, _is_degraded
+    from stem_tutor.prompts.templates import active_subject_scope
+
+    run_data = await _load_run_result(run_id, user_id)
+    if not run_data:
+        yield f"event: reference_progress\ndata: {_json.dumps({'type':'error','message':'运行记录不存在'}, ensure_ascii=False)}\n\n"
+        return
+
+    raw = run_data.get("raw_output", {})
+    problem_text = raw.get("problem_input", {}).get("problem_text", "")
+    if not problem_text:
+        yield f"event: reference_progress\ndata: {_json.dumps({'type':'error','message':'题目信息缺失'}, ensure_ascii=False)}\n\n"
+        return
+
+    subject_id = (run_data.get("run_meta") or {}).get("subject_id") or "calculus"
+    if not subject_id or subject_id not in VALID_SUBJECTS:
+        subject_id = "calculus"
+
+    yield f"event: reference_progress\ndata: {_json.dumps({'type':'progress','message':'正在重新生成参考解答...'}, ensure_ascii=False)}\n\n"
+
+    loop = asyncio.get_event_loop()
+    try:
+        with active_subject_scope(subject_id):
+            new_ref, tool_calls = await loop.run_in_executor(
+                None,
+                lambda: _generate_via_agent(problem_text, subject_id=subject_id),
+            )
+        ref_text = new_ref.get("reference_text", "")
+        if not ref_text or _is_degraded(ref_text):
+            raise ValueError(
+                f"Generated reference is degraded: len={len(ref_text)}, "
+                f"meta_thinking={_is_degraded(ref_text)}"
+            )
+    except Exception as exc:
+        logger.error("[RegenRef] failed: %s", exc, exc_info=True)
+        yield f"event: reference_progress\ndata: {_json.dumps({'type':'error','message':'重新生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+        return
+
+    new_ref_clean = new_ref if isinstance(new_ref, dict) else (
+        new_ref.model_dump() if hasattr(new_ref, "model_dump") else {}
+    )
+    run_data["reference_solution"] = new_ref_clean
+    raw["reference_solution"] = new_ref_clean
+    run_data.setdefault("reference_history", []).append({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "tool_call_count": len(tool_calls),
+    })
+    await database.update_run(run_id, run_data)
+
+    yield f"event: reference_progress\ndata: {_json.dumps({'type':'result','reference_text':ref_text,'key_assertions':new_ref_clean.get('key_assertions',[]),'tool_call_count':len(tool_calls)}, ensure_ascii=False)}\n\n"
+
+
 async def get_stats(user_id: int) -> dict:
     all_rows = await database.get_all_runs_for_stats(user_id)
     if not all_rows:

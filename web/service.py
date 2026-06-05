@@ -2295,7 +2295,6 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     import asyncio
     import json as _json
 
-    from stem_tutor.graph.agent_subgraph import parse_json_from_text
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
     from stem_tutor.prompts.templates import set_active_subject
 
@@ -2307,14 +2306,22 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
 
     loop = asyncio.get_event_loop()
 
+    from stem_tutor.nodes.generate_reference_solution import _is_degraded
+
     try:
         raw, tool_calls = await loop.run_in_executor(
             None,
             lambda: _generate_via_agent(problem_text, subject_id=subject_id),
         )
+        ref_text = raw.get("reference_text", "")
+        if not ref_text or _is_degraded(ref_text):
+            raise ValueError(
+                f"Generated reference is degraded or empty: len={len(ref_text)}, "
+                f"meta_thinking={_is_degraded(ref_text)}"
+            )
         result = {
             "type": "result",
-            "reference_text": raw.get("reference_text", ""),
+            "reference_text": ref_text,
             "key_assertions": raw.get("key_assertions", []),
             "tool_call_count": len(tool_calls),
         }
@@ -2322,10 +2329,11 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
         logger.error("[Practice] Reference generation failed: %s", exc, exc_info=True)
         result = {
             "type": "result",
-            "reference_text": "生成参考解答失败",
+            "reference_text": "参考解答暂时无法生成，请稍后重试。",
             "key_assertions": [],
             "tool_call_count": 0,
         }
+        yield f"event: reference_progress\ndata: {_json.dumps({'type': 'error', 'message': '参考解答生成异常'}, ensure_ascii=False)}\n\n"
 
     yield f"event: reference_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
 

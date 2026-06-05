@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from stem_tutor.domain.models import ReferenceSolutionPayload
+from stem_tutor.graph.agent_subgraph import SCHEMA_KEYS
 from stem_tutor.graph.observability import record_provider_call
 from stem_tutor.graph.state import TutorGraphState
 from stem_tutor.providers.base import LLMProvider
@@ -18,9 +19,26 @@ _DEGRADED_MARKERS = (
     "代码执行超时",
     "超时了",
     "timed out",
-    "Reference solution unavailable",
+    "reference solution unavailable",
     "unable to generate",
 )
+
+_META_THINKING_PREFIXES = (
+    "我注意到",
+    "让我",
+    "我看到",
+    "我需要",
+    "看起来",
+    "首先让我",
+    "让我重新",
+    "i notice",
+    "i see",
+    "let me",
+    "looking at",
+    "it seems",
+)
+
+_MATH_INDICATORS = ("=", "\\boxed", "$", "∫", "√", "frac", "**", "\\\\")
 
 
 def _is_failed_preview(preview: str) -> bool:
@@ -29,10 +47,35 @@ def _is_failed_preview(preview: str) -> bool:
     return any(preview.strip().startswith(p) for p in _FAILED_HINT_PREFIXES)
 
 
+def _looks_like_meta_thinking(text: str) -> bool:
+    """Detect LLM output that looks like internal monologue rather than a
+    structured reference solution. Real references are math-heavy and rarely
+    start with first-person reflection.
+    """
+    if not text:
+        return True
+    stripped = text.lstrip()
+    lowered = stripped.lower()
+    if any(lowered.startswith(p) for p in _META_THINKING_PREFIXES):
+        return True
+    if len(text) > 100:
+        math_count = sum(1 for tok in _MATH_INDICATORS if tok in text)
+        if math_count == 0:
+            return True
+    return False
+
+
 def _is_degraded(text: str) -> bool:
+    """Detect low-quality reference text. Case-insensitive marker match so
+    that ``_minimal_reference``'s capital-U "Unable to generate" is itself
+    flagged as degraded (avoids shipping a degraded fallback as a valid
+    answer)."""
     if not text or len(text) < 50:
         return True
-    return any(marker in text for marker in _DEGRADED_MARKERS)
+    if _looks_like_meta_thinking(text):
+        return True
+    lowered = text.lower()
+    return any(marker in lowered for marker in _DEGRADED_MARKERS)
 
 
 def _is_tool_calling_enabled() -> bool:
@@ -120,16 +163,31 @@ def _generate_via_agent(problem_text: str, model_name: str | None = None, max_to
 
     raw = parse_json_from_text(last_ai.content)
     if "reference_text" not in raw:
-        if "raw_text" in raw:
-            raw = {
-                "reference_text": raw["raw_text"],
-                "key_assertions": [],
-            }
-        else:
-            raise ValueError("Could not extract JSON from agent response")
+        # Detect the "router exited via success_anchor but produced no schema"
+        # failure mode: the LLM output prose containing anchor strings rather
+        # than schema JSON. treat as failure so the caller can fall back to
+        # the minimal reference instead of shipping meta-thinking as the answer.
+        if agent_result.termination_reason == "success_anchor" and not _looks_like_schema(raw):
+            raise ValueError(
+                f"Agent exited via success_anchor but produced no schema JSON. "
+                f"raw_keys={list(raw.keys())}"
+            )
+        if last_ai.content and _looks_like_meta_thinking(last_ai.content):
+            raise ValueError(
+                f"Agent output looks like meta-thinking, not a reference solution: "
+                f"{last_ai.content[:200]}"
+            )
+        raise ValueError(f"Could not extract reference_text from agent response: {list(raw.keys())}")
 
     raw.setdefault("key_assertions", [])
     return raw, agent_result.tool_calls
+
+
+def _looks_like_schema(raw: dict) -> bool:
+    """Heuristic: does raw already look like a valid reference / verify / diagnosis payload?"""
+    if not isinstance(raw, dict):
+        return False
+    return any(key in raw for key in SCHEMA_KEYS)
 
 
 def _minimal_reference(problem: str) -> dict:
@@ -313,17 +371,29 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     local_schema_fallback = False
     try:
         parsed = ReferenceSolutionPayload(**raw)
-        if parsed.reference_text and not parsed.reference_text.startswith("Reference solution unavailable"):
+        # Re-check for degradation after Pydantic coercion: the pre-Pydantic
+        # check can miss meta-thinking replies that happen to include an "="
+        # or other math indicator, and the legacy prefix check below only
+        # matches the original "Reference solution unavailable" string,
+        # missing the newer "Unable to generate" minimal reference prefix.
+        if parsed.reference_text and not (
+            parsed.reference_text.startswith("Reference solution unavailable")
+            or _is_degraded(parsed.reference_text)
+        ):
             logging.info("[generate_reference_solution] [budget] Successfully generated reference solution")
         else:
-            logging.warning("[generate_reference_solution] [budget] Generated reference is placeholder/unavailable")
+            if not parsed.reference_text:
+                logging.warning("[generate_reference_solution] [budget] Generated reference is empty")
+            else:
+                logging.warning(
+                    f"[generate_reference_solution] [budget] Generated reference is degraded "
+                    f"(len={len(parsed.reference_text)}, prefix={parsed.reference_text[:30]!r})"
+                )
+            parsed = ReferenceSolutionPayload(**_minimal_reference(problem))
             local_schema_fallback = True
     except ValidationError as e:
         logging.error(f"[generate_reference_solution] [budget] Validation error: {e}")
-        parsed = ReferenceSolutionPayload(
-            reference_text=f"Reference solution unavailable for: {problem}",
-            key_assertions=[],
-        )
+        parsed = ReferenceSolutionPayload(**_minimal_reference(problem))
         local_schema_fallback = True
 
     flags, run_meta = record_provider_call(
@@ -342,6 +412,13 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     hints = _build_computation_hints(tool_calls, outcome)
     if not hints:
         hints = _build_computation_hints_legacy(tool_calls)
+
+    # Record the final reference quality signal so audit logs and the
+    # frontend can surface degraded references.
+    ref_text_for_signal = parsed.reference_text if hasattr(parsed, "reference_text") else ""
+    quality_signals["reference_is_degraded"] = (
+        _is_degraded(ref_text_for_signal) if ref_text_for_signal else True
+    )
 
     trace = state.get("trace", [])
     if local_schema_fallback:
@@ -469,7 +546,16 @@ def make_generate_reference_solution_node(provider: LLMProvider):
         try:
             parsed = ReferenceSolutionPayload(**raw)
             if parsed.reference_text and not parsed.reference_text.startswith("Reference solution unavailable"):
-                logging.info("[generate_reference_solution] Successfully generated reference solution")
+                if _is_degraded(parsed.reference_text):
+                    logging.warning(
+                        f"[generate_reference_solution] LLM fallback produced degraded reference "
+                        f"(len={len(parsed.reference_text)}, meta_thinking={_looks_like_meta_thinking(parsed.reference_text)})"
+                    )
+                    raw = _minimal_reference(problem)
+                    parsed = ReferenceSolutionPayload(**raw)
+                    local_schema_fallback = True
+                else:
+                    logging.info("[generate_reference_solution] Successfully generated reference solution")
             else:
                 logging.warning("[generate_reference_solution] Generated reference is placeholder/unavailable")
                 local_schema_fallback = True
@@ -492,6 +578,12 @@ def make_generate_reference_solution_node(provider: LLMProvider):
 
         if complexity_label:
             run_meta.setdefault("node_stats", {}).setdefault("reference", {})["complexity"] = complexity_label
+        # Record reference quality signals so the audit log shows when the
+        # reference was degraded (e.g. meta-thinking fallback, placeholder).
+        ref_text_for_signal = parsed.reference_text if hasattr(parsed, "reference_text") else ""
+        run_meta.setdefault("node_stats", {}).setdefault("reference", {})["reference_is_degraded"] = (
+            _is_degraded(ref_text_for_signal) if ref_text_for_signal else True
+        )
 
         trace = state.get("trace", [])
         mode_label = "tool-calling agent" if use_tools else "standard"

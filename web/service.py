@@ -1447,6 +1447,14 @@ async def reverify_step(run_id: str, user_id: int, step_id: str) -> dict:
     if getattr(settings, "verify_model_name", None):
         provider.model_name = settings.verify_model_name
 
+    # Restore the original subject context so prompts, taxonomy and sympy
+    # postprocess rules all use the run's original subject.
+    subject_id = (run_data.get("run_meta") or {}).get("subject_id") or "calculus"
+    if not subject_id or subject_id not in VALID_SUBJECTS:
+        subject_id = "calculus"
+    from stem_tutor.prompts.templates import set_active_subject
+    set_active_subject(subject_id)
+
     problem_text = raw["problem_input"]["problem_text"]
     ref = raw.get("reference_solution", {})
     ref_text = ref.get("reference_text", "")
@@ -1493,12 +1501,13 @@ async def reverify_step(run_id: str, user_id: int, step_id: str) -> dict:
         final_answer_status="",
         computation_hints="",
         provider=provider,
+        subject_id=subject_id,
     )
 
     from stem_tutor.domain.models import VerificationResult
     result = _outcome_to_verification_result(outcome, step_id)
 
-    adj_label, adj_evidence, adj_principles = _rule_based_adjustment(target.get("normalized_text", ""))
+    adj_label, adj_evidence, adj_principles = _rule_based_adjustment(target.get("normalized_text", ""), subject_id)
     if adj_label is not None:
         result = VerificationResult(
             step_id=result.step_id,
@@ -2189,9 +2198,10 @@ async def practice_verify_stream(
     from stem_tutor.subjects.context import get_subject_context
     from stem_tutor.prompts.templates import set_active_subject
 
-    if not subject_id or subject_id not in {"calculus", "linear_algebra", "mechanics", "relativity", "optics", "quantum", "electromagnetism", "thermodynamics"}:
+    if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
     set_active_subject(subject_id)
+
     try:
         subject_display = get_subject_context(subject_id).display_name
     except Exception:
@@ -2270,7 +2280,7 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
     from stem_tutor.prompts.templates import set_active_subject
 
-    if not subject_id or subject_id not in {"calculus", "linear_algebra", "mechanics", "relativity", "optics", "quantum", "electromagnetism", "thermodynamics"}:
+    if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
     set_active_subject(subject_id)
 

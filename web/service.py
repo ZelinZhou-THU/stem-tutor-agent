@@ -21,6 +21,12 @@ from stem_tutor.subjects.detector import VALID_SUBJECTS, detect_subject
 from stem_tutor.taxonomy.errors import lookup_error
 from web import database
 
+# Canonical subject_id defaults. Use:
+#   DEFAULT_PROCESSING_SUBJECT  — for LLM calls, taxonomy lookups, prompt building
+#   DEFAULT_DISPLAY_SUBJECT     — for list/report/grouping views where "no data" is fine
+DEFAULT_PROCESSING_SUBJECT = "calculus"
+DEFAULT_DISPLAY_SUBJECT = ""
+
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 RUN_ATTEMPTS_BY_DEPTH = {
@@ -155,7 +161,7 @@ async def _save_run_payload(run_id: str, user_id: int, payload: dict) -> None:
         meta["completed_at"] = datetime.now(timezone.utc).isoformat()
     meta["failed"] = payload.get("status") == "failed"
     run_status = payload.get("status", "running")
-    subject = meta.get("subject_id", "")
+    subject = meta.get("subject_id", DEFAULT_DISPLAY_SUBJECT)
     problem_text = ""
     raw = payload.get("raw_output", {})
     pi = raw.get("problem_input")
@@ -187,7 +193,7 @@ async def _save_running_placeholder(run_id: str, user_id: int, run_meta: dict) -
         "raw_output": {},
         "tool_calls_log": [],
     }
-    subject = run_meta.get("subject_id", "")
+    subject = run_meta.get("subject_id", DEFAULT_DISPLAY_SUBJECT)
     await database.save_run(run_id, user_id, payload, status="running", subject=subject, problem_text="")
 
 
@@ -378,7 +384,7 @@ def _shape_response(state: dict) -> dict:
     shaped_diagnoses = []
     for d in diagnoses:
         error_code = _get_attr(d, "error_code", "")
-        subject_id = run_meta.get("subject_id") or "calculus"
+        subject_id = run_meta.get("subject_id") or DEFAULT_PROCESSING_SUBJECT
         entry = lookup_error(error_code, subject_id=subject_id)
         shaped_diagnoses.append({
             "step_id": _get_attr(d, "step_id", ""),
@@ -493,7 +499,7 @@ def _build_partial(node_name: str, node_output: dict, accumulated_state: dict) -
         if not diagnoses:
             return None
         shaped = []
-        subject_id = (accumulated_state.get("run_meta") or {}).get("subject_id") or "calculus"
+        subject_id = (accumulated_state.get("run_meta") or {}).get("subject_id") or DEFAULT_PROCESSING_SUBJECT
         for d in diagnoses:
             entry = lookup_error(d.error_code, subject_id=subject_id)
             shaped.append({
@@ -945,7 +951,7 @@ def _serialize_partial(node_name: str, state: dict) -> dict | None:
     if node_name == "diagnose_error":
         diagnoses = state.get("diagnosis_results", [])
         shaped = []
-        subject_id = (state.get("run_meta") or {}).get("subject_id") or "calculus"
+        subject_id = (state.get("run_meta") or {}).get("subject_id") or DEFAULT_PROCESSING_SUBJECT
         for d in diagnoses:
             entry = lookup_error(d.error_code, subject_id=subject_id)
             shaped.append({
@@ -1337,7 +1343,7 @@ async def list_runs(
         if not problem_text:
             problem_text = row.get("problem_text", "") or meta.get("problem_text", "")
 
-        subject_id = meta.get("subject_id", "") or row.get("subject", "")
+        subject_id = meta.get("subject_id", DEFAULT_DISPLAY_SUBJECT) or row.get("subject", "")
 
         started = meta.get("started_at", "")
         completed = meta.get("completed_at", "")
@@ -1448,84 +1454,85 @@ async def reverify_step(run_id: str, user_id: int, step_id: str) -> dict:
         provider.model_name = settings.verify_model_name
 
     # Restore the original subject context so prompts, taxonomy and sympy
-    # postprocess rules all use the run's original subject.
-    subject_id = (run_data.get("run_meta") or {}).get("subject_id") or "calculus"
+    # postprocess rules all use the run's original subject. Use a context
+    # manager so the threading.local value is restored on exit and does
+    # not bleed into the next coroutine on this async thread.
+    subject_id = (run_data.get("run_meta") or {}).get("subject_id") or DEFAULT_PROCESSING_SUBJECT
     if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
-    from stem_tutor.prompts.templates import set_active_subject
-    set_active_subject(subject_id)
+    from stem_tutor.prompts.templates import active_subject_scope
+    with active_subject_scope(subject_id):
+        problem_text = raw["problem_input"]["problem_text"]
+        ref = raw.get("reference_solution", {})
+        ref_text = ref.get("reference_text", "")
+        assertions = ref.get("key_assertions", [])
+        all_steps = steps_raw
+        prev_text = all_steps[target_idx - 1].get("normalized_text", "") if target_idx > 0 else ""
+        next_text = all_steps[target_idx + 1].get("normalized_text", "") if target_idx < len(all_steps) - 1 else ""
+        full_solution = "\n".join(f"{s.get('step_id','')}: {s.get('normalized_text','')}" for s in all_steps)
 
-    problem_text = raw["problem_input"]["problem_text"]
-    ref = raw.get("reference_solution", {})
-    ref_text = ref.get("reference_text", "")
-    assertions = ref.get("key_assertions", [])
-    all_steps = steps_raw
-    prev_text = all_steps[target_idx - 1].get("normalized_text", "") if target_idx > 0 else ""
-    next_text = all_steps[target_idx + 1].get("normalized_text", "") if target_idx < len(all_steps) - 1 else ""
-    full_solution = "\n".join(f"{s.get('step_id','')}: {s.get('normalized_text','')}" for s in all_steps)
+        from stem_tutor.nodes.verify_steps import (
+            _strategy_sympy_verify, _strategy_numerical_verify,
+            _strategy_agent_verify, _strategy_pure_llm_verify,
+            _outcome_to_verification_result, _rule_based_adjustment,
+            _extract_reference_answer_hint, _is_tool_calling_enabled,
+        )
+        from stem_tutor.graph.strategy import StrategyChain
+        from stem_tutor.graph.budget import NodeBudgetConfig, NodeBudgetManager
 
-    from stem_tutor.nodes.verify_steps import (
-        _strategy_sympy_verify, _strategy_numerical_verify,
-        _strategy_agent_verify, _strategy_pure_llm_verify,
-        _outcome_to_verification_result, _rule_based_adjustment,
-        _extract_reference_answer_hint, _is_tool_calling_enabled,
-    )
-    from stem_tutor.graph.strategy import StrategyChain
-    from stem_tutor.graph.budget import NodeBudgetConfig, NodeBudgetManager
+        reference_answer_hint = _extract_reference_answer_hint(ref_text, assertions)
 
-    reference_answer_hint = _extract_reference_answer_hint(ref_text, assertions)
+        unlim_config = NodeBudgetConfig(600, 120, 5, {"simple": 15, "moderate": 25, "complex": 35})
+        budget = NodeBudgetManager(config=unlim_config)
 
-    unlim_config = NodeBudgetConfig(600, 120, 5, {"simple": 15, "moderate": 25, "complex": 35})
-    budget = NodeBudgetManager(config=unlim_config)
+        strategies = [
+            ("sympy", _strategy_sympy_verify),
+            ("numerical", _strategy_numerical_verify),
+        ]
+        if _is_tool_calling_enabled():
+            strategies.append(("tool_agent", _strategy_agent_verify))
+        strategies.append(("pure_llm", _strategy_pure_llm_verify))
 
-    strategies = [
-        ("sympy", _strategy_sympy_verify),
-        ("numerical", _strategy_numerical_verify),
-    ]
-    if _is_tool_calling_enabled():
-        strategies.append(("tool_agent", _strategy_agent_verify))
-    strategies.append(("pure_llm", _strategy_pure_llm_verify))
-
-    chain = StrategyChain(strategies, budget)
-    outcome = chain.execute(
-        step_text=target.get("normalized_text", ""),
-        prev_text=prev_text,
-        next_text=next_text,
-        reference_text=ref_text,
-        reference_answer_hint=reference_answer_hint,
-        problem_text=problem_text,
-        full_solution=full_solution,
-        step_id=step_id,
-        total_steps=len(all_steps),
-        assertions=assertions,
-        final_answer_status="",
-        computation_hints="",
-        provider=provider,
-        subject_id=subject_id,
-    )
-
-    from stem_tutor.domain.models import VerificationResult
-    result = _outcome_to_verification_result(outcome, step_id)
-
-    adj_label, adj_evidence, adj_principles = _rule_based_adjustment(target.get("normalized_text", ""), subject_id)
-    if adj_label is not None:
-        result = VerificationResult(
-            step_id=result.step_id,
-            label=adj_label,
-            evidence=adj_evidence or result.evidence,
-            confidence=min(result.confidence, 0.6),
-            violated_principles=sorted(set(result.violated_principles + adj_principles)),
-            sympy_verified=result.sympy_verified,
-            sympy_equivalent=result.sympy_equivalent,
+        chain = StrategyChain(strategies, budget)
+        outcome = chain.execute(
+            step_text=target.get("normalized_text", ""),
+            prev_text=prev_text,
+            next_text=next_text,
+            reference_text=ref_text,
+            reference_answer_hint=reference_answer_hint,
+            problem_text=problem_text,
+            full_solution=full_solution,
+            step_id=step_id,
+            total_steps=len(all_steps),
+            assertions=assertions,
+            final_answer_status="",
+            computation_hints="",
+            provider=provider,
+            subject_id=subject_id,
         )
 
-    await _update_step_in_run(run_id, user_id, step_id, result)
+        from stem_tutor.domain.models import VerificationResult
+        result = _outcome_to_verification_result(outcome, step_id)
 
-    return {
-        "success": True,
-        "verification_result": result.model_dump(),
-        "elapsed_seconds": round(budget.elapsed(), 2),
-    }
+        adj_label, adj_evidence, adj_principles = _rule_based_adjustment(target.get("normalized_text", ""), subject_id)
+        if adj_label is not None:
+            result = VerificationResult(
+                step_id=result.step_id,
+                label=adj_label,
+                evidence=adj_evidence or result.evidence,
+                confidence=min(result.confidence, 0.6),
+                violated_principles=sorted(set(result.violated_principles + adj_principles)),
+                sympy_verified=result.sympy_verified,
+                sympy_equivalent=result.sympy_equivalent,
+            )
+
+        await _update_step_in_run(run_id, user_id, step_id, result)
+
+        return {
+            "success": True,
+            "verification_result": result.model_dump(),
+            "elapsed_seconds": round(budget.elapsed(), 2),
+        }
 
 
 async def get_stats(user_id: int) -> dict:
@@ -1715,10 +1722,22 @@ async def chat_stream(
 
     settings = load_provider_settings()
 
+    # Resolve the original subject from the stored run so the chat tutor
+    # speaks with the right subject identity (e.g. "量子物理" not "微积分").
+    run_meta = result.get("run_meta") or {}
+    subject_id = run_meta.get("subject_id") or DEFAULT_PROCESSING_SUBJECT
+    if not subject_id or subject_id not in VALID_SUBJECTS:
+        subject_id = "calculus"
+    from stem_tutor.subjects.context import get_subject_context
+    try:
+        subject_display = get_subject_context(subject_id).display_name
+    except Exception:
+        subject_display = "数理基础"
+
     context = await _build_chat_context(run_id, user_id)
-    system_prompt = f"""你是一位数理基础课程的辅导老师。你的职责是：
+    system_prompt = f"""你是一位{subject_display}辅导老师。你的职责是：
 1. 基于系统分析结果回答学生的追问
-2. 用清晰、通俗的语言解释数学概念
+2. 用清晰、通俗的语言解释相关概念
 3. 如果涉及具体步骤，引用步骤编号（如"第2步"）
 4. 适当给出类似题目或解题方法建议
 5. 使用 $...$ 包裹行内公式，$$...$$ 包裹独立公式
@@ -1836,7 +1855,7 @@ async def get_report_run_list(user_id: int) -> list[dict]:
         data = row["data"]
         meta = data.get("run_meta", {})
         run_id = meta.get("run_id", row.get("id", ""))
-        subject_id = meta.get("subject_id", "") or row.get("subject", "")
+        subject_id = meta.get("subject_id", DEFAULT_DISPLAY_SUBJECT) or row.get("subject", "")
         started = meta.get("started_at", "")
         completed = meta.get("completed_at", "")
         timestamp = completed or started or row.get("created_at", "")
@@ -2094,7 +2113,7 @@ async def get_report_data(
 
     all_subjects = sorted(subject_display_map.values())
     for subj in all_subjects:
-        subj_runs = [d for d in runs_data if subject_display_map.get(d.get("run_meta", {}).get("subject_id", ""), "") == subj]
+        subj_runs = [d for d in runs_data if subject_display_map.get(d.get("run_meta", {}).get("subject_id", DEFAULT_DISPLAY_SUBJECT), "") == subj]
         if len(subj_runs) >= 3:
             last_n = subj_runs[-3:]
             has_error = False

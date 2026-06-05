@@ -1004,6 +1004,18 @@ textarea {
     border-radius: 3px;
     margin-right: 4px;
 }
+.reference-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.reference-history-hint {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
 .action-cell {
     white-space: nowrap;
     text-align: center;

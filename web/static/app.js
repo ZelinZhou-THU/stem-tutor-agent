@@ -4162,8 +4162,24 @@
         var el = $("reference-section");
         var container = $("reference-container");
         var ref = data.reference_solution;
+        var runId = (data.run_meta || {}).run_id;
+
         if (!ref || (!ref.reference_text && !ref.key_assertions)) {
-            el.style.display = "none";
+            // Still show the section with just the regen button if we have a runId.
+            if (runId) {
+                el.style.display = "";
+                container.innerHTML = '<div class="reference-header">' +
+                    '<div class="reference-text">参考解答：</div>' +
+                    '<button class="btn-reverify btn-regenerate-reference-main" data-run-id="' + esc(runId) + '">重新生成</button>' +
+                    '</div>' +
+                    '<p class="summary-text">暂无参考解答。</p>';
+                var btn = container.querySelector(".btn-regenerate-reference-main");
+                if (btn) btn.addEventListener("click", function () {
+                    startRegenerateReferenceMain(this.getAttribute("data-run-id"), this);
+                });
+            } else {
+                el.style.display = "none";
+            }
             return;
         }
         el.style.display = "";
@@ -4180,10 +4196,16 @@
                   + '\u9a8c\u8bc1\u9636\u6bb5\u8bf7\u7a0d\u52a0\u8c28\u614e\u3002'
                   + '</div>';
         }
+        html += '<div class="reference-header">';
+        html += '<div class="reference-text">参考解答：</div>';
+        if (runId) {
+            html += '<button class="btn-reverify btn-regenerate-reference-main" data-run-id="' + esc(runId) + '">重新生成</button>';
+        }
+        html += '</div>';
+
         if (ref.reference_text) {
             var processed = preprocessLatex(ref.reference_text);
             var rendered = window.marked ? marked.parse(processed) : esc(processed);
-            html += '<div class="reference-text">参考解答：</div>';
             html += '<div class="reference-content">' + rendered + '</div>';
         }
         if (ref.key_assertions && ref.key_assertions.length) {
@@ -4193,7 +4215,49 @@
             });
             html += '</ul></div>';
         }
+        if (data.reference_history && data.reference_history.length) {
+            var last = data.reference_history[data.reference_history.length - 1];
+            html += '<p class="reference-history-hint">上次更新于 ' + esc(formatTimestamp(last.timestamp)) + '</p>';
+        }
         container.innerHTML = html;
+        var btn = container.querySelector(".btn-regenerate-reference-main");
+        if (btn) btn.addEventListener("click", function () {
+            startRegenerateReferenceMain(this.getAttribute("data-run-id"), this);
+        });
+    }
+
+    function startRegenerateReferenceMain(runId, btn) {
+        var originalText = btn.textContent;
+        if (!confirm("将再次调用 AI 模型生成参考解答，耗时约 1-3 分钟。是否继续？")) {
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-small"></span> 生成中...';
+        var formData = new FormData();
+        formData.append("run_id", runId);
+        fetch("/api/regenerate-reference", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
+            .then(function (resp) {
+                if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
+                return resp;
+            })
+            .then(function (resp) { return _readReferenceSSE(resp); })
+            .then(function (result) {
+                if (result.type === "error") throw new Error(result.message || "生成失败");
+                return fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
+                    .then(function (r) { return r.json(); })
+                    .then(function (fullData) {
+                        renderResults(fullData);
+                        renderAllMath($("results"));
+                        showToast("参考解答已更新");
+                    });
+            })
+            .catch(function (err) {
+                showError("重新生成失败: " + (err.message || "未知错误"));
+            })
+            .then(function () {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
     }
 
     function renderSteps(steps, runId) {

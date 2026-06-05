@@ -38,7 +38,7 @@ from web.service import delete_runs, cleanup_runs_before
 from web.service import get_report_data, report_stream, get_report_run_list
 from web.service import list_reports, _load_report, delete_reports
 from web.service import practice_verify_stream
-from web.service import practice_reference_stream
+from web.service import practice_reference_stream, regenerate_reference
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -545,6 +545,21 @@ async def reverify_step_endpoint(
     except Exception as exc:
         logging.getLogger("stem_tutor.app").exception("Reverify step failed")
         return JSONResponse(status_code=500, content={"success": False, "error": "验证失败，请稍后重试"})
+
+
+@app.post("/api/regenerate-reference")
+async def regenerate_reference_endpoint(
+    run_id: str = Form(...),
+    user: dict = Depends(get_current_user),
+):
+    async def event_generator():
+        async for chunk in regenerate_reference(run_id, user_id=user["id"]):
+            yield chunk
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control":"no-cache","Connection":"keep-alive","X-Accel-Buffering":"no"},
+    )
 
 
 @app.post("/practice/verify")

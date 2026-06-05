@@ -111,11 +111,19 @@ def test_is_degraded_markers():
     from stem_tutor.nodes.generate_reference_solution import _is_degraded
     assert _is_degraded("计算超时了，请稍后重试 a long enough string here to pass length") is True
     assert _is_degraded("Unable to generate a long enough fallback string here ok") is True
+    # Case-insensitive: lowercase marker must match a capitalised occurrence
+    assert _is_degraded("UNABLE TO GENERATE a long enough fallback string here ok") is True
 
 
 # -----------------------------
 # Router early-stop
 # -----------------------------
+
+def _build_agent():
+    """Create a bare AgentSubgraph without invoking __init__ (skips LLM setup)."""
+    from stem_tutor.graph.agent_subgraph import AgentSubgraph
+    return object.__new__(AgentSubgraph)
+
 
 def test_router_does_not_early_stop_on_prose_with_anchor_substring():
     """The router must NOT early-stop when AI prose contains anchor substrings.
@@ -123,32 +131,41 @@ def test_router_does_not_early_stop_on_prose_with_anchor_substring():
     Reproduces the production bug: LLM says 'I will output FINAL_ANSWER=...'
     in its reasoning, but the actual JSON hasn't been emitted yet. The old
     router saw the substring in AI prose and ended the run prematurely.
+
+    To distinguish buggy (early-END on anchor substring) vs fixed (proceeds
+    to tool_calls) code, we attach a fake tool_call to the AI message and
+    assert the router routes to "tools" -- which would only happen if the
+    schema-key check (and the now-removed anchor check) both do not fire.
     """
     from langchain_core.messages import AIMessage
-    from stem_tutor.graph.agent_subgraph import AgentSubgraph, AgentState
+    from langgraph.graph import END
+    from stem_tutor.graph.agent_subgraph import AgentState
 
-    agent = object.__new__(AgentSubgraph)
-    router = agent._make_router(2).__func__
+    agent = _build_agent()
+    router = agent._make_router(2)
 
-    state: AgentState = {
-        "messages": [
-            AIMessage(content='我观察到 CHECK_PASS=true 还没输出，下一步输出 JSON。'),
-        ]
-    }
-    # Since the AI content is not schema-valid JSON and there are no tool
-    # calls, the router should END (not loop forever) -- but it should NOT
-    # END via the success-anchor shortcut. With no tool_calls and no JSON
-    # schema, the router naturally returns END via the final fallthrough.
+    ai = AIMessage(content='我观察到 CHECK_PASS=true 还没输出，下一步输出 JSON。')
+    # Attach a tool_call so the router, if it reaches the tool_calls check,
+    # routes to "tools". This proves the schema-key check (and the legacy
+    # anchor-substring check) both do not short-circuit to END.
+    ai.tool_calls = [{"id": "c1", "name": "execute_python", "args": {"code": "print(1)"}}]
+
+    state: AgentState = {"messages": [ai]}
     result = router(state)
-    assert result == "end"  # state['messages'] has no tool_calls and no JSON, so END
+    assert result == "tools", (
+        f"router early-stopped (got {result!r}); AI prose with anchor substring "
+        f"and tool_calls present must route to 'tools'"
+    )
+    assert result != END
 
 
 def test_router_early_stops_on_schema_valid_json():
     from langchain_core.messages import AIMessage
-    from stem_tutor.graph.agent_subgraph import AgentSubgraph, AgentState
+    from langgraph.graph import END
+    from stem_tutor.graph.agent_subgraph import AgentState
 
-    agent = object.__new__(AgentSubgraph)
-    router = agent._make_router(2).__func__
+    agent = _build_agent()
+    router = agent._make_router(2)
 
     state: AgentState = {
         "messages": [
@@ -156,15 +173,16 @@ def test_router_early_stops_on_schema_valid_json():
         ]
     }
     result = router(state)
-    assert result == "end"
+    assert result == END
 
 
 def test_router_early_stops_on_label_schema():
     from langchain_core.messages import AIMessage
-    from stem_tutor.graph.agent_subgraph import AgentSubgraph, AgentState
+    from langgraph.graph import END
+    from stem_tutor.graph.agent_subgraph import AgentState
 
-    agent = object.__new__(AgentSubgraph)
-    router = agent._make_router(2).__func__
+    agent = _build_agent()
+    router = agent._make_router(2)
 
     state: AgentState = {
         "messages": [
@@ -172,41 +190,51 @@ def test_router_early_stops_on_label_schema():
         ]
     }
     result = router(state)
-    assert result == "end"
+    assert result == END
 
 
 def test_router_does_not_early_stop_on_prose_only_with_anchor():
-    """AI message contains the literal strings but no JSON: must NOT end via anchor."""
+    """AI message contains the literal anchor strings but no JSON: must NOT end via anchor.
+
+    We attach a tool_call and assert the router routes to "tools", proving
+    the schema-key check does not short-circuit on anchor substrings.
+    """
     from langchain_core.messages import AIMessage
-    from stem_tutor.graph.agent_subgraph import AgentSubgraph, AgentState
+    from langgraph.graph import END
+    from stem_tutor.graph.agent_subgraph import AgentState
 
-    agent = object.__new__(AgentSubgraph)
-    router = agent._make_router(2).__func__
+    agent = _build_agent()
+    router = agent._make_router(2)
 
-    state: AgentState = {
-        "messages": [
-            AIMessage(content='让我看看，我现在准备输出 FINAL_ANSWER=16/5 和 CHECK_PASS=true 还需要再算一下。'),
-        ]
-    }
+    ai = AIMessage(content='让我看看，我现在准备输出 FINAL_ANSWER=16/5 和 CHECK_PASS=true 还需要再算一下。')
+    ai.tool_calls = [{"id": "c1", "name": "execute_python", "args": {"code": "print(1)"}}]
+
+    state: AgentState = {"messages": [ai]}
     result = router(state)
-    # Must fall through to the final END, NOT a premature success-anchor END.
-    # (This test simply confirms we don't crash and the router does return.
-    # The critical thing is the new logic doesn't recognize the substring.)
-    assert result == "end"
+    assert result == "tools", (
+        f"router short-circuited (got {result!r}); anchor substring in prose "
+        f"must not trigger the schema-key early-stop"
+    )
+    assert result != END
 
 
 # -----------------------------
 # _generate_via_agent raises on bad output
 # -----------------------------
 
-def _make_mock_agent(messages, termination_reason="success_anchor"):
-    """Build a mock AgentSubgraph whose .invoke returns messages and reason."""
+def _make_mock_agent(last_ai_message, termination_reason="success_anchor"):
+    """Build a mock AgentSubgraph whose .invoke returns messages and reason.
+
+    `_generate_via_agent` calls both `result.messages` and
+    `agent.get_last_ai_message(messages)`, so we wire both up.
+    """
     agent = MagicMock()
     result = MagicMock()
-    result.messages = messages
+    result.messages = [last_ai_message]
     result.tool_calls = []
     result.termination_reason = termination_reason
     agent.invoke.return_value = result
+    agent.get_last_ai_message.return_value = last_ai_message
     return agent
 
 
@@ -217,18 +245,22 @@ def test_generate_via_agent_raises_on_success_anchor_without_schema():
     minimal reference instead of shipping the prose as reference_text.
     """
     from langchain_core.messages import AIMessage
-    from stem_tutor.nodes import generate_reference_solution as ref_mod
 
     meta = AIMessage(
         content="我注意到自验证步骤中比值不是1，这说明我的代换计算可能有误，让我重新检查代换关系"
     )
-    agent = _make_mock_agent([meta], termination_reason="success_anchor")
+    agent = _make_mock_agent(meta, termination_reason="success_anchor")
 
-    with patch.object(ref_mod, "AgentSubgraph", return_value=agent), \
-         patch.object(ref_mod, "is_dual_model_enabled", return_value=False), \
-         patch.object(ref_mod, "load_provider_settings") as mock_settings, \
-         patch.object(ref_mod, "get_subject_context") as mock_ctx, \
-         patch.object(ref_mod, "parse_json_from_text", return_value={}):
+    # Patch the source modules: _generate_via_agent uses
+    # `from stem_tutor.graph.agent_subgraph import AgentSubgraph, parse_json_from_text`
+    # inside the function body, so module-attribute patches on the consumer
+    # module are no-ops.
+    with patch("stem_tutor.graph.agent_subgraph.AgentSubgraph", return_value=agent), \
+         patch("stem_tutor.settings.is_dual_model_enabled", return_value=False), \
+         patch("stem_tutor.settings.load_provider_settings") as mock_settings, \
+         patch("stem_tutor.settings.reference_max_tool_rounds", return_value=2), \
+         patch("stem_tutor.subjects.context.get_subject_context") as mock_ctx, \
+         patch("stem_tutor.graph.agent_subgraph.parse_json_from_text", return_value={}):
         mock_settings.return_value = MagicMock(
             api_key="x", base_url="http://x", reasoning_model_name="m",
             verify_model_group="fast", verify_model_name=None,
@@ -236,24 +268,25 @@ def test_generate_via_agent_raises_on_success_anchor_without_schema():
         mock_ctx.return_value = MagicMock(display_name="Calculus", prompts={"system_role": "x"})
 
         with pytest.raises(ValueError, match="meta-thinking|success_anchor"):
+            from stem_tutor.nodes import generate_reference_solution as ref_mod
             ref_mod._generate_via_agent("题目: test")
 
 
 def test_generate_via_agent_raises_on_meta_thinking_even_with_completion():
     """Even if termination_reason is 'completed', meta-thinking prose should raise."""
     from langchain_core.messages import AIMessage
-    from stem_tutor.nodes import generate_reference_solution as ref_mod
 
     meta = AIMessage(
         content="让我看看，第一步是代换。第二步是验证。我注意到一些细节问题需要确认。"
     )
-    agent = _make_mock_agent([meta], termination_reason="completed")
+    agent = _make_mock_agent(meta, termination_reason="completed")
 
-    with patch.object(ref_mod, "AgentSubgraph", return_value=agent), \
-         patch.object(ref_mod, "is_dual_model_enabled", return_value=False), \
-         patch.object(ref_mod, "load_provider_settings") as mock_settings, \
-         patch.object(ref_mod, "get_subject_context") as mock_ctx, \
-         patch.object(ref_mod, "parse_json_from_text", return_value={}):
+    with patch("stem_tutor.graph.agent_subgraph.AgentSubgraph", return_value=agent), \
+         patch("stem_tutor.settings.is_dual_model_enabled", return_value=False), \
+         patch("stem_tutor.settings.load_provider_settings") as mock_settings, \
+         patch("stem_tutor.settings.reference_max_tool_rounds", return_value=2), \
+         patch("stem_tutor.subjects.context.get_subject_context") as mock_ctx, \
+         patch("stem_tutor.graph.agent_subgraph.parse_json_from_text", return_value={}):
         mock_settings.return_value = MagicMock(
             api_key="x", base_url="http://x", reasoning_model_name="m",
             verify_model_group="fast", verify_model_name=None,
@@ -261,22 +294,23 @@ def test_generate_via_agent_raises_on_meta_thinking_even_with_completion():
         mock_ctx.return_value = MagicMock(display_name="Calculus", prompts={"system_role": "x"})
 
         with pytest.raises(ValueError, match="meta-thinking"):
+            from stem_tutor.nodes import generate_reference_solution as ref_mod
             ref_mod._generate_via_agent("题目: test")
 
 
 def test_generate_via_agent_returns_valid_json():
     """Happy path: agent returns schema-valid JSON, function returns it."""
     from langchain_core.messages import AIMessage
-    from stem_tutor.nodes import generate_reference_solution as ref_mod
 
     valid = AIMessage(content='{"reference_text": "x = 5", "key_assertions": ["x=5"]}')
-    agent = _make_mock_agent([valid], termination_reason="completed")
+    agent = _make_mock_agent(valid, termination_reason="completed")
 
-    with patch.object(ref_mod, "AgentSubgraph", return_value=agent), \
-         patch.object(ref_mod, "is_dual_model_enabled", return_value=False), \
-         patch.object(ref_mod, "load_provider_settings") as mock_settings, \
-         patch.object(ref_mod, "get_subject_context") as mock_ctx, \
-         patch.object(ref_mod, "parse_json_from_text") as mock_parse:
+    with patch("stem_tutor.graph.agent_subgraph.AgentSubgraph", return_value=agent), \
+         patch("stem_tutor.settings.is_dual_model_enabled", return_value=False), \
+         patch("stem_tutor.settings.load_provider_settings") as mock_settings, \
+         patch("stem_tutor.settings.reference_max_tool_rounds", return_value=2), \
+         patch("stem_tutor.subjects.context.get_subject_context") as mock_ctx, \
+         patch("stem_tutor.graph.agent_subgraph.parse_json_from_text") as mock_parse:
         mock_settings.return_value = MagicMock(
             api_key="x", base_url="http://x", reasoning_model_name="m",
             verify_model_group="fast", verify_model_name=None,
@@ -284,6 +318,7 @@ def test_generate_via_agent_returns_valid_json():
         mock_ctx.return_value = MagicMock(display_name="Calculus", prompts={"system_role": "x"})
         mock_parse.return_value = {"reference_text": "x = 5", "key_assertions": ["x=5"]}
 
+        from stem_tutor.nodes import generate_reference_solution as ref_mod
         raw, tools = ref_mod._generate_via_agent("题目: test", subject_id="calculus")
         assert raw["reference_text"] == "x = 5"
         assert raw["key_assertions"] == ["x=5"]
@@ -301,6 +336,7 @@ def test_looks_like_schema():
     assert _looks_like_schema({"review_problems": []}) is True
     assert _looks_like_schema({"steps": []}) is True
     assert _looks_like_schema({"concise_summary": "ok"}) is True
+    assert _looks_like_schema({"feedback": "ok"}) is True
     assert _looks_like_schema({"foo": "bar"}) is False
     assert _looks_like_schema({}) is False
     assert _looks_like_schema(None) is False

@@ -2,6 +2,7 @@
 
 import json as _json
 import threading
+from contextlib import contextmanager
 
 from stem_tutor.subjects.context import get_subject_context
 
@@ -19,6 +20,26 @@ def set_active_subject(subject_id: str) -> None:
 
 def _current_subject_id() -> str:
     return getattr(_active_subject, "value", None) or "calculus"
+
+
+@contextmanager
+def active_subject_scope(subject_id: str):
+    """Context manager that sets the active subject for the current thread
+    and restores the previous value on exit. Prevents threading.local bleed
+    between async coroutines that share a thread.
+    """
+    previous = getattr(_active_subject, "value", None)
+    _active_subject.value = subject_id
+    try:
+        yield
+    finally:
+        if previous is None:
+            try:
+                del _active_subject.value
+            except AttributeError:
+                pass
+        else:
+            _active_subject.value = previous
 
 
 def _get_prompts() -> dict[str, str]:

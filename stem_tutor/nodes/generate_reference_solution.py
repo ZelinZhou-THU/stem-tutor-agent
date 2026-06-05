@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from stem_tutor.domain.models import ReferenceSolutionPayload
+from stem_tutor.graph.agent_subgraph import SCHEMA_KEYS
 from stem_tutor.graph.observability import record_provider_call
 from stem_tutor.graph.state import TutorGraphState
 from stem_tutor.providers.base import LLMProvider
@@ -38,20 +39,6 @@ _META_THINKING_PREFIXES = (
 )
 
 _MATH_INDICATORS = ("=", "\\boxed", "$", "∫", "√", "frac", "**", "\\\\")
-
-# Schema keys that, when present in the agent's final AI message, indicate
-# the agent has produced a structured payload ready for the caller. Shared
-# by the router (early-stop) and the post-hoc ``_looks_like_schema`` helper
-# in ``generate_reference_solution``.
-SCHEMA_KEYS: tuple[str, ...] = (
-    "reference_text",
-    "label",
-    "error_code",
-    "steps",
-    "review_problems",
-    "feedback",
-    "concise_summary",
-)
 
 
 def _is_failed_preview(preview: str) -> bool:

@@ -24,6 +24,19 @@ from stem_tutor.tools import get_tools
 
 logger = logging.getLogger(__name__)
 
+# Schema keys used by the router (early-stop) and by
+# _looks_like_schema in generate_reference_solution.py.
+# Keep these two consumers in sync.
+SCHEMA_KEYS: tuple[str, ...] = (
+    "reference_text",
+    "label",
+    "error_code",
+    "steps",
+    "review_problems",
+    "feedback",
+    "concise_summary",
+)
+
 DEFAULT_MAX_ITERATIONS = 2
 
 _llm_cache: dict[str, tuple] = {}
@@ -161,10 +174,7 @@ class AgentSubgraph:
             # required by the caller (e.g. {"reference_text": "..."}).
             if last_msg.content:
                 parsed = parse_json_from_text(last_msg.content)
-                if any(
-                    key in parsed
-                    for key in ("reference_text", "label", "error_code", "steps", "review_problems", "feedback", "concise_summary")
-                ):
+                if any(key in parsed for key in SCHEMA_KEYS):
                     logger.info("[AgentSubgraph] Detected schema-valid output, forcing END")
                     return END
 

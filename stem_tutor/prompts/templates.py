@@ -77,7 +77,7 @@ def _subject_name() -> str:
         ctx = get_subject_context(_current_subject_id())
         return ctx.display_name
     except Exception:
-        return "微积分"
+        return "STEM"
 
 
 def _inject_template(template: str, **kwargs: str) -> str:
@@ -254,7 +254,7 @@ def report_prompt(
     parts.append(
         "## 分析原则\n\n"
         "- **具体胜于笼统**：不要说'注意符号操作'，而要说'在链式法则求导时，"
-        "你习惯性地遗漏内层函数的导数因子，这在你的 8 次微积分诊断中出现了 5 次'\n"
+        "你习惯性地遗漏内层函数的导数因子，这在你的 8 次诊断中出现了 5 次'\n"
         "- **纵向对比胜于横截面**：关注同一学生随时间的进步和退步，"
         "而非孤立地评判某次诊断的结果\n"
         "- **建设性优先**：先肯定进步，再指出不足；先分析原因，再给出建议\n"
@@ -337,7 +337,7 @@ def report_prompt(
         '          "runs_involved": 8,\n'
         '          "recurring": true,\n'
         '          "analysis": "具体分析，引用数据，解释为什么这是系统性问题而非偶然错误",\n'
-        '          "related_subjects": ["微积分"]\n'
+        '          "related_subjects": ["<根据学生本次错误涉及的实际学科填写，例：力学、量子物理>"]\n'
         "        }\n"
         "      ]\n"
         "    },\n"
@@ -350,7 +350,7 @@ def report_prompt(
         "        {\n"
         '          "name": "知识点名称",\n'
         '          "severity": "high",\n'
-        '          "subject": "微积分",\n'
+        '          "subject": "<根据实际学科填写，例：电磁学、热学>",\n'
         '          "mastery": 0.35,\n'
         '          "analysis": "具体说明这个盲区的表现和影响"\n'
         "        }\n"

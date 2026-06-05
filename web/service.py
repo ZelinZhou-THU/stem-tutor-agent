@@ -2402,7 +2402,7 @@ async def practice_verify_stream(
     import json as _json
 
     from stem_tutor.subjects.context import get_subject_context
-    from stem_tutor.prompts.templates import set_active_subject
+    from stem_tutor.prompts.templates import set_active_subject, active_subject_scope
 
     if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
@@ -2483,7 +2483,7 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     import json as _json
 
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
-    from stem_tutor.prompts.templates import set_active_subject
+    from stem_tutor.prompts.templates import set_active_subject, active_subject_scope
 
     if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
@@ -2496,10 +2496,11 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     from stem_tutor.nodes.generate_reference_solution import _is_degraded
 
     try:
-        raw, tool_calls = await loop.run_in_executor(
-            None,
-            lambda: _generate_via_agent(problem_text, subject_id=subject_id),
-        )
+        with active_subject_scope(subject_id):
+            raw, tool_calls = await loop.run_in_executor(
+                None,
+                lambda: _generate_via_agent(problem_text, subject_id=subject_id),
+            )
         ref_text = raw.get("reference_text", "")
         if not ref_text or _is_degraded(ref_text):
             raise ValueError(

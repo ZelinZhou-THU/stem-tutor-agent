@@ -5147,14 +5147,27 @@
         }
     };
 
-    function _readPracticeSSE(response, onProgress, onResult, onError) {
+    function _readPracticeSSE(response, onProgress, onResult, onError, timeoutMs) {
         var reader = response.body.getReader();
         var decoder = new TextDecoder("utf-8");
         var buffer = "";
+        var finished = false;
+        var effectiveTimeoutMs = timeoutMs || 180000;  // 180s, matches reference regen budget
+
+        var timeoutId = setTimeout(function () {
+            if (finished) return;
+            finished = true;
+            try { reader.cancel(); } catch (e) {}
+            onError("请求超时，请稍后重试。");
+        }, effectiveTimeoutMs);
 
         function readNext() {
             return reader.read().then(function (chunk) {
-                if (chunk.done) { onError("连接中断，请重试。"); return; }
+                if (chunk.done) {
+                    clearTimeout(timeoutId);
+                    if (!finished) onError("连接中断，请重试。");
+                    return;
+                }
                 buffer += decoder.decode(chunk.value, { stream: true });
                 var lines = buffer.split("\n");
                 buffer = lines.pop();
@@ -5164,27 +5177,52 @@
                         try {
                             var data = JSON.parse(line.substring(6));
                             if (data.type === "progress") onProgress(data);
-                            else if (data.type === "result") { onResult(data); return; }
-                            else if (data.type === "error") { onError(data.message); return; }
+                            else if (data.type === "result") {
+                                finished = true;
+                                clearTimeout(timeoutId);
+                                onResult(data);
+                                return;
+                            }
+                            else if (data.type === "error") {
+                                finished = true;
+                                clearTimeout(timeoutId);
+                                onError(data.message);
+                                return;
+                            }
                         } catch (e) {}
                     }
                 }
                 return readNext();
+            }, function (err) {
+                clearTimeout(timeoutId);
+                if (!finished) onError(err.message || "读取失败");
             });
         }
-        return readNext();
+        return readNext().catch(function (err) {
+            clearTimeout(timeoutId);
+            if (!finished) onError(err.message || "读取失败");
+        });
     }
 
-    function _readReferenceSSE(response) {
+    function _readReferenceSSE(response, timeoutMs) {
         return new Promise(function (resolve, reject) {
             var reader = response.body.getReader();
             var decoder = new TextDecoder("utf-8");
             var buffer = "";
             var resolved = false;
+            var effectiveTimeoutMs = timeoutMs || 180000;  // 180s, accommodates 1-3 min reference regen
+
+            var timeoutId = setTimeout(function () {
+                if (resolved) return;
+                resolved = true;
+                try { reader.cancel(); } catch (e) {}
+                reject(new Error("请求超时，请稍后重试"));
+            }, effectiveTimeoutMs);
 
             function readNext() {
                 return reader.read().then(function (chunk) {
                     if (chunk.done) {
+                        clearTimeout(timeoutId);
                         if (!resolved) reject(new Error("连接中断"));
                         return;
                     }
@@ -5198,11 +5236,13 @@
                                 var data = JSON.parse(line.substring(6));
                                 if (data.type === "result") {
                                     resolved = true;
+                                    clearTimeout(timeoutId);
                                     resolve(data);
                                     return;
                                 }
                                 if (data.type === "error") {
                                     resolved = true;
+                                    clearTimeout(timeoutId);
                                     reject(new Error(data.message || "服务错误"));
                                     return;
                                 }
@@ -5210,9 +5250,15 @@
                         }
                     }
                     return readNext();
+                }, function (err) {
+                    clearTimeout(timeoutId);
+                    if (!resolved) reject(err);
                 });
             }
-            readNext().catch(reject);
+            readNext().catch(function (err) {
+                clearTimeout(timeoutId);
+                if (!resolved) reject(err);
+            });
         });
     }
 

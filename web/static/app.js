@@ -4168,6 +4168,18 @@
         }
         el.style.display = "";
         var html = "";
+        var flags = data.uncertainty_flags || [];
+        var refStats = ((data.run_meta || {}).node_stats || {}).reference || {};
+        var isDegraded = flags.indexOf("reference_quality_degraded") >= 0 ||
+                         flags.indexOf("reference_solution_failed") >= 0 ||
+                         refStats.reference_is_degraded === true;
+        if (isDegraded) {
+            html += '<div class="alert alert-warning reference-degraded-banner">'
+                  + '\u26a0\ufe0f \u53c2\u8003\u89e3\u7b54\u672a\u8fbe\u9884\u671f\u8d28\u91cf\uff08'
+                  + 'LLM \u8f93\u51fa\u88ab\u5224\u5b9a\u4e3a\u5143\u601d\u8003\u3001\u7a7a\u5185\u5bb9\u6216\u5176\u4ed6\u4f4e\u8d28\u91cf\u60c5\u5f62\uff09\u3002'
+                  + '\u9a8c\u8bc1\u9636\u6bb5\u8bf7\u7a0d\u52a0\u8c28\u614e\u3002'
+                  + '</div>';
+        }
         if (ref.reference_text) {
             var processed = preprocessLatex(ref.reference_text);
             var rendered = window.marked ? marked.parse(processed) : esc(processed);

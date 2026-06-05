@@ -2295,7 +2295,6 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     import asyncio
     import json as _json
 
-    from stem_tutor.graph.agent_subgraph import parse_json_from_text
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
     from stem_tutor.prompts.templates import set_active_subject
 

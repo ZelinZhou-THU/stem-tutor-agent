@@ -18,7 +18,7 @@ _DEGRADED_MARKERS = (
     "代码执行超时",
     "超时了",
     "timed out",
-    "Reference solution unavailable",
+    "reference solution unavailable",
     "unable to generate",
 )
 
@@ -30,14 +30,28 @@ _META_THINKING_PREFIXES = (
     "看起来",
     "首先让我",
     "让我重新",
-    "I notice",
-    "I see",
-    "Let me",
-    "Looking at",
-    "It seems",
+    "i notice",
+    "i see",
+    "let me",
+    "looking at",
+    "it seems",
 )
 
 _MATH_INDICATORS = ("=", "\\boxed", "$", "∫", "√", "frac", "**", "\\\\")
+
+# Schema keys that, when present in the agent's final AI message, indicate
+# the agent has produced a structured payload ready for the caller. Shared
+# by the router (early-stop) and the post-hoc ``_looks_like_schema`` helper
+# in ``generate_reference_solution``.
+SCHEMA_KEYS: tuple[str, ...] = (
+    "reference_text",
+    "label",
+    "error_code",
+    "steps",
+    "review_problems",
+    "feedback",
+    "concise_summary",
+)
 
 
 def _is_failed_preview(preview: str) -> bool:
@@ -54,7 +68,8 @@ def _looks_like_meta_thinking(text: str) -> bool:
     if not text:
         return True
     stripped = text.lstrip()
-    if any(stripped.startswith(p) for p in _META_THINKING_PREFIXES):
+    lowered = stripped.lower()
+    if any(lowered.startswith(p) for p in _META_THINKING_PREFIXES):
         return True
     if len(text) > 100:
         math_count = sum(1 for tok in _MATH_INDICATORS if tok in text)
@@ -64,11 +79,16 @@ def _looks_like_meta_thinking(text: str) -> bool:
 
 
 def _is_degraded(text: str) -> bool:
+    """Detect low-quality reference text. Case-insensitive marker match so
+    that ``_minimal_reference``'s capital-U "Unable to generate" is itself
+    flagged as degraded (avoids shipping a degraded fallback as a valid
+    answer)."""
     if not text or len(text) < 50:
         return True
     if _looks_like_meta_thinking(text):
         return True
-    return any(marker in text for marker in _DEGRADED_MARKERS)
+    lowered = text.lower()
+    return any(marker in lowered for marker in _DEGRADED_MARKERS)
 
 
 def _is_tool_calling_enabled() -> bool:
@@ -180,10 +200,7 @@ def _looks_like_schema(raw: dict) -> bool:
     """Heuristic: does raw already look like a valid reference / verify / diagnosis payload?"""
     if not isinstance(raw, dict):
         return False
-    return any(
-        key in raw
-        for key in ("reference_text", "label", "error_code", "review_problems", "steps")
-    )
+    return any(key in raw for key in SCHEMA_KEYS)
 
 
 def _minimal_reference(problem: str) -> dict:
@@ -367,17 +384,29 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     local_schema_fallback = False
     try:
         parsed = ReferenceSolutionPayload(**raw)
-        if parsed.reference_text and not parsed.reference_text.startswith("Reference solution unavailable"):
+        # Re-check for degradation after Pydantic coercion: the pre-Pydantic
+        # check can miss meta-thinking replies that happen to include an "="
+        # or other math indicator, and the legacy prefix check below only
+        # matches the original "Reference solution unavailable" string,
+        # missing the newer "Unable to generate" minimal reference prefix.
+        if parsed.reference_text and not (
+            parsed.reference_text.startswith("Reference solution unavailable")
+            or _is_degraded(parsed.reference_text)
+        ):
             logging.info("[generate_reference_solution] [budget] Successfully generated reference solution")
         else:
-            logging.warning("[generate_reference_solution] [budget] Generated reference is placeholder/unavailable")
+            if not parsed.reference_text:
+                logging.warning("[generate_reference_solution] [budget] Generated reference is empty")
+            else:
+                logging.warning(
+                    f"[generate_reference_solution] [budget] Generated reference is degraded "
+                    f"(len={len(parsed.reference_text)}, prefix={parsed.reference_text[:30]!r})"
+                )
+            parsed = ReferenceSolutionPayload(**_minimal_reference(problem))
             local_schema_fallback = True
     except ValidationError as e:
         logging.error(f"[generate_reference_solution] [budget] Validation error: {e}")
-        parsed = ReferenceSolutionPayload(
-            reference_text=f"Reference solution unavailable for: {problem}",
-            key_assertions=[],
-        )
+        parsed = ReferenceSolutionPayload(**_minimal_reference(problem))
         local_schema_fallback = True
 
     flags, run_meta = record_provider_call(

@@ -1594,6 +1594,134 @@ async def regenerate_reference(run_id: str, user_id: int):
     yield f"event: reference_progress\ndata: {_json.dumps({'type':'result','reference_text':ref_text,'key_assertions':new_ref_clean.get('key_assertions',[]),'tool_call_count':len(tool_calls)}, ensure_ascii=False)}\n\n"
 
 
+async def regenerate_review_problems(run_id: str, user_id: int):
+    """SSE stream that re-rolls the review problems for an existing run
+    and persists the new list. Mirrors regenerate_reference so the frontend
+    can use a similar fetch + re-render pattern.
+    """
+    import asyncio
+    import json as _json
+    from stem_tutor.nodes.generate_review_problems import _generate_review_problems_inner
+    from stem_tutor.prompts.templates import active_subject_scope, set_active_subject
+    from stem_tutor.domain.models import (
+        ProblemInput, SolutionStep, ErrorDiagnosis, VerificationResult, FeedbackReport,
+    )
+    from stem_tutor.providers.factory import create_provider
+    from stem_tutor.graph.observability import record_provider_call
+    from stem_tutor.domain.models import ReviewProblem
+
+    run_data = await _load_run_result(run_id, user_id)
+    if not run_data:
+        yield f"event: review_progress\ndata: {_json.dumps({'type':'error','message':'运行记录不存在'}, ensure_ascii=False)}\n\n"
+        return
+
+    raw = run_data.get("raw_output", {})
+    problem_input_dict = raw.get("problem_input", {})
+    if not problem_input_dict.get("problem_text"):
+        yield f"event: review_progress\ndata: {_json.dumps({'type':'error','message':'题目信息缺失'}, ensure_ascii=False)}\n\n"
+        return
+
+    subject_id = (run_data.get("run_meta") or {}).get("subject_id") or "calculus"
+    if not subject_id or subject_id not in VALID_SUBJECTS:
+        subject_id = "calculus"
+    set_active_subject(subject_id)
+
+    yield f"event: review_progress\ndata: {_json.dumps({'type':'progress','message':'正在重新生成复习题...'}, ensure_ascii=False)}\n\n"
+
+    # Reconstruct a minimal state dict the inner function can consume.
+    def _coerce_diagnoses(items):
+        out = []
+        for d in items or []:
+            if isinstance(d, dict):
+                try:
+                    out.append(ErrorDiagnosis(**d))
+                except Exception:
+                    pass
+            elif hasattr(d, "model_dump"):
+                out.append(d)
+        return out
+
+    def _coerce_steps(items):
+        out = []
+        for s in items or []:
+            if isinstance(s, dict):
+                try:
+                    out.append(SolutionStep(**s))
+                except Exception:
+                    pass
+            elif hasattr(s, "model_dump"):
+                out.append(s)
+        return out
+
+    def _coerce_verifications(items):
+        out = []
+        for v in items or []:
+            if isinstance(v, dict):
+                try:
+                    out.append(VerificationResult(**v))
+                except Exception:
+                    pass
+            elif hasattr(v, "model_dump"):
+                out.append(v)
+        return out
+
+    try:
+        problem_input = ProblemInput(**problem_input_dict)
+    except Exception:
+        problem_input = ProblemInput(problem_id=run_id, problem_text=problem_input_dict.get("problem_text", ""))
+
+    fake_state = {
+        "problem_input": problem_input,
+        "reference_solution": raw.get("reference_solution", {}),
+        "diagnosis_results": _coerce_diagnoses(raw.get("diagnosis_results", [])),
+        "normalized_steps": _coerce_steps(raw.get("normalized_steps", [])),
+        "verification_results": _coerce_verifications(raw.get("verification_results", [])),
+        "uncertainty_flags": list(run_data.get("uncertainty_flags", [])),
+        "run_meta": dict(run_data.get("run_meta", {})),
+        "subject_id": subject_id,
+    }
+
+    loop = asyncio.get_event_loop()
+    settings = load_provider_settings()
+    try:
+        provider = create_provider(settings.provider_type, settings, model_group="fast")
+    except Exception as exc:
+        logger.error("[RegenReview] failed to create provider: %s", exc)
+        yield f"event: review_progress\ndata: {_json.dumps({'type':'error','message':'服务暂时不可用'}, ensure_ascii=False)}\n\n"
+        return
+
+    try:
+        with active_subject_scope(subject_id):
+            inner_result = await loop.run_in_executor(
+                None, lambda: _generate_review_problems_inner(fake_state, provider)
+            )
+    except Exception as exc:
+        logger.error("[RegenReview] failed: %s", exc, exc_info=True)
+        yield f"event: review_progress\ndata: {_json.dumps({'type':'error','message':'重新生成失败'}, ensure_ascii=False)}\n\n"
+        return
+
+    new_problems = inner_result.get("review_problems", [])
+    if hasattr(new_problems[0] if new_problems else None, "model_dump"):
+        new_problems_dicts = [p.model_dump() for p in new_problems]
+    elif isinstance(new_problems[0] if new_problems else None, dict):
+        new_problems_dicts = list(new_problems)
+    else:
+        new_problems_dicts = []
+    if not new_problems_dicts:
+        yield f"event: review_progress\ndata: {_json.dumps({'type':'error','message':'生成结果为空'}, ensure_ascii=False)}\n\n"
+        return
+
+    run_data["review_problems"] = new_problems_dicts
+    raw["review_problems"] = new_problems_dicts
+    run_data.setdefault("review_history", []).append({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "problem_count": len(new_problems_dicts),
+    })
+    await database.update_run(run_id, run_data)
+
+    yield f"event: review_progress\ndata: {_json.dumps({'type':'result','problems':new_problems_dicts}, ensure_ascii=False)}\n\n"
+
+
 async def get_stats(user_id: int) -> dict:
     all_rows = await database.get_all_runs_for_stats(user_id)
     if not all_rows:

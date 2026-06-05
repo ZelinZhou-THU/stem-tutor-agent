@@ -1010,6 +1010,17 @@ textarea {
     justify-content: space-between;
     margin-bottom: 8px;
 }
+.review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.review-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
 .reference-history-hint {
     margin-top: 8px;
     font-size: 0.75rem;

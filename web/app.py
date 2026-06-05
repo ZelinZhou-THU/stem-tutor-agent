@@ -38,7 +38,7 @@ from web.service import delete_runs, cleanup_runs_before
 from web.service import get_report_data, report_stream, get_report_run_list
 from web.service import list_reports, _load_report, delete_reports
 from web.service import practice_verify_stream
-from web.service import practice_reference_stream, regenerate_reference
+from web.service import practice_reference_stream, regenerate_reference, regenerate_review_problems
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -554,6 +554,21 @@ async def regenerate_reference_endpoint(
 ):
     async def event_generator():
         async for chunk in regenerate_reference(run_id, user_id=user["id"]):
+            yield chunk
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control":"no-cache","Connection":"keep-alive","X-Accel-Buffering":"no"},
+    )
+
+
+@app.post("/api/regenerate-review")
+async def regenerate_review_endpoint(
+    run_id: str = Form(...),
+    user: dict = Depends(get_current_user),
+):
+    async def event_generator():
+        async for chunk in regenerate_review_problems(run_id, user_id=user["id"]):
             yield chunk
     return StreamingResponse(
         event_generator(),

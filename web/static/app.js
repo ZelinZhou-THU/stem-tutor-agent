@@ -4260,6 +4260,40 @@
             });
     }
 
+    function startRegenerateReviewMain(runId, btn) {
+        var originalText = btn.textContent;
+        if (!confirm("将使用 AI 重新生成 3 道复习题，耗时约 30 秒。是否继续？")) {
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-small"></span> 生成中...';
+        var formData = new FormData();
+        formData.append("run_id", runId);
+        fetch("/api/regenerate-review", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData })
+            .then(function (resp) {
+                if (!resp.ok) return resp.text().then(function (t) { throw new Error(t || "HTTP " + resp.status); });
+                return resp;
+            })
+            .then(function (resp) { return _readReferenceSSE(resp); })
+            .then(function (result) {
+                if (result.type === "error") throw new Error(result.message || "生成失败");
+                return fetch("/analyze/result/" + runId, { headers: AuthModule.getAuthHeader() })
+                    .then(function (r) { return r.json(); })
+                    .then(function (fullData) {
+                        renderResults(fullData);
+                        renderAllMath($("results"));
+                        showToast("复习题已更新");
+                    });
+            })
+            .catch(function (err) {
+                showError("重新生成复习题失败: " + (err.message || "未知错误"));
+            })
+            .then(function () {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
+    }
+
     function renderSteps(steps, runId) {
         var el = $("steps-table-container");
         if (!steps || !steps.length) { el.innerHTML = '<p class="summary-text">\u65e0\u6b65\u9aa4\u6570\u636e\u3002</p>'; return; }
@@ -4395,8 +4429,35 @@
     function renderReview(problems) {
         var section = $("review-section");
         var container = $("review-container");
-        if (!problems || !problems.length) { section.style.display = "none"; return; }
+        var runId = (typeof _lastResult !== "undefined" && _lastResult && _lastResult.run_meta) 
+                    ? _lastResult.run_meta.run_id : null;
+
+        if (!problems || !problems.length) {
+            if (runId) {
+                section.style.display = "";
+                container.innerHTML = '<div class="review-header">' +
+                    '<h2 class="review-title">复习练习</h2>' +
+                    '<button class="btn-secondary btn-sm btn-regenerate-review-main" data-run-id="' + esc(runId) + '">换一组</button>' +
+                    '</div>' +
+                    '<p class="summary-text">无复习题，点击"换一组"生成。</p>';
+                var btn = container.querySelector(".btn-regenerate-review-main");
+                if (btn) btn.addEventListener("click", function () {
+                    startRegenerateReviewMain(this.getAttribute("data-run-id"), this);
+                });
+            } else {
+                section.style.display = "none";
+            }
+            return;
+        }
         var html = "";
+        if (runId) {
+            html += '<div class="review-header">' +
+                        '<h2 class="review-title">复习练习</h2>' +
+                        '<button class="btn-secondary btn-sm btn-regenerate-review-main" data-run-id="' + esc(runId) + '">换一组</button>' +
+                    '</div>';
+        } else {
+            html += '<h2>复习练习</h2>';
+        }
         problems.forEach(function (p, i) {
             var diff = DIFFICULTY_MAP[p.difficulty_label] || p.difficulty_label || "";
             html += '<div class="review-card" data-review-index="' + i + '">';
@@ -4514,6 +4575,11 @@
                         contentEl.innerHTML = '<p class="reference-answer-error">' + esc(err.message || "请求失败") + "</p>";
                     });
             });
+        });
+
+        var regenReviewBtn = container.querySelector(".btn-regenerate-review-main");
+        if (regenReviewBtn) regenReviewBtn.addEventListener("click", function () {
+            startRegenerateReviewMain(this.getAttribute("data-run-id"), this);
         });
 
         PracticeModule.init(problems);
@@ -5091,6 +5157,11 @@
                                 if (data.type === "result") {
                                     resolved = true;
                                     resolve(data);
+                                    return;
+                                }
+                                if (data.type === "error") {
+                                    resolved = true;
+                                    reject(new Error(data.message || "服务错误"));
                                     return;
                                 }
                             } catch (e) {}

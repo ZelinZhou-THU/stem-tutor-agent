@@ -1027,6 +1027,33 @@ textarea {
     color: var(--text-tertiary);
     font-style: italic;
 }
+.btn-regenerate-reference {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-regenerate-reference:hover {
+    background: var(--bg-secondary);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+.btn-regenerate-reference:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+.reference-answer-hint {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
 .action-cell {
     white-space: nowrap;
     text-align: center;

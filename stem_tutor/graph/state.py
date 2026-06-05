@@ -38,13 +38,3 @@ class TutorGraphState(TypedDict, total=False):
     quality_signals: dict[str, Any]
     global_budget: dict[str, Any]
     subject_id: str
-
-
-def get_subject_id(state: dict | None) -> str:
-    """Read subject_id from state with safe fallback to 'calculus'."""
-    if not state:
-        return "calculus"
-    sid = state.get("subject_id") if isinstance(state, dict) else None
-    if not sid or not isinstance(sid, str):
-        return "calculus"
-    return sid

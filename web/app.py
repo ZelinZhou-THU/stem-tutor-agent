@@ -602,10 +602,23 @@ async def practice_reference_endpoint(
     if not problem_text.strip():
         return JSONResponse(status_code=400, content={"error": "请输入题目"})
 
+    resolved_subject_id = subject_id
+    if resolved_subject_id == "auto_detect":
+        try:
+            settings = load_provider_settings()
+            resolved_subject_id = detect_subject(
+                problem_text.strip(),
+                base_url=settings.base_url,
+                api_key=settings.api_key,
+                model=settings.detection_model_name,
+            )
+        except Exception:
+            resolved_subject_id = "calculus"
+
     async def event_generator():
         async for chunk in practice_reference_stream(
             problem_text=problem_text.strip(),
-            subject_id=subject_id,
+            subject_id=resolved_subject_id,
         ):
             yield chunk
 

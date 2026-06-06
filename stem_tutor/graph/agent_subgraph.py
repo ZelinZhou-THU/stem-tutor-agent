@@ -97,6 +97,7 @@ class AgentSubgraph:
         tools: list | None = None,
         tool_model_name: str | None = None,
         request_timeout: int | None = None,
+        response_format: dict | None = None,
     ):
         self.tools = tools or get_tools()
         self.system_prompt = system_prompt
@@ -106,6 +107,7 @@ class AgentSubgraph:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.request_timeout = request_timeout
+        self.response_format = response_format
 
         self.llm, self.llm_with_tools = _get_or_create_llm(
             base_url, api_key, model_name, temperature, max_tokens, self.tools, request_timeout=request_timeout,
@@ -121,6 +123,30 @@ class AgentSubgraph:
             self.tool_llm = None
             self.tool_llm_with_tools = None
             self.dual_model = False
+
+        if response_format:
+            # Bind response_format only on the LLM that actually emits the
+            # final answer. OpenAI-compatible APIs (any provider that follows
+            # the OpenAI chat completions spec) treat this as a top-level
+            # request field; tool_calls are unaffected, but the LLM is forced
+            # to emit JSON in the message content. This drastically reduces
+            # schema drift when the model otherwise returns an arbitrary dict
+            # shape.
+            # In single-model mode that's `llm_with_tools` (used by
+            # _agent_node). In dual-model mode that's `llm` (used by
+            # _invoke_dual Phase 2 to synthesize the final answer).
+            # We do NOT bind on tool_llm / tool_llm_with_tools: applying
+            # json_object mode to a tool-calling model can break tool
+            # dispatch or cause the provider to drop tool_calls.
+            target_attr = "llm" if self.dual_model else "llm_with_tools"
+            target = getattr(self, target_attr, None)
+            if target is not None:
+                try:
+                    setattr(self, target_attr, target.bind(response_format=response_format))
+                except Exception as exc:
+                    logger.warning(
+                        f"[AgentSubgraph] Failed to bind response_format on {target_attr}: {exc}"
+                    )
 
         self._graph = None
         self._graph_max_iterations = None
@@ -172,13 +198,28 @@ class AgentSubgraph:
             # We previously checked for anchor substrings in the AI's prose,
             # which caused the agent to exit before producing the schema
             # required by the caller (e.g. {"reference_text": "..."}).
+            # When response_format={"type": "json_object"} is bound, the LLM
+            # may emit a complete schema on the very first turn without ever
+            # calling a tool. For problems that require verification (integrals,
+            # limits, equation solving), this would let the model ship an
+            # unverified answer. Force at least one tool round before allowing
+            # schema-based END.
+            tool_rounds = sum(1 for m in state["messages"] if isinstance(m, ToolMessage))
             if last_msg.content:
                 parsed = parse_json_from_text(last_msg.content)
                 if any(key in parsed for key in SCHEMA_KEYS):
-                    logger.info("[AgentSubgraph] Detected schema-valid output, forcing END")
-                    return END
+                    if tool_rounds > 0 or tool_rounds >= max_tool_rounds:
+                        logger.info(
+                            f"[AgentSubgraph] Detected schema-valid output after "
+                            f"tool verification (tool_rounds={tool_rounds}), forcing END"
+                        )
+                        return END
+                    logger.info(
+                        f"[AgentSubgraph] Schema produced without tool call "
+                        f"(tool_rounds={tool_rounds}), forcing one tool round"
+                    )
+                    return "tools"
 
-            tool_rounds = sum(1 for m in state["messages"] if isinstance(m, ToolMessage))
             if tool_rounds >= max_tool_rounds:
                 logger.info(
                     f"[AgentSubgraph] Reached max_tool_rounds={max_tool_rounds}, forcing END"

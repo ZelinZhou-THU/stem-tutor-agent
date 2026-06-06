@@ -4017,34 +4017,37 @@ textarea {
     color: var(--text-muted);
 }
 
-/* ===== Resolve Run Button ===== */
-.btn-resolve-run {
-    display: block;
-    margin: 16px 0;
-    padding: 10px 24px;
-    font-size: 0.9rem;
-    font-weight: 600;
+/* ===== Resolve Diagnosis Button (per-diagnosis) ===== */
+.diagnosis-actions {
+    text-align: right;
+    margin-top: 8px;
+}
+
+.btn-resolve-diagnosis {
+    display: inline-block;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
     color: var(--accent);
     background: transparent;
-    border: 2px solid var(--accent);
+    border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.15s;
 }
 
-.btn-resolve-run:hover {
+.btn-resolve-diagnosis:hover {
     background: var(--accent-light);
 }
 
-.btn-resolve-run.resolved {
+.btn-resolve-diagnosis.resolved {
     color: var(--success-text);
     border-color: var(--success-text);
     background: var(--success-bg);
     cursor: default;
-    opacity: 0.85;
 }
 
-.btn-resolve-run:disabled:not(.resolved) {
+.btn-resolve-diagnosis:disabled:not(.resolved) {
     opacity: 0.6;
     cursor: wait;
 }

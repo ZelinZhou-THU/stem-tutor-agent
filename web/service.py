@@ -294,6 +294,7 @@ async def _auto_record_mastery(user_id: int, state: dict):
         "step_count": len(steps),
         "correct_count": correct_count,
         "resolved": False,
+        "resolved_diagnoses": [],
     })
     if len(history) > 200:
         history[:] = history[-200:]
@@ -1389,6 +1390,10 @@ async def run_stem_tutor_stream(
         final_state["run_meta"] = final_response.get("run_meta", {})
 
     await _save_run_payload(run_id, user_id, final_response)
+    try:
+        await _auto_record_mastery(user_id, final_state)
+    except Exception:
+        logger.warning("[Run] _auto_record_mastery failed for run %s", run_id, exc_info=True)
     yield f"data: {_json.dumps({'type': 'result', 'data': final_response}, ensure_ascii=False)}\n\n"
     yield f"data: {_json.dumps({'type': 'done', 'message': '分析完成'}, ensure_ascii=False)}\n\n"
     _cancel_events.pop(run_id, None)
@@ -2413,6 +2418,35 @@ async def get_report_data(
         "recent_analysis_count": len(mastery_data.get("analysis_history", [])[-10:]),
     }
 
+    resolved_by_code: dict[str, dict] = {}
+    total_resolved = 0
+    for hist_entry in mastery_data.get("analysis_history", []):
+        for r in (hist_entry.get("resolved_diagnoses") or []):
+            ec = r.get("error_code", "")
+            if not ec:
+                continue
+            total_resolved += 1
+            slot = resolved_by_code.setdefault(ec, {
+                "count": 0,
+                "subjects": [],
+                "first_resolved_at": None,
+                "last_resolved_at": None,
+            })
+            slot["count"] += 1
+            sid = r.get("subject_id", "")
+            if sid and sid not in slot["subjects"]:
+                slot["subjects"].append(sid)
+            ts = r.get("resolved_at", "")
+            if ts:
+                if not slot["first_resolved_at"] or ts < slot["first_resolved_at"]:
+                    slot["first_resolved_at"] = ts
+                if not slot["last_resolved_at"] or ts > slot["last_resolved_at"]:
+                    slot["last_resolved_at"] = ts
+    resolved_summary = {
+        "total_resolved": total_resolved,
+        "by_error_code": resolved_by_code,
+    }
+
     _MAX_EXAMPLES_PER_ERROR = 2
 
     error_examples: dict[str, list[dict]] = {}
@@ -2467,6 +2501,7 @@ async def get_report_data(
         "taxonomy_summary": taxonomy_summary,
         "mastery_summary": mastery_summary,
         "error_examples": error_examples,
+        "resolved_summary": resolved_summary,
     }
 
 
@@ -2680,6 +2715,7 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
             "improvement_signals": data.get("improvement_signals", []),
             "mastery_summary": data.get("mastery_summary"),
             "error_examples": data.get("error_examples", {}),
+            "resolved_summary": data.get("resolved_summary"),
         },
         time_range=data.get("time_range", {"start": "?", "end": "?", "days": 0}),
         total_runs=data.get("total_runs", 0),

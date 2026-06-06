@@ -354,6 +354,16 @@ def report_prompt(
                     parts.append(f"  支持证据：{ex['evidence']}\n")
             parts.append("\n")
 
+    resolved_summary = aggregated_data.get("resolved_summary")
+    if resolved_summary and resolved_summary.get("by_error_code"):
+        parts.append("### 学生主动复习的错误类型\n\n")
+        parts.append("以下错误类型学生在历史分析中主动标记为「已理解」（说明学生有意识在弥补这些薄弱点）。\n")
+        parts.append("在制定薄弱环节诊断和行动建议时，将此类错误视为「学生正在主动管理」的方向，与「未管理」的薄弱环节区分对待：\n\n")
+        for ec, info in resolved_summary["by_error_code"].items():
+            subj_str = ", ".join(info.get("subjects", [])) or "未知学科"
+            parts.append(f"- {ec}：复习过 {info.get('count', 0)} 次，涉及学科 {subj_str}\n")
+        parts.append("\n")
+
     parts.append(
         "## 输出格式\n\n"
         "请严格输出以下 JSON 结构（不要输出 JSON 以外的任何内容）：\n\n"

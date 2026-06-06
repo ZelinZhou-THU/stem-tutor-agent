@@ -2607,6 +2607,7 @@ textarea {
     gap: 16px;
     padding: 48px 20px;
     color: var(--text-secondary);
+    position: relative;
 }
 
 .report-loading .spinner {
@@ -2616,6 +2617,31 @@ textarea {
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+.report-loading-hint {
+    font-size: 0.82rem;
+    color: var(--text-tertiary, #888);
+    text-align: center;
+}
+
+.btn-cancel-report {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    border: 1px solid var(--border-color, #ccc);
+    color: var(--text-secondary, #666);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-cancel-report:hover {
+    background: var(--bg-hover, #f5f5f5);
+    color: var(--text-primary, #333);
 }
 
 .report-empty {

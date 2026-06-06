@@ -2603,7 +2603,10 @@
             this._renderDetailSettings(data.info.settings, data.info.mastery);
 
             this._bindDetailTabs();
-            $("admin-detail-runs").style.display = "";
+            ["admin-detail-runs", "admin-detail-reports", "admin-detail-chats", "admin-detail-settings"].forEach(function (id) {
+                var el = $(id);
+                if (el) el.style.display = "";
+            });
             $("admin-detail-runs").classList.add("active");
         },
 
@@ -2793,10 +2796,18 @@
                 (function (tab) {
                     tab.addEventListener("click", function () {
                         for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
-                        for (var k = 0; k < panels.length; k++) $(panels[k]).classList.remove("active");
+                        for (var k = 0; k < panels.length; k++) {
+                            var p = $(panels[k]);
+                            if (!p) continue;
+                            p.classList.remove("active");
+                            p.style.display = "none";
+                        }
                         tab.classList.add("active");
                         var target = $("admin-detail-" + tab.getAttribute("data-tab"));
-                        if (target) target.classList.add("active");
+                        if (target) {
+                            target.classList.add("active");
+                            target.style.display = "";
+                        }
                     });
                 })(tabs[i]);
             }

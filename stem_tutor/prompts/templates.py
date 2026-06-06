@@ -334,7 +334,7 @@ def report_prompt(
         if learning_items:
             parts.append("以下错误类型学生仍标记为「学习中」（应重点关注）：\n")
             for item in learning_items:
-                parts.append(f"- {item.get('error_code', '?')}（出现过 {item.get('total_encounters', 0)} 次，最近出现 {item.get('last_seen', '未知')[:10]})\n")
+                parts.append(f"- {item.get('error_code', '?')}（出现过 {item.get('total_encounters', 0)} 次，最近出现 {item.get('last_seen', '未知')[:10]}）\n")
             parts.append("\n")
 
     parts.append(

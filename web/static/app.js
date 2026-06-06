@@ -5412,7 +5412,6 @@
                 var maxTotal = Math.max.apply(null, totalData.concat([1]));
                 var masteryData = errorKeys.map(function (k) { return calcProgress(data.errors[k]); });
                 var freqNorm = totalData.map(function (t) { return t / maxTotal; });
-                var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered || data.errors[k].auto_mastered; }).length;
 
                 if (radarCanvas._chart) radarCanvas._chart.destroy();
                 radarCanvas._chart = new Chart(radarCanvas.getContext("2d"), {

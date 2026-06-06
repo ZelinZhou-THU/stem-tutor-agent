@@ -2811,16 +2811,18 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
                                 else:
                                     try:
                                         chunk_data = _json.loads(data_str)
-                                        choices = chunk_data.get("choices", [{}])
-                                        delta = choices[0].get("delta", {})
-                                        content = delta.get("content", "")
-                                        if content:
-                                            full_content += content
-                                            if len(full_content) % 500 < len(content):
-                                                yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
-                                                last_yield_at = time.time()
                                     except _json.JSONDecodeError:
-                                        pass
+                                        continue
+                                    choices = chunk_data.get("choices") or []
+                                    if not choices:
+                                        continue
+                                    delta = choices[0].get("delta", {}) or {}
+                                    content = delta.get("content", "")
+                                    if content:
+                                        full_content += content
+                                        if len(full_content) % 500 < len(content):
+                                            yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
+                                            last_yield_at = time.time()
                     elif kind == "done":
                         got_done_signal = True
                     elif kind == "thread_end":

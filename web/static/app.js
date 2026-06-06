@@ -4138,6 +4138,7 @@
         resultsDiv.style.display = "";
         var exportArea = $("export-area");
         if (exportArea) exportArea.style.display = "";
+        renderResolveButton(data);
         renderAllMath(resultsDiv);
         var meta = data.run_meta || {};
         if (meta.run_id) initChat(meta.run_id);
@@ -4411,23 +4412,78 @@
             html += '<p><span class="field-label">假设根因：</span>' + esc(d.root_cause_hypothesis) + "</p>";
             html += '<p><span class="field-label">支持证据：</span>' + esc(d.supporting_evidence) + "</p>";
             html += '<p><span class="field-label">置信度：</span>' + (d.confidence * 100).toFixed(0) + "%</p>";
-            var _md = (typeof MasteryModule !== "undefined") ? MasteryModule.getData() : null;
-            var _mastered = _md && _md.errors && _md.errors[d.error_code] && _md.errors[d.error_code].mastered;
-            html += '<button type="button" class="btn-mastered-toggle' + (_mastered ? ' mastered' : '') + '" data-error-code="' + esc(d.error_code) + '">' + (_mastered ? '已掌握' : '标记已掌握') + '</button>';
             html += "</div>";
         });
         container.innerHTML = html;
         section.style.display = "";
+    }
 
-        container.querySelectorAll(".btn-mastered-toggle").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-                if (typeof MasteryModule !== "undefined" && MasteryModule.toggleMastered) {
-                    MasteryModule.toggleMastered(this.getAttribute("data-error-code"));
-                    this.classList.toggle("mastered");
-                    this.textContent = this.classList.contains("mastered") ? "已掌握" : "标记已掌握";
+    function renderResolveButton(data) {
+        var existing = $("resolve-run-btn");
+        if (existing) existing.remove();
+        var meta = data.run_meta || {};
+        var runId = meta.run_id;
+        if (!runId) return;
+        var diagnoses = data.diagnoses || [];
+        if (!diagnoses.length) return;
+        var masteryData = (typeof MasteryModule !== "undefined") ? MasteryModule.getData() : null;
+        var history = (masteryData && masteryData.analysis_history) || [];
+        var isResolved = false;
+        for (var i = 0; i < history.length; i++) {
+            if (history[i].run_id === runId && history[i].resolved) { isResolved = true; break; }
+        }
+        var btn = document.createElement("button");
+        btn.id = "resolve-run-btn";
+        btn.type = "button";
+        btn.className = "btn-resolve-run" + (isResolved ? " resolved" : "");
+        btn.setAttribute("data-run-id", runId);
+        btn.textContent = isResolved ? "已理解" : "标记为已理解";
+        if (isResolved) btn.disabled = true;
+        btn.addEventListener("click", function () {
+            var self = this;
+            self.disabled = true;
+            self.textContent = "提交中...";
+            fetch("/api/user/resolve-run/" + encodeURIComponent(runId), {
+                method: "POST",
+                headers: AuthModule.getAuthHeader()
+            }).then(function (r) { return r.json(); }).then(function (result) {
+                if (result.resolved) {
+                    self.classList.add("resolved");
+                    self.textContent = "已理解";
+                    self.disabled = true;
+                    if (typeof MasteryModule !== "undefined" && MasteryModule.reload) MasteryModule.reload();
+                } else {
+                    self.disabled = false;
+                    self.textContent = "标记为已理解";
                 }
+            }).catch(function () {
+                self.disabled = false;
+                self.textContent = "标记为已理解";
+                showError("操作失败，请重试");
             });
         });
+        var resultsDiv = $("results");
+        var exportArea = $("export-area");
+        if (exportArea && exportArea.parentNode === resultsDiv) {
+            resultsDiv.insertBefore(btn, exportArea);
+        } else {
+            resultsDiv.appendChild(btn);
+        }
+        if (typeof MasteryModule !== "undefined" && MasteryModule.reload) {
+            MasteryModule.reload().then(function () {
+                var freshData = MasteryModule.getData();
+                var freshHistory = (freshData && freshData.analysis_history) || [];
+                var freshResolved = false;
+                for (var j = 0; j < freshHistory.length; j++) {
+                    if (freshHistory[j].run_id === runId && freshHistory[j].resolved) { freshResolved = true; break; }
+                }
+                if (freshResolved && !isResolved) {
+                    btn.className = "btn-resolve-run resolved";
+                    btn.textContent = "已理解";
+                    btn.disabled = true;
+                }
+            });
+        }
     }
 
     function renderFeedback(data) {
@@ -5334,6 +5390,11 @@
                 }).catch(function () {})
                 .finally(function () { self._loadPromise = null; });
             return this._loadPromise;
+        },
+
+        reload: function () {
+            this._loadPromise = null;
+            return this.loadFromServer();
         },
 
         recordEncounter: function (errorCode) {

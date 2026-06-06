@@ -337,6 +337,23 @@ def report_prompt(
                 parts.append(f"- {item.get('error_code', '?')}（出现过 {item.get('total_encounters', 0)} 次，最近出现 {item.get('last_seen', '未知')[:10]}）\n")
             parts.append("\n")
 
+    error_examples = aggregated_data.get("error_examples", {})
+    if error_examples:
+        parts.append("### 代表性错误实例\n\n")
+        parts.append("以下是各错误类型在近期诊断中的具体实例，请在分析中引用这些真实案例：\n\n")
+        for ec, examples in error_examples.items():
+            tax_desc = taxonomy_summary.get(ec, "")
+            parts.append(f"**{ec}**" + (f"（{tax_desc}）" if tax_desc else "") + "\n")
+            for ex in examples:
+                parts.append(f"- 日期：{ex.get('date', '?')}，学科：{ex.get('subject', '?')}\n")
+                if ex.get("student_step"):
+                    parts.append(f"  学生步骤：{ex['student_step']}\n")
+                if ex.get("analysis"):
+                    parts.append(f"  根因分析：{ex['analysis']}\n")
+                if ex.get("evidence"):
+                    parts.append(f"  支持证据：{ex['evidence']}\n")
+            parts.append("\n")
+
     parts.append(
         "## 输出格式\n\n"
         "请严格输出以下 JSON 结构（不要输出 JSON 以外的任何内容）：\n\n"

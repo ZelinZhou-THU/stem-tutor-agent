@@ -4017,34 +4017,36 @@ textarea {
     color: var(--text-muted);
 }
 
-/* ===== Mastered Toggle Button ===== */
-.btn-mastered-toggle {
-    display: inline-block;
-    margin-top: 10px;
-    padding: 5px 14px;
-    font-size: 0.82rem;
-    font-weight: 500;
+/* ===== Resolve Run Button ===== */
+.btn-resolve-run {
+    display: block;
+    margin: 16px 0;
+    padding: 10px 24px;
+    font-size: 0.9rem;
+    font-weight: 600;
     color: var(--accent);
     background: transparent;
-    border: 1px solid var(--accent);
+    border: 2px solid var(--accent);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.15s;
 }
 
-.btn-mastered-toggle:hover {
+.btn-resolve-run:hover {
     background: var(--accent-light);
 }
 
-.btn-mastered-toggle.mastered {
+.btn-resolve-run.resolved {
     color: var(--success-text);
     border-color: var(--success-text);
     background: var(--success-bg);
-    cursor: pointer;
+    cursor: default;
+    opacity: 0.85;
 }
 
-.btn-mastered-toggle.mastered:hover {
-    opacity: 0.85;
+.btn-resolve-run:disabled:not(.resolved) {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 /* ===== Admin Panel ===== */

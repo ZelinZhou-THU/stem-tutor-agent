@@ -7,6 +7,7 @@ import re
 import secrets
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -813,6 +814,31 @@ async def save_user_mastery(data: dict = Body(...), user: dict = Depends(get_cur
     from web.database import save_mastery as db_save_mastery
     await db_save_mastery(user["id"], data)
     return {"ok": True}
+
+
+@app.post("/api/user/resolve-run/{run_id}")
+async def resolve_run(run_id: str, user: dict = Depends(get_current_user)):
+    from web.database import get_mastery as db_get_mastery, save_mastery as db_save_mastery
+    if not re.match(r"^[A-Za-z0-9_-]{1,64}$", run_id):
+        return JSONResponse(status_code=400, content={"error": "run_id 格式无效"})
+    mastery = await db_get_mastery(user["id"])
+    history = mastery.get("analysis_history", [])
+    found = False
+    resolved = False
+    for entry in history:
+        if entry.get("run_id") == run_id:
+            found = True
+            entry["resolved"] = not entry.get("resolved", False)
+            if entry["resolved"]:
+                entry["resolved_at"] = datetime.now(timezone.utc).isoformat()
+            else:
+                entry.pop("resolved_at", None)
+            resolved = entry["resolved"]
+            break
+    if not found:
+        return JSONResponse(status_code=404, content={"error": "运行记录未找到"})
+    await db_save_mastery(user["id"], mastery)
+    return {"resolved": resolved}
 
 
 @app.get("/api/admin/users/{user_id}")

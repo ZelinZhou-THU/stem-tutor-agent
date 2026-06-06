@@ -293,6 +293,7 @@ async def _auto_record_mastery(user_id: int, state: dict):
         "subject_id": subject_id,
         "step_count": len(steps),
         "correct_count": correct_count,
+        "resolved": False,
     })
     if len(history) > 200:
         history[:] = history[-200:]
@@ -2412,6 +2413,42 @@ async def get_report_data(
         "recent_analysis_count": len(mastery_data.get("analysis_history", [])[-10:]),
     }
 
+    _MAX_EXAMPLES_PER_ERROR = 2
+
+    error_examples: dict[str, list[dict]] = {}
+    for data in reversed(runs_data):
+        meta = data.get("run_meta", {})
+        run_id = meta.get("run_id", "")
+        completed_at = (meta.get("completed_at") or "")[:10]
+        subject_id = meta.get("subject_id", "unknown")
+        try:
+            sctx = get_subject_context(subject_id)
+            subject_name = sctx.display_name
+        except Exception:
+            subject_name = subject_id
+        steps = data.get("steps", [])
+        for d in (data.get("diagnoses") or []):
+            ec = d.get("error_code", "")
+            if not ec:
+                continue
+            examples = error_examples.setdefault(ec, [])
+            if len(examples) >= _MAX_EXAMPLES_PER_ERROR:
+                continue
+            step_idx = d.get("step_id") if d.get("step_id") is not None else d.get("step_index")
+            student_step = ""
+            if step_idx is not None and steps:
+                idx = step_idx if isinstance(step_idx, int) else None
+                if idx is not None and 0 <= idx < len(steps):
+                    student_step = steps[idx].get("student_content", "") or steps[idx].get("content", "")
+            examples.append({
+                "date": completed_at,
+                "subject": subject_name,
+                "student_step": (student_step[:200] if student_step else ""),
+                "analysis": d.get("root_cause_hypothesis", ""),
+                "evidence": d.get("supporting_evidence", ""),
+                "confidence": d.get("confidence", 0),
+            })
+
     return {
         "time_range": {
             "start": first_ts,
@@ -2429,6 +2466,7 @@ async def get_report_data(
         "improvement_signals": improvement_signals,
         "taxonomy_summary": taxonomy_summary,
         "mastery_summary": mastery_summary,
+        "error_examples": error_examples,
     }
 
 
@@ -2640,6 +2678,8 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
             "heatmap_data": data.get("heatmap_data", {}),
             "error_evolution": data.get("error_evolution", []),
             "improvement_signals": data.get("improvement_signals", []),
+            "mastery_summary": data.get("mastery_summary"),
+            "error_examples": data.get("error_examples", {}),
         },
         time_range=data.get("time_range", {"start": "?", "end": "?", "days": 0}),
         total_runs=data.get("total_runs", 0),

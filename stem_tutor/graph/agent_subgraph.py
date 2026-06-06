@@ -97,6 +97,7 @@ class AgentSubgraph:
         tools: list | None = None,
         tool_model_name: str | None = None,
         request_timeout: int | None = None,
+        response_format: dict | None = None,
     ):
         self.tools = tools or get_tools()
         self.system_prompt = system_prompt
@@ -106,6 +107,7 @@ class AgentSubgraph:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.request_timeout = request_timeout
+        self.response_format = response_format
 
         self.llm, self.llm_with_tools = _get_or_create_llm(
             base_url, api_key, model_name, temperature, max_tokens, self.tools, request_timeout=request_timeout,
@@ -121,6 +123,21 @@ class AgentSubgraph:
             self.tool_llm = None
             self.tool_llm_with_tools = None
             self.dual_model = False
+
+        if response_format:
+            # Apply JSON mode to every LLM handle. OpenAI-compatible APIs
+            # (e.g. OpenRouter) treat this as a top-level request field;
+            # tool_calls are unaffected, but the LLM is forced to emit JSON
+            # in the message content. This drastically reduces schema drift
+            # when the model otherwise returns an arbitrary dict shape.
+            for attr in ("llm", "llm_with_tools", "tool_llm", "tool_llm_with_tools"):
+                obj = getattr(self, attr, None)
+                if obj is None:
+                    continue
+                try:
+                    setattr(self, attr, obj.bind(response_format=response_format))
+                except Exception as exc:
+                    logger.warning(f"[AgentSubgraph] Failed to bind response_format on {attr}: {exc}")
 
         self._graph = None
         self._graph_max_iterations = None

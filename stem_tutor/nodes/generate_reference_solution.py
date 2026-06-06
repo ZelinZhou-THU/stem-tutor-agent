@@ -106,9 +106,20 @@ def _generate_via_agent(problem_text: str, model_name: str | None = None, max_to
 
     system_prompt = (
         ctx.prompts["system_role"].replace("{subject_name}", display_name)
-        + "\n\n你可以使用 execute_python 工具执行 Python 代码进行精确计算（支持 sympy/numpy/scipy）。\n\n"
+        + "\n\n"
+        "=== 强制输出格式（最高优先级） ===\n"
+        "你的最终回复必须且只能是一个 JSON 对象，不使用 markdown 代码块包裹。\n"
+        "JSON 必须且只能包含以下两个键，缺一不可，且键名必须完全一致：\n"
+        '  "reference_text": string（完整分步解答文本，使用 LaTeX 包裹数学公式）\n'
+        '  "key_assertions": string[]（3-5 条关键断言）\n'
+        "严禁使用其他键名（如 problem、solution、steps、solution_steps、verification、"
+        "final_answer、decimal_value、explanation 等）。\n"
+        "严禁在 JSON 之外输出任何文字、思考、解释或代码块。\n\n"
+        "=== 工具调用规则 ===\n"
+        "你可以使用 execute_python 工具执行 Python 代码进行精确计算（支持 sympy/numpy/scipy）。\n\n"
         "【严禁操作 - blacklist=v1】\n"
-        "- 禁止使用 sp.integrate() 或 sympy.integrate() 计算定积分/不定积分，会导致超时。如需验证积分结果，用 scipy.integrate.quad() 做数值验证，或用 sp.beta/sp.gamma 计算特殊函数。\n"
+        "- 禁止使用 sp.integrate() 或 sympy.integrate() 计算定积分/不定积分，会导致超时。"
+        "如需验证积分结果，用 scipy.integrate.quad() 做数值验证，或用 sp.beta/sp.gamma 计算特殊函数。\n"
         "- 禁止使用 sp.limit() 处理复杂极限（含嵌套根式/分数幂），用数值逼近替代。\n"
         "- 代码总长度控制在 800 字符以内，只保留核心计算逻辑。\n\n"
         "【计算规范 - efficiency=v2】\n"
@@ -128,9 +139,7 @@ def _generate_via_agent(problem_text: str, model_name: str | None = None, max_to
         "【多轮调用策略 - strict_cap=v1】\n"
         "- 优先一次 execute_python 调用完成全部计算。\n"
         "- 仅在第一次结果与预期严重不符且需要重新分析题意时才考虑第二次调用。\n"
-        "- 若执行失败，不要重试，直接基于理论推导给出文字解答。\n\n"
-        "最终请只返回有效的 JSON，不要使用 markdown 代码块包裹。格式如下：\n"
-        '{"reference_text": "完整的分步解答文本", "key_assertions": ["关键断言1", "关键断言2"]}'
+        "- 若执行失败，不要重试，直接基于理论推导给出文字解答。\n"
     )
 
     resolved_model = model_name or settings.reasoning_model_name
@@ -142,10 +151,11 @@ def _generate_via_agent(problem_text: str, model_name: str | None = None, max_to
         system_prompt=system_prompt,
         max_tokens=16000,
         tool_model_name=tool_model,
+        response_format={"type": "json_object"},
     )
 
     agent_result = agent.invoke(
-        f"题目: {problem_text}\n\n请提供完整的分步解答。最终只返回 JSON。",
+        f"题目: {problem_text}\n\n请提供完整的分步解答。最终只返回包含 reference_text 和 key_assertions 两个键的 JSON 对象。",
         max_iterations=max_rounds,
     )
 

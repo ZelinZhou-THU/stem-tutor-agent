@@ -504,3 +504,67 @@ def test_heartbeat_fires_with_keep_alive_only():
         f"Expected >=2 heartbeats over 12s of keep-alive-only, got "
         f"{len(heartbeat_events)}: {heartbeat_events}"
     )
+
+
+def test_chunk_with_empty_choices_does_not_crash():
+    """LLM streaming responses may include chunks with `choices: []`
+    (e.g. finish_reason-only chunks, tool-call finish chunks, or
+    provider keep-alive frames). These must be skipped, not crash
+    the SSE stream.
+    """
+    from web import service
+
+    final_json = json.dumps(VALID_SECTIONS_JSON, ensure_ascii=False)
+    lines = [
+        b'data: {"id":"x","choices":[]}\n\n',
+        b'data: {"id":"x","choices":[{"finish_reason":"length","index":0}]}\n\n',
+        _sse_chunk(final_json),
+        b'data: [DONE]\n\n',
+    ]
+
+    with patch("web.service.requests.post") as mock_post, \
+         patch("web.service.load_provider_settings", return_value=MagicMock(base_url="http://x", api_key="y")), \
+         patch("web.service._save_report", new=AsyncMock()):
+        mock_post.return_value = _fake_response(lines)
+        gen = service.report_stream(user_id=1, data=_make_data(), model_name="test")
+
+        async def _run():
+            return await _collect(gen, max_events=20, timeout=10)
+
+        events = asyncio.run(_run())
+
+    section_events = [ev for _, ev in events if ev.get("type") == "report_section"]
+    done_events = [ev for _, ev in events if ev.get("type") == "report_done"]
+    error_events = [ev for _, ev in events if ev.get("type") == "report_error"]
+    assert len(section_events) == 1, f"Expected 1 section despite empty-choices chunks, got: {events}"
+    assert len(done_events) == 1
+    assert len(error_events) == 0
+
+
+def test_chunk_with_malformed_choices_does_not_crash():
+    """Defensive: even if `choices` is non-list (e.g. dict, string), don't crash."""
+    from web import service
+
+    final_json = json.dumps(VALID_SECTIONS_JSON, ensure_ascii=False)
+    lines = [
+        b'data: {"id":"x","choices":{}}\n\n',
+        b'data: {"id":"x","choices":null}\n\n',
+        _sse_chunk(final_json),
+        b'data: [DONE]\n\n',
+    ]
+
+    with patch("web.service.requests.post") as mock_post, \
+         patch("web.service.load_provider_settings", return_value=MagicMock(base_url="http://x", api_key="y")), \
+         patch("web.service._save_report", new=AsyncMock()):
+        mock_post.return_value = _fake_response(lines)
+        gen = service.report_stream(user_id=1, data=_make_data(), model_name="test")
+
+        async def _run():
+            return await _collect(gen, max_events=20, timeout=10)
+
+        events = asyncio.run(_run())
+
+    section_events = [ev for _, ev in events if ev.get("type") == "report_section"]
+    error_events = [ev for _, ev in events if ev.get("type") == "report_error"]
+    assert len(section_events) == 1
+    assert len(error_events) == 0

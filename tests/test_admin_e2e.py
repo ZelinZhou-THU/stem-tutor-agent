@@ -125,6 +125,7 @@ def test_admin_user_detail_e2e():
 
         reports_panel = page.locator("#admin-detail-reports")
         expect(reports_panel).to_have_class(re.compile(r"\bactive\b"))
+        expect(reports_panel).to_be_visible()
 
         page.screenshot(path="C:/Users/17785/AppData/Local/Temp/opencode/admin_step4_reports.png", full_page=True)
 
@@ -134,6 +135,10 @@ def test_admin_user_detail_e2e():
         chats_tab = page.locator(".admin-detail-tab", has_text="聊天记录")
         chats_tab.click()
         page.wait_for_timeout(500)
+
+        chats_panel = page.locator("#admin-detail-chats")
+        expect(chats_panel).to_have_class(re.compile(r"\bactive\b"))
+        expect(chats_panel).to_be_visible()
 
         page.screenshot(path="C:/Users/17785/AppData/Local/Temp/opencode/admin_step5_chats.png", full_page=True)
 
@@ -148,6 +153,7 @@ def test_admin_user_detail_e2e():
 
         settings_panel = page.locator("#admin-detail-settings")
         expect(settings_panel).to_have_class(re.compile(r"\bactive\b"))
+        expect(settings_panel).to_be_visible()
 
         back_btn = page.locator("#admin-detail-back")
         back_btn.click()

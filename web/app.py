@@ -785,12 +785,17 @@ async def get_user_mastery(user: dict = Depends(get_current_user)):
     mastered_types = sum(1 for e in errors.values() if e.get("mastered") or e.get("auto_mastered"))
     now = datetime.now(timezone.utc)
     week_ago = (now - timedelta(days=7)).isoformat()
+    week_ago_ts = now.timestamp() - 7 * 86400
     recent_active = []
     weak_areas = []
     strong_areas = []
     for code, entry in errors.items():
         ts_list = entry.get("timestamps", [])
-        if any(t >= week_ago for t in ts_list if isinstance(t, str)):
+        if any(
+            (isinstance(t, str) and t >= week_ago) or
+            (isinstance(t, (int, float)) and t / 1000 >= week_ago_ts)
+            for t in ts_list
+        ):
             recent_active.append(code)
         if entry.get("mastered") or entry.get("auto_mastered"):
             strong_areas.append(code)

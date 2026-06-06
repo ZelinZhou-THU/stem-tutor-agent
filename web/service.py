@@ -233,7 +233,7 @@ async def _save_run_state(run_id: str, user_id: int, state: dict):
     try:
         await _auto_record_mastery(user_id, state)
     except Exception:
-        logging.getLogger(__name__).debug("auto_record_mastery failed", exc_info=True)
+        logging.getLogger(__name__).warning("auto_record_mastery failed for user %s", user_id, exc_info=True)
 
 
 async def _auto_record_mastery(user_id: int, state: dict):
@@ -244,6 +244,7 @@ async def _auto_record_mastery(user_id: int, state: dict):
     errors = mastery.get("errors", {})
     now_iso = datetime.now(timezone.utc).isoformat()
     subject_id = (state.get("run_meta") or {}).get("subject_id", "calculus")
+    diagnosed_codes = set(_get_attr(d, "error_code", "") for d in diagnoses if _get_attr(d, "error_code", ""))
     for d in diagnoses:
         error_code = _get_attr(d, "error_code", "")
         if not error_code:
@@ -252,7 +253,7 @@ async def _auto_record_mastery(user_id: int, state: dict):
             errors[error_code] = {
                 "total": 0, "mastered": False, "timestamps": [],
                 "auto_mastered": False, "last_seen": None,
-                "subject_ids": [], "consecutive_correct": 0,
+                "subject_ids": [], "consecutive_correct": {},
             }
         entry = errors[error_code]
         entry["total"] = entry.get("total", 0) + 1
@@ -266,6 +267,19 @@ async def _auto_record_mastery(user_id: int, state: dict):
         if subject_id not in sids:
             sids.append(subject_id)
         entry["subject_ids"] = sids
+        cc = entry.get("consecutive_correct", {})
+        if isinstance(cc, int):
+            cc = {}
+        cc[subject_id] = 0
+        entry["consecutive_correct"] = cc
+    for code in list(errors.keys()):
+        if code in diagnosed_codes:
+            continue
+        cc = errors[code].get("consecutive_correct", {})
+        if isinstance(cc, int):
+            cc = {}
+        cc[subject_id] = cc.get(subject_id, 0) + 1
+        errors[code]["consecutive_correct"] = cc
     mastery["errors"] = errors
     history = mastery.get("analysis_history", [])
     error_codes = [_get_attr(d, "error_code", "") for d in diagnoses if _get_attr(d, "error_code", "")]

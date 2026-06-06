@@ -4415,9 +4415,6 @@
             var _mastered = _md && _md.errors && _md.errors[d.error_code] && _md.errors[d.error_code].mastered;
             html += '<button type="button" class="btn-mastered-toggle' + (_mastered ? ' mastered' : '') + '" data-error-code="' + esc(d.error_code) + '">' + (_mastered ? '已掌握' : '标记已掌握') + '</button>';
             html += "</div>";
-            if (typeof MasteryModule !== "undefined" && MasteryModule.recordEncounter) {
-                MasteryModule.recordEncounter(d.error_code);
-            }
         });
         container.innerHTML = html;
         section.style.display = "";
@@ -5392,9 +5389,16 @@
             if (emptyEl) emptyEl.style.display = "none";
             if (contentEl) contentEl.style.display = "";
 
+            var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered || data.errors[k].auto_mastered; }).length;
+
             function calcProgress(entry) {
                 if (entry.mastered || entry.auto_mastered) return 1.0;
-                var consecutive = entry.consecutive_correct || 0;
+                var ccMap = entry.consecutive_correct;
+                var consecutive = 0;
+                if (ccMap && typeof ccMap === "object") {
+                    var vals = Object.keys(ccMap).map(function (k) { return ccMap[k]; });
+                    if (vals.length) consecutive = Math.max.apply(null, vals);
+                }
                 var total = entry.total || 0;
                 var base = Math.min(consecutive * 0.25, 0.75);
                 var penalty = total > 3 ? Math.max(0, 1 - (total - 3) * 0.1) : 1;
@@ -5442,13 +5446,15 @@
                         plugins: { legend: { display: true, position: "bottom" } }
                     }
                 });
-            } else {
-                var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered || data.errors[k].auto_mastered; }).length;
             }
 
             var trajectoryCanvas = $("mastery-trajectory-chart");
             if (trajectoryCanvas && window.Chart) {
                 var history = data.analysis_history || [];
+                if (!history.length) {
+                    var tw = trajectoryCanvas.parentElement;
+                    if (tw) tw.innerHTML = '<p style="text-align:center;padding:2rem;color:var(--text-muted,#888)">暂无轨迹数据，完成更多分析后将在此展示学习趋势</p>';
+                } else {
                 var dateErrors = {};
                 history.forEach(function (h) {
                     var date = (h.date || "").substring(0, 10);
@@ -5485,6 +5491,7 @@
                         plugins: { legend: { display: true, position: "bottom" } }
                     }
                 });
+                }
             }
 
             var progressList = container.querySelector(".mastery-progress-list");
@@ -5515,7 +5522,7 @@
                 var correctPractice = (data.practice_history || []).filter(function (p) { return p.correct; }).length;
                 var hasWeaknessConquered = errorKeys.some(function (k) { var e = data.errors[k]; return e.total >= 3 && (e.mastered || e.auto_mastered); });
                 var analysisHistory = data.analysis_history || [];
-                var hasZeroErrorRun = analysisHistory.some(function (h) { return h.step_count > 0 && h.correct_count === h.step_count; });
+                var hasZeroErrorRun = analysisHistory.some(function (h) { return h.step_count > 0 && (h.error_codes || []).length === 0; });
                 var hasSevenDayStreak = (function () {
                     var dates = [];
                     analysisHistory.forEach(function (h) { var d = (h.date || "").substring(0, 10); if (d) dates.push(d); });

@@ -817,28 +817,97 @@ async def save_user_mastery(data: dict = Body(...), user: dict = Depends(get_cur
 
 
 @app.post("/api/user/resolve-run/{run_id}")
-async def resolve_run(run_id: str, user: dict = Depends(get_current_user)):
+async def resolve_run(
+    run_id: str,
+    error_code: str | None = None,
+    step_id: str | None = None,
+    subject_id: str | None = None,
+    user: dict = Depends(get_current_user),
+):
     from web.database import get_mastery as db_get_mastery, save_mastery as db_save_mastery
     if not re.match(r"^[A-Za-z0-9_-]{1,64}$", run_id):
         return JSONResponse(status_code=400, content={"error": "run_id 格式无效"})
+    if not error_code or not step_id or not subject_id:
+        return JSONResponse(status_code=400, content={"error": "需要同时提供 error_code、step_id、subject_id 三个参数"})
+    if not re.match(r"^[A-Za-z0-9_-]{1,64}$", error_code):
+        return JSONResponse(status_code=400, content={"error": "error_code 格式无效"})
+    if not re.match(r"^[A-Za-z0-9_-]{1,64}$", step_id):
+        return JSONResponse(status_code=400, content={"error": "step_id 格式无效"})
+    if not re.match(r"^[A-Za-z0-9_-]{1,64}$", subject_id):
+        return JSONResponse(status_code=400, content={"error": "subject_id 格式无效"})
+
     mastery = await db_get_mastery(user["id"])
     history = mastery.get("analysis_history", [])
-    found = False
-    resolved = False
-    for entry in history:
-        if entry.get("run_id") == run_id:
-            found = True
-            entry["resolved"] = not entry.get("resolved", False)
-            if entry["resolved"]:
-                entry["resolved_at"] = datetime.now(timezone.utc).isoformat()
-            else:
-                entry.pop("resolved_at", None)
-            resolved = entry["resolved"]
+    entry = None
+    for e in history:
+        if e.get("run_id") == run_id:
+            entry = e
             break
-    if not found:
-        return JSONResponse(status_code=404, content={"error": "运行记录未找到"})
+
+    if entry is None:
+        from web.database import load_run
+        run_row = await load_run(run_id, user["id"])
+        if not run_row:
+            return JSONResponse(status_code=404, content={"error": "运行记录未找到"})
+        run_data = run_row.get("data", {})
+        run_meta = run_data.get("run_meta", {})
+        diagnoses = run_data.get("diagnoses", []) or []
+        verifications = run_data.get("verification_results", []) or []
+        correct_count = 0
+        for v in verifications:
+            label = ""
+            if isinstance(v, dict):
+                label = v.get("label", "")
+                if not isinstance(label, str) and hasattr(label, "value"):
+                    label = label.value
+            elif hasattr(v, "label"):
+                label = v.label
+                if not isinstance(label, str) and hasattr(label, "value"):
+                    label = label.value
+            if label == "correct":
+                correct_count += 1
+        error_codes_list = [d.get("error_code", "") for d in diagnoses if d.get("error_code", "")]
+        entry = {
+            "run_id": run_id,
+            "date": run_meta.get("completed_at", datetime.now(timezone.utc).isoformat()),
+            "error_codes": error_codes_list,
+            "subject_id": run_meta.get("subject_id", subject_id),
+            "step_count": len(run_data.get("normalized_steps", []) or []),
+            "correct_count": correct_count,
+            "resolved": False,
+            "resolved_diagnoses": [],
+        }
+        history.append(entry)
+        if len(history) > 200:
+            history[:] = history[-200:]
+
+    if "resolved_diagnoses" not in entry or not isinstance(entry["resolved_diagnoses"], list):
+        entry["resolved_diagnoses"] = []
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rd = entry["resolved_diagnoses"]
+    existing_idx = -1
+    for i, r in enumerate(rd):
+        if (r.get("error_code") == error_code
+                and r.get("step_id") == step_id
+                and r.get("subject_id") == subject_id):
+            existing_idx = i
+            break
+    if existing_idx >= 0:
+        rd.pop(existing_idx)
+        resolved = False
+    else:
+        rd.append({
+            "error_code": error_code,
+            "step_id": step_id,
+            "subject_id": subject_id,
+            "resolved_at": now_iso,
+        })
+        resolved = True
+
+    mastery["analysis_history"] = history
     await db_save_mastery(user["id"], mastery)
-    return {"resolved": resolved}
+    return {"resolved": resolved, "resolved_diagnoses": rd}
 
 
 @app.get("/api/admin/users/{user_id}")

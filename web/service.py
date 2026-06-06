@@ -2,12 +2,15 @@
 
 import base64
 import json
+import logging
 import os
 import re
 import time
 from datetime import datetime, timezone, timedelta
 from typing import Literal
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 import requests
 
@@ -796,6 +799,7 @@ def run_stem_tutor(
     depth: str = "with_ref",
     user_id: int | None = None,
 ) -> dict:
+    ocr_payload = None
     settings = load_provider_settings()
     settings.__dict__["reasoning_model_name"] = model_name
 
@@ -813,8 +817,9 @@ def run_stem_tutor(
 
     if subject_id:
         settings.__dict__["subject_id"] = subject_id
-        from stem_tutor.prompts.templates import set_active_subject
-        set_active_subject(subject_id)
+        from stem_tutor.prompts.templates import active_subject_scope as _subj_scope
+        _subj_scope_cm = _subj_scope(subject_id)
+        _subj_scope_cm.__enter__()
 
     problem_input = ProblemInput(
         problem_id=f"web-{uuid4().hex[:8]}",
@@ -892,6 +897,12 @@ def run_stem_tutor(
     meta["max_attempts"] = max_attempts
     meta["failed"] = response.get("status") == "failed"
     response["run_meta"] = meta
+
+    if subject_id:
+        try:
+            _subj_scope_cm.__exit__(None, None, None)
+        except Exception:
+            pass
 
     return response
 
@@ -1302,6 +1313,7 @@ async def run_stem_tutor_stream(
         yield f"data: {_json.dumps({'type': 'safe_error', 'message': final_response.get('user_message') or GENERIC_UNAVAILABLE_MESSAGE}, ensure_ascii=False)}\n\n"
         yield f"data: {_json.dumps({'type': 'result', 'data': final_response}, ensure_ascii=False)}\n\n"
         yield f"data: {_json.dumps({'type': 'done', 'message': '分析完成'}, ensure_ascii=False)}\n\n"
+        _cancel_events.pop(run_id, None)
         return
 
     if final_state is not None:
@@ -1624,7 +1636,6 @@ async def regenerate_review_problems(run_id: str, user_id: int):
     subject_id = (run_data.get("run_meta") or {}).get("subject_id") or "calculus"
     if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
-    set_active_subject(subject_id)
 
     yield f"event: review_progress\ndata: {_json.dumps({'type':'progress','message':'正在重新生成复习题...'}, ensure_ascii=False)}\n\n"
 
@@ -2467,11 +2478,11 @@ async def practice_verify_stream(
         logger.error("[Practice] LLM verify error: %s", exc, exc_info=True)
         result = {
             "type": "result",
-            "label": "correct",
+            "label": "uncertain",
             "summary": "验证完成",
             "step_results": [],
             "hint": None,
-            "all_correct": True,
+            "all_correct": False,
         }
         yield f"event: practice_progress\ndata: {_json.dumps({'type': 'error', 'message': 'LLM 验证出错，默认标记为正确'}, ensure_ascii=False)}\n\n"
 
@@ -2483,11 +2494,10 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
     import json as _json
 
     from stem_tutor.nodes.generate_reference_solution import _generate_via_agent
-    from stem_tutor.prompts.templates import set_active_subject, active_subject_scope
+    from stem_tutor.prompts.templates import active_subject_scope
 
     if not subject_id or subject_id not in VALID_SUBJECTS:
         subject_id = "calculus"
-    set_active_subject(subject_id)
 
     yield f"event: reference_progress\ndata: {_json.dumps({'type': 'progress', 'message': '正在生成参考解答（使用工具验证）...'}, ensure_ascii=False)}\n\n"
 
@@ -2522,6 +2532,7 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
             "tool_call_count": 0,
         }
         yield f"event: reference_progress\ndata: {_json.dumps({'type': 'error', 'message': '参考解答生成异常'}, ensure_ascii=False)}\n\n"
+        return
 
     yield f"event: reference_progress\ndata: {_json.dumps(result, ensure_ascii=False)}\n\n"
 
@@ -2529,11 +2540,8 @@ async def practice_reference_stream(problem_text: str, subject_id: str = "calcul
 async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.6-plus"):
     import asyncio
     import json as _json
-    import logging
 
     from stem_tutor.prompts.templates import report_prompt
-
-    logger = logging.getLogger(__name__)
 
     yield f"data: {_json.dumps({'type': 'report_progress', 'message': '正在准备数据并调用 AI 模型...'}, ensure_ascii=False)}\n\n"
 

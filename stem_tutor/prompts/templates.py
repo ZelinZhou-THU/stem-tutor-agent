@@ -383,19 +383,6 @@ def report_prompt(
         "      ]\n"
         "    },\n"
         "    {\n"
-        '      "type": "improvements",\n'
-        '      "title": "进步信号",\n'
-        '      "icon": "✅",\n'
-        '      "summary": "1-3 句积极总结",\n'
-        '      "items": [\n'
-        "        {\n"
-        '          "description": "具体进步内容",\n'
-        '          "evidence": "支撑这个判断的数据依据",\n'
-        '          "significance": "high"\n'
-        "        }\n"
-        "      ]\n"
-        "    },\n"
-        "    {\n"
         '      "type": "action_plan",\n'
         '      "title": "改进建议",\n'
         '      "icon": "🚀",\n'

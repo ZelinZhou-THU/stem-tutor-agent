@@ -2790,42 +2790,46 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
 
         stream_done = False
         got_done_signal = False
+        last_yield_at = time.time()
         try:
             while not stream_done:
                 try:
                     item = await asyncio.wait_for(q.get(), timeout=HEARTBEAT_INTERVAL)
                 except asyncio.TimeoutError:
+                    item = None
+
+                if item is not None:
+                    kind = item[0]
+                    if kind == "chunk":
+                        line = item[1]
+                        if line:
+                            line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                            if line_str.startswith("data:"):
+                                data_str = line_str[5:].strip()
+                                if data_str == "[DONE]":
+                                    stream_done = True
+                                else:
+                                    try:
+                                        chunk_data = _json.loads(data_str)
+                                        choices = chunk_data.get("choices", [{}])
+                                        delta = choices[0].get("delta", {})
+                                        content = delta.get("content", "")
+                                        if content:
+                                            full_content += content
+                                            if len(full_content) % 500 < len(content):
+                                                yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
+                                                last_yield_at = time.time()
+                                    except _json.JSONDecodeError:
+                                        pass
+                    elif kind == "done":
+                        got_done_signal = True
+                    elif kind == "thread_end":
+                        stream_done = True
+
+                if not stream_done and time.time() - last_yield_at >= HEARTBEAT_INTERVAL:
                     elapsed = int(time.time() - call_start)
                     yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型处理中（已等待 {elapsed} 秒）...'}, ensure_ascii=False)}\n\n"
-                    continue
-
-                kind = item[0]
-                if kind == "chunk":
-                    line = item[1]
-                    if not line:
-                        continue
-                    line_str = line.decode("utf-8") if isinstance(line, bytes) else line
-                    if not line_str.startswith("data:"):
-                        continue
-                    data_str = line_str[5:].strip()
-                    if data_str == "[DONE]":
-                        stream_done = True
-                        continue
-                    try:
-                        chunk_data = _json.loads(data_str)
-                        choices = chunk_data.get("choices", [{}])
-                        delta = choices[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            full_content += content
-                            if len(full_content) % 500 < len(content):
-                                yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
-                    except _json.JSONDecodeError:
-                        continue
-                elif kind == "done":
-                    got_done_signal = True
-                elif kind == "thread_end":
-                    stream_done = True
+                    last_yield_at = time.time()
         finally:
             pass
 

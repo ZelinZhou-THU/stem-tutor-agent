@@ -407,3 +407,100 @@ def test_all_attempts_fail_returns_error():
     error_events = [ev for _, ev in events if ev.get("type") == "report_error"]
     assert len(section_events) == 0
     assert len(error_events) == 1
+
+
+def test_heartbeat_fires_even_with_frequent_chunks():
+    """If the LLM sends small chunks frequently (e.g., every 1-2s with keep-alive
+    comments or tiny content), the heartbeat should STILL fire every 5s based on
+    wall-clock time, not queue emptiness. This is the regression test for the bug
+    where '已等待 5 秒' was emitted once and then never updated.
+    """
+    from web import service
+
+    def streaming_chunks():
+        time.sleep(5.5)
+        for _ in range(6):
+            yield b'data: {"choices":[{"delta":{"content":"x"}}]}\n\n'
+            time.sleep(2.0)
+        yield b"data: [DONE]\n\n"
+
+    class _StreamingResp:
+        status_code = 200
+
+        def iter_lines(self):
+            return streaming_chunks()
+
+        def raise_for_status(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("web.service.requests.post", return_value=_StreamingResp()), \
+         patch("web.service.load_provider_settings", return_value=MagicMock(base_url="http://x", api_key="y")), \
+         patch("web.service._save_report", new=AsyncMock()):
+        gen = service.report_stream(user_id=1, data=_make_data(), model_name="test")
+
+        async def _run():
+            return await _collect(gen, max_events=20, timeout=20)
+
+        events = asyncio.run(_run())
+
+    heartbeat_events = [
+        (t, ev) for t, ev in events
+        if ev.get("type") == "report_progress" and "已等待" in ev.get("message", "")
+    ]
+    assert len(heartbeat_events) >= 2, (
+        f"Expected >=2 heartbeats over ~17s of small-chunk streaming, got "
+        f"{len(heartbeat_events)}: {heartbeat_events}"
+    )
+    t1, ev1 = heartbeat_events[0]
+    t2, ev2 = heartbeat_events[1]
+    assert 4.0 < t1 < 7.0, f"First heartbeat should be around 5-6s, got t={t1}"
+    assert t2 - t1 >= 4.0, f"Heartbeats should be ~5s apart, got {t2 - t1:.2f}s"
+    assert "5" in ev1["message"], f"First heartbeat should mention ~5s, got {ev1['message']}"
+
+
+def test_heartbeat_fires_with_keep_alive_only():
+    """If the LLM only sends keep-alive comment lines (no real data), heartbeat
+    should still fire every 5s based on wall-clock time.
+    """
+    from web import service
+
+    def keep_alive_stream():
+        t0 = time.time()
+        while time.time() - t0 < 12:
+            yield b": keep-alive\n\n"
+            time.sleep(1.0)
+        yield b"data: [DONE]\n\n"
+
+    class _KAResp:
+        status_code = 200
+
+        def iter_lines(self):
+            return keep_alive_stream()
+
+        def raise_for_status(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("web.service.requests.post", return_value=_KAResp()), \
+         patch("web.service.load_provider_settings", return_value=MagicMock(base_url="http://x", api_key="y")), \
+         patch("web.service._save_report", new=AsyncMock()):
+        gen = service.report_stream(user_id=1, data=_make_data(), model_name="test")
+
+        async def _run():
+            return await _collect(gen, max_events=20, timeout=18)
+
+        events = asyncio.run(_run())
+
+    heartbeat_events = [
+        (t, ev) for t, ev in events
+        if ev.get("type") == "report_progress" and "已等待" in ev.get("message", "")
+    ]
+    assert len(heartbeat_events) >= 2, (
+        f"Expected >=2 heartbeats over 12s of keep-alive-only, got "
+        f"{len(heartbeat_events)}: {heartbeat_events}"
+    )

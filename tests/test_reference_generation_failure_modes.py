@@ -159,7 +159,10 @@ def test_router_does_not_early_stop_on_prose_with_anchor_substring():
     assert result != END
 
 
-def test_router_early_stops_on_schema_valid_json():
+def test_router_forces_tool_round_when_schema_appears_without_tool_call():
+    """When the LLM (under response_format) emits a complete schema on the
+    first turn, the router must route to "tools" to force at least one
+    verification round before allowing END."""
     from langchain_core.messages import AIMessage
     from langgraph.graph import END
     from stem_tutor.graph.agent_subgraph import AgentState
@@ -173,11 +176,12 @@ def test_router_early_stops_on_schema_valid_json():
         ]
     }
     result = router(state)
-    assert result == END
+    assert result == "tools"
 
 
-def test_router_early_stops_on_label_schema():
-    from langchain_core.messages import AIMessage
+def test_router_allows_end_after_tool_round_with_label_schema():
+    """After a tool round, schema-based END is allowed."""
+    from langchain_core.messages import AIMessage, ToolMessage
     from langgraph.graph import END
     from stem_tutor.graph.agent_subgraph import AgentState
 
@@ -186,6 +190,8 @@ def test_router_early_stops_on_label_schema():
 
     state: AgentState = {
         "messages": [
+            AIMessage(content='{"label": "correct", "evidence": "ok", "confidence": 0.9, "violated_principles": []}'),
+            ToolMessage(content="FINAL_ANSWER=ok\nKEY_RESULT=ok", tool_call_id="t1", name="execute_python"),
             AIMessage(content='{"label": "correct", "evidence": "ok", "confidence": 0.9, "violated_principles": []}'),
         ]
     }

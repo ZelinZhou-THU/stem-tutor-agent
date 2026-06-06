@@ -1,6 +1,10 @@
 (function () {
     "use strict";
 
+    if (typeof window.va === "undefined") {
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    }
+
     var SITE_TITLE = "\u6570\u7406\u57fa\u7840\u8bfe\u7a0b\u5b66\u4e60\u8f85\u5bfc\u7cfb\u7edf";
     var _lastResult = null;
     var cropperInstance = null;
@@ -5491,7 +5495,35 @@
             _expandedBatchId = null;
             document.getElementById("queue-filter-status").onchange = function() { _loadList(); };
             document.getElementById("queue-new-btn").onclick = function() { _openNewModal(); };
+            _ensureDelegation();
             _loadList();
+        }
+
+        var _delegationAttached = false;
+        function _ensureDelegation() {
+            if (_delegationAttached) return;
+            var container = document.getElementById("queue-list");
+            if (!container) return;
+            _delegationAttached = true;
+            container.addEventListener("click", function(e) {
+                var target = e.target.closest("[data-action]");
+                if (!target) return;
+                var action = target.getAttribute("data-action");
+                if (action === "view-run") {
+                    var runId = target.getAttribute("data-run-id");
+                    if (runId) viewRun(runId);
+                    return;
+                }
+                var batchId = target.getAttribute("data-batch-id");
+                if (!batchId) return;
+                if (action === "pause") pause(batchId);
+                else if (action === "cancel") cancel(batchId);
+                else if (action === "resume") resume(batchId);
+                else if (action === "start") start(batchId);
+                else if (action === "remove") remove(batchId);
+                else if (action === "view-summary") viewSummary(batchId);
+                else if (action === "toggle-expand") toggleExpand(batchId);
+            });
         }
 
         function _loadList() {
@@ -5528,19 +5560,19 @@
                 html += '</div>';
                 html += '<div class="batch-card-actions">';
                 if (b.status === "running") {
-                    html += '<button class="btn btn-sm" onclick="QueueModule.pause(\'' + b.id + '\')">暂停</button>';
-                    html += '<button class="btn btn-sm" onclick="QueueModule.cancel(\'' + b.id + '\')">取消</button>';
+                    html += '<button class="btn btn-sm" data-action="pause" data-batch-id="' + esc(b.id) + '">暂停</button>';
+                    html += '<button class="btn btn-sm" data-action="cancel" data-batch-id="' + esc(b.id) + '">取消</button>';
                 } else if (b.status === "paused") {
-                    html += '<button class="btn btn-sm btn-primary" onclick="QueueModule.resume(\'' + b.id + '\')">继续</button>';
-                    html += '<button class="btn btn-sm" onclick="QueueModule.cancel(\'' + b.id + '\')">取消</button>';
+                    html += '<button class="btn btn-sm btn-primary" data-action="resume" data-batch-id="' + esc(b.id) + '">继续</button>';
+                    html += '<button class="btn btn-sm" data-action="cancel" data-batch-id="' + esc(b.id) + '">取消</button>';
                 } else if (b.status === "pending") {
-                    html += '<button class="btn btn-sm btn-primary" onclick="QueueModule.start(\'' + b.id + '\')">开始</button>';
-                    html += '<button class="btn btn-sm" onclick="QueueModule.remove(\'' + b.id + '\')">删除</button>';
+                    html += '<button class="btn btn-sm btn-primary" data-action="start" data-batch-id="' + esc(b.id) + '">开始</button>';
+                    html += '<button class="btn btn-sm" data-action="remove" data-batch-id="' + esc(b.id) + '">删除</button>';
                 } else {
-                    if (b.status === "completed") html += '<button class="btn btn-sm" onclick="QueueModule.viewSummary(\'' + b.id + '\')">查看汇总</button>';
-                    html += '<button class="btn btn-sm" onclick="QueueModule.remove(\'' + b.id + '\')">删除</button>';
+                    if (b.status === "completed") html += '<button class="btn btn-sm" data-action="view-summary" data-batch-id="' + esc(b.id) + '">查看汇总</button>';
+                    html += '<button class="btn btn-sm" data-action="remove" data-batch-id="' + esc(b.id) + '">删除</button>';
                 }
-                html += '<button class="btn btn-sm" onclick="QueueModule.toggleExpand(\'' + b.id + '\')">' + (_expandedBatchId === b.id ? '收起' : '展开详情') + '</button>';
+                html += '<button class="btn btn-sm" data-action="toggle-expand" data-batch-id="' + esc(b.id) + '">' + (_expandedBatchId === b.id ? '收起' : '展开详情') + '</button>';
                 html += '</div>';
                 if (_expandedBatchId === b.id) {
                     html += '<div class="batch-item-list" id="batch-items-' + b.id + '">加载中...</div>';
@@ -5570,7 +5602,7 @@
                 html += '<span class="batch-item-seq">#' + (item.seq + 1) + '</span>';
                 html += '<span>' + icon + '</span>';
                 if (item.status === "completed" && item.run_id) {
-                    html += '<a class="batch-item-link" onclick="QueueModule.viewRun(\'' + item.run_id + '\')">' + esc(item.problem_preview) + '</a>';
+                    html += '<a class="batch-item-link" data-action="view-run" data-run-id="' + esc(item.run_id) + '">' + esc(item.problem_preview) + '</a>';
                 } else {
                     html += '<span class="batch-item-preview">' + esc(item.problem_preview) + '</span>';
                 }

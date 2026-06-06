@@ -2571,57 +2571,112 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.4,
-        "max_tokens": 8000,
-        "stream": False,
+        "max_tokens": 12000,
+        "stream": True,
     }
 
-    logger.info("[Report] LLM request: model=%s, prompt_len=%d, max_tokens=8000", model_name, len(prompt))
+    logger.info("[Report] LLM request: model=%s, prompt_len=%d, max_tokens=12000, stream=True", model_name, len(prompt))
 
-    try:
-        import functools
-        resp = await asyncio.to_thread(
-            functools.partial(requests.post, url, json=payload, headers=headers, timeout=300)
-        )
-        resp.raise_for_status()
-        result = resp.json()
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    import functools
+    max_attempts = 3
+    full_content = ""
+    succeeded = False
+    for attempt in range(1, max_attempts + 1):
+        try:
+            full_content = ""
+            resp = await asyncio.to_thread(
+                functools.partial(requests.post, url, json=payload, headers=headers, timeout=300, stream=True)
+            )
+            if resp.status_code != 200 and attempt < max_attempts and resp.status_code in (429, 500, 502, 503, 504):
+                logger.warning("[Report] LLM returned %d on attempt %d/%d, retrying", resp.status_code, attempt, max_attempts)
+                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': f'服务器返回 {resp.status_code}，正在自动重试...'}, ensure_ascii=False)}\n\n"
+                resp.close()
+                await asyncio.sleep(_retry_sleep_seconds(attempt))
+                continue
+            resp.raise_for_status()
 
-        logger.info("[Report] LLM response received: content_len=%d, first_200=%s", len(content), content[:200])
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                if not line_str.startswith("data:"):
+                    continue
+                data_str = line_str[5:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk_data = _json.loads(data_str)
+                    choices = chunk_data.get("choices", [{}])
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        full_content += content
+                        if len(full_content) % 500 < len(content):
+                            yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
+                except _json.JSONDecodeError:
+                    continue
 
-        report = _extract_json_object(content)
-        if report is None:
-            logger.warning("[Report] Failed to parse JSON from LLM response. Raw content (first 500): %s", content[:500])
-            yield f"data: {_json.dumps({'type': 'report_error', 'message': 'LLM 未返回有效的 JSON 格式，请重试'}, ensure_ascii=False)}\n\n"
+            succeeded = True
+            break
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            if attempt < max_attempts and _is_retryable_exception(exc):
+                logger.warning("[Report] Attempt %d/%d failed (%s), retrying", attempt, max_attempts, type(exc).__name__)
+                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': '网络或模型暂时不稳定，正在自动重试...'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(_retry_sleep_seconds(attempt))
+                continue
+            logger.error("[Report] Generation failed after %d attempt(s): %s", attempt, exc, exc_info=True)
+            yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+            return
+        except requests.HTTPError as exc:
+            if attempt < max_attempts and _is_retryable_exception(exc):
+                logger.warning("[Report] Attempt %d/%d HTTPError (%s), retrying", attempt, max_attempts, exc)
+                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': '网络或模型暂时不稳定，正在自动重试...'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(_retry_sleep_seconds(attempt))
+                continue
+            logger.error("[Report] Generation failed after %d attempt(s): %s", attempt, exc, exc_info=True)
+            yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
             return
 
-        sections = report.get("sections", [])
-        logger.info("[Report] Parsed %d sections", len(sections))
+    if not succeeded or not full_content:
+        logger.error("[Report] No content received from LLM after %d attempt(s)", max_attempts)
+        yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+        return
 
-        report_id = str(uuid4())
-        now = datetime.now(BEIJING_TZ).isoformat()
-        metadata = {
-            "title": f"学习报告 · {now[:10]}",
-            "model": model_name,
-            "created_at": now,
-            "filter": {
-                "mode": "time",
-                "days": data.get("time_range", {}).get("days", 0),
-                "start_date": data.get("time_range", {}).get("start", ""),
-                "end_date": data.get("time_range", {}).get("end", ""),
-                "run_ids": None,
-                "total_runs": data.get("total_runs", 0),
-            },
-        }
-        await _save_report(report_id, user_id, data, sections, metadata)
+    logger.info("[Report] LLM response received: content_len=%d, first_200=%s", len(full_content), full_content[:200])
 
-        for i, section in enumerate(sections):
-            yield f"data: {_json.dumps({'type': 'report_section', 'index': i, 'section': section}, ensure_ascii=False)}\n\n"
-
-        yield f"data: {_json.dumps({'type': 'report_done', 'message': '报告已自动保存', 'report_id': report_id}, ensure_ascii=False)}\n\n"
-
+    try:
+        report = _extract_json_object(full_content)
     except _json.JSONDecodeError as jde:
         logger.error("[Report] JSON decode error: %s", jde)
         yield f"data: {_json.dumps({'type': 'report_error', 'message': '报告内容解析失败，请重试'}, ensure_ascii=False)}\n\n"
-    except Exception as exc:
-        logger.error("[Report] Generation failed: %s", exc, exc_info=True)
-        yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+        return
+
+    if report is None:
+        logger.warning("[Report] Failed to parse JSON from LLM response. Raw content (first 500): %s", full_content[:500])
+        yield f"data: {_json.dumps({'type': 'report_error', 'message': 'LLM 未返回有效的 JSON 格式，请重试'}, ensure_ascii=False)}\n\n"
+        return
+
+    sections = report.get("sections", [])
+    logger.info("[Report] Parsed %d sections", len(sections))
+
+    report_id = str(uuid4())
+    now = datetime.now(BEIJING_TZ).isoformat()
+    metadata = {
+        "title": f"学习报告 · {now[:10]}",
+        "model": model_name,
+        "created_at": now,
+        "filter": {
+            "mode": "time",
+            "days": data.get("time_range", {}).get("days", 0),
+            "start_date": data.get("time_range", {}).get("start", ""),
+            "end_date": data.get("time_range", {}).get("end", ""),
+            "run_ids": None,
+            "total_runs": data.get("total_runs", 0),
+        },
+    }
+    await _save_report(report_id, user_id, data, sections, metadata)
+
+    for i, section in enumerate(sections):
+        yield f"data: {_json.dumps({'type': 'report_section', 'index': i, 'section': section}, ensure_ascii=False)}\n\n"
+
+    yield f"data: {_json.dumps({'type': 'report_done', 'message': '报告已自动保存', 'report_id': report_id}, ensure_ascii=False)}\n\n"

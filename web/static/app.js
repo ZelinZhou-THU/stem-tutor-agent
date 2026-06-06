@@ -1230,6 +1230,9 @@
             if (params.end_date) formData.append("end_date", params.end_date);
             if (params.run_ids) formData.append("run_ids", params.run_ids);
 
+            var loadingTxt = $("report-loading-text");
+            if (loadingTxt) loadingTxt.textContent = "正在分析诊断数据并生成学习报告...";
+
             fetch("/report/generate", { method: "POST", headers: AuthModule.getAuthHeader(), body: formData, signal: AbortSignal.timeout(600000) })
                 .then(function (r) {
                     if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "生成失败"); });
@@ -1274,7 +1277,11 @@
                         try {
                             var event = JSON.parse(jsonStr);
                             if (event.type === "report_progress") {
-                                console.log("[ReportSSE] progress:", event.message);
+                                var txt = $("report-loading-text");
+                                if (txt && event.message) txt.textContent = event.message;
+                            } else if (event.type === "report_retrying") {
+                                var rtxt = $("report-loading-text");
+                                if (rtxt) rtxt.textContent = "网络或模型暂时不稳定，正在自动重试 (" + event.attempt + "/" + event.max_attempts + ")...";
                             } else if (event.type === "report_section") {
                                 self._pendingSections.push(event.section);
                                 self._showLoading(false);

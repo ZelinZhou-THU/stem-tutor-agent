@@ -67,6 +67,10 @@ async def startup():
         pw_file = Path(__file__).resolve().parent.parent / "data" / "admin_password.txt"
         pw_file.parent.mkdir(parents=True, exist_ok=True)
         pw_file.write_text(pw, encoding="utf-8")
+        try:
+            pw_file.chmod(0o600)
+        except (OSError, AttributeError):
+            pass
         logging.getLogger("uvicorn").info(
             "══════════════════════════════════════════════════\n"
             "  管理员初始密码已生成，已写入密码文件\n"
@@ -168,6 +172,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             _rate_requests[client_ip].append(now)
             if len(_rate_requests[client_ip]) > _RATE_LIMIT_MAX:
                 return JSONResponse(status_code=429, content={"detail": "请求过于频繁，请稍后重试"})
+        if len(_rate_requests) > 10000:
+            cutoff = now - _RATE_LIMIT_WINDOW
+            stale = [ip for ip, ts in _rate_requests.items() if not ts or ts[-1] < cutoff]
+            for ip in stale:
+                del _rate_requests[ip]
         response = await call_next(request)
         return response
 
@@ -191,6 +200,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self'; "
+            "font-src 'self' https://cdn.jsdelivr.net"
+        )
         return response
 
 

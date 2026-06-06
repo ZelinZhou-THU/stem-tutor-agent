@@ -1358,7 +1358,7 @@
 
             var titleDiv = document.createElement("div");
             titleDiv.className = "report-section-title";
-            titleDiv.innerHTML = '<span class="section-icon">' + (section.icon || "") + "</span>" + (section.title || "");
+            titleDiv.innerHTML = '<span class="section-icon">' + esc(section.icon || "") + "</span>" + esc(section.title || "");
             div.appendChild(titleDiv);
 
             if (section.summary) {
@@ -1555,7 +1555,7 @@
                 var periodDiv = document.createElement("div");
                 periodDiv.className = "report-timeline-period";
                 var trendLabels = { improving: "改善 ↑", worsening: "恶化 ↓", stable: "稳定 →", shifting: "转变 ↗" };
-                periodDiv.innerHTML = item.period + ' <span class="report-timeline-trend ' + (item.trend || "stable") + '">' + (trendLabels[item.trend] || item.trend) + "</span>";
+                periodDiv.innerHTML = esc(item.period) + ' <span class="report-timeline-trend ' + (item.trend || "stable") + '">' + esc(trendLabels[item.trend] || item.trend) + "</span>";
                 itemDiv.appendChild(periodDiv);
 
                 if (item.description) {
@@ -1967,8 +1967,8 @@
                         if (errorEl) { errorEl.textContent = "两次输入的新密码不一致"; errorEl.style.display = ""; }
                         return;
                     }
-                    if (newPwd.length < 4) {
-                        if (errorEl) { errorEl.textContent = "新密码至少4位"; errorEl.style.display = ""; }
+                    if (newPwd.length < 8) {
+                        if (errorEl) { errorEl.textContent = "新密码至少8位"; errorEl.style.display = ""; }
                         return;
                     }
                     pwdConfirmBtn.textContent = "修改中...";
@@ -2387,8 +2387,8 @@
                 if (errorEl) { errorEl.textContent = "\u7528\u6237\u540d\u9700\u8981 2-32 \u4e2a\u5b57\u7b26"; errorEl.style.display = ""; }
                 return;
             }
-            if (password.length < 4) {
-                if (errorEl) { errorEl.textContent = "\u5bc6\u7801\u81f3\u5c11 4 \u4f4d"; errorEl.style.display = ""; }
+            if (password.length < 8) {
+                if (errorEl) { errorEl.textContent = "密码至少 8 位"; errorEl.style.display = ""; }
                 return;
             }
 
@@ -4205,7 +4205,7 @@
 
         if (ref.reference_text) {
             var processed = preprocessLatex(ref.reference_text);
-            var rendered = window.marked ? marked.parse(processed) : esc(processed);
+            var rendered = window.marked ? DOMPurify.sanitize(marked.parse(processed)) : esc(processed);
             html += '<div class="reference-content">' + rendered + '</div>';
         }
         if (ref.key_assertions && ref.key_assertions.length) {
@@ -4454,7 +4454,7 @@
             .then(function (resp) { return _readReferenceSSE(resp); })
             .then(function (result) {
                 if (result.reference_text) {
-                    contentEl.innerHTML = '<div class="reference-answer-body">' + marked.parse(result.reference_text) + "</div>";
+                    contentEl.innerHTML = '<div class="reference-answer-body">' + DOMPurify.sanitize(marked.parse(result.reference_text)) + "</div>";
                     if (result.key_assertions && result.key_assertions.length) {
                         var ah = "<p class=\"reference-answer-assertions-title\">关键断言：</p><ul>";
                         result.key_assertions.forEach(function (a) { ah += "<li>" + esc(a) + "</li>"; });
@@ -4653,7 +4653,7 @@
 
     function renderChatMarkdown(element) {
         var text = element.textContent || "";
-        if (typeof marked !== "undefined") element.innerHTML = marked.parse(text);
+        if (typeof marked !== "undefined") element.innerHTML = DOMPurify.sanitize(marked.parse(text));
         renderAllMath(element);
     }
 

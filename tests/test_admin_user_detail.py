@@ -14,6 +14,7 @@ def tmp_db(tmp_path, monkeypatch):
     db_file = tmp_path / "test.db"
     monkeypatch.setattr(db_mod, "DB_PATH", db_file)
     monkeypatch.setattr(db_mod, "_initialized", False)
+    monkeypatch.setattr(db_mod, "_sqlite_conn", None)
     yield db_file
 
 
@@ -87,14 +88,19 @@ def user_headers():
 
 
 async def _ensure_admin_user():
-    from web.database import _ensure_db, create_user
+    from web.database import _ensure_db, create_user, get_user_by_username
     await _ensure_db()
-    await create_user("admin", "h", is_admin=True)
+    admin = await get_user_by_username("admin")
+    if not admin:
+        await create_user("admin", "h", is_admin=True)
 
 
 async def _ensure_normal_user():
-    from web.database import _ensure_db, create_user
+    from web.database import _ensure_db, create_user, get_user_by_username
     await _ensure_db()
+    normal = await get_user_by_username("normal")
+    if normal:
+        return normal["id"]
     return await create_user("normal", "h", is_admin=False)
 
 

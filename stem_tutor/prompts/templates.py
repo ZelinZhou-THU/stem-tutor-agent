@@ -318,6 +318,25 @@ def report_prompt(
             parts.append(f"- [{sig.get('type', '?')}] {sig.get('description', '')}\n")
         parts.append("\n")
 
+    mastery_summary = aggregated_data.get("mastery_summary")
+    if mastery_summary:
+        parts.append("### 学生自我评估数据（掌握度标记）\n\n")
+        mc = mastery_summary.get("mastered_count", 0)
+        tt = mastery_summary.get("total_error_types", 0)
+        parts.append(f"总体掌握率：{mc}/{tt}\n\n")
+        mastered_items = mastery_summary.get("mastered_items", [])
+        if mastered_items:
+            parts.append("以下错误类型学生已标记为「已掌握」（可降低分析优先级）：\n")
+            for item in mastered_items:
+                parts.append(f"- {item.get('error_code', '?')}（出现过 {item.get('total_encounters', 0)} 次）\n")
+            parts.append("\n")
+        learning_items = mastery_summary.get("learning_items", [])
+        if learning_items:
+            parts.append("以下错误类型学生仍标记为「学习中」（应重点关注）：\n")
+            for item in learning_items:
+                parts.append(f"- {item.get('error_code', '?')}（出现过 {item.get('total_encounters', 0)} 次，最近出现 {item.get('last_seen', '未知')[:10]})\n")
+            parts.append("\n")
+
     parts.append(
         "## 输出格式\n\n"
         "请严格输出以下 JSON 结构（不要输出 JSON 以外的任何内容）：\n\n"

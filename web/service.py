@@ -2740,69 +2740,131 @@ async def report_stream(user_id: int, data: dict, model_name: str = "qwen/qwen3.
 
     logger.info("[Report] LLM request: model=%s, prompt_len=%d, max_tokens=12000, stream=True", model_name, len(prompt))
 
-    import functools
+    import threading
     max_attempts = 3
     full_content = ""
     succeeded = False
+
+    HEARTBEAT_INTERVAL = 5.0
+
     for attempt in range(1, max_attempts + 1):
+        full_content = ""
+        if attempt == 1:
+            yield f"data: {_json.dumps({'type': 'report_progress', 'message': '正在调用 AI 模型（首次响应可能需要 30-90 秒）...'}, ensure_ascii=False)}\n\n"
+        else:
+            yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt, 'max_attempts': max_attempts, 'message': f'正在重新调用 AI 模型（第 {attempt}/{max_attempts} 次）...'}, ensure_ascii=False)}\n\n"
+
+        q: asyncio.Queue = asyncio.Queue()
+        call_start = time.time()
+        outcome: dict = {}
+
+        def llm_thread():
+            try:
+                resp = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=300,
+                    stream=True,
+                )
+                if resp.status_code != 200:
+                    outcome["status_code"] = resp.status_code
+                    resp.close()
+                    return
+                for line in resp.iter_lines():
+                    q.put_nowait(("chunk", line))
+                q.put_nowait(("done", None))
+            except requests.Timeout as exc:
+                outcome["exception"] = exc
+            except requests.ConnectionError as exc:
+                outcome["exception"] = exc
+            except requests.HTTPError as exc:
+                outcome["exception"] = exc
+            except Exception as exc:
+                outcome["exception"] = exc
+            finally:
+                q.put_nowait(("thread_end", None))
+
+        thread = threading.Thread(target=llm_thread, daemon=True)
+        thread.start()
+
+        stream_done = False
+        got_done_signal = False
         try:
-            full_content = ""
-            resp = await asyncio.to_thread(
-                functools.partial(requests.post, url, json=payload, headers=headers, timeout=300, stream=True)
-            )
-            if resp.status_code != 200 and attempt < max_attempts and resp.status_code in (429, 500, 502, 503, 504):
-                logger.warning("[Report] LLM returned %d on attempt %d/%d, retrying", resp.status_code, attempt, max_attempts)
-                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': f'服务器返回 {resp.status_code}，正在自动重试...'}, ensure_ascii=False)}\n\n"
-                resp.close()
+            while not stream_done:
+                try:
+                    item = await asyncio.wait_for(q.get(), timeout=HEARTBEAT_INTERVAL)
+                except asyncio.TimeoutError:
+                    elapsed = int(time.time() - call_start)
+                    yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型处理中（已等待 {elapsed} 秒）...'}, ensure_ascii=False)}\n\n"
+                    continue
+
+                kind = item[0]
+                if kind == "chunk":
+                    line = item[1]
+                    if not line:
+                        continue
+                    line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    if not line_str.startswith("data:"):
+                        continue
+                    data_str = line_str[5:].strip()
+                    if data_str == "[DONE]":
+                        stream_done = True
+                        continue
+                    try:
+                        chunk_data = _json.loads(data_str)
+                        choices = chunk_data.get("choices", [{}])
+                        delta = choices[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            full_content += content
+                            if len(full_content) % 500 < len(content):
+                                yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
+                    except _json.JSONDecodeError:
+                        continue
+                elif kind == "done":
+                    got_done_signal = True
+                elif kind == "thread_end":
+                    stream_done = True
+        finally:
+            pass
+
+        if "status_code" in outcome:
+            sc = outcome["status_code"]
+            if sc in (429, 500, 502, 503, 504) and attempt < max_attempts:
+                logger.warning("[Report] LLM returned %d on attempt %d/%d, retrying", sc, attempt, max_attempts)
+                yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'服务器返回 {sc}，准备重试...'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(_retry_sleep_seconds(attempt))
                 continue
-            resp.raise_for_status()
+            logger.error("[Report] LLM returned %d after %d attempt(s)", sc, attempt)
+            yield f"data: {_json.dumps({'type': 'report_error', 'message': f'服务器返回 {sc}，请稍后重试'}, ensure_ascii=False)}\n\n"
+            return
 
-            for line in resp.iter_lines():
-                if not line:
-                    continue
-                line_str = line.decode("utf-8") if isinstance(line, bytes) else line
-                if not line_str.startswith("data:"):
-                    continue
-                data_str = line_str[5:].strip()
-                if data_str == "[DONE]":
-                    break
-                try:
-                    chunk_data = _json.loads(data_str)
-                    choices = chunk_data.get("choices", [{}])
-                    delta = choices[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if content:
-                        full_content += content
-                        if len(full_content) % 500 < len(content):
-                            yield f"data: {_json.dumps({'type': 'report_progress', 'message': f'AI 模型返回中（已接收 {len(full_content)} 字符）...'}, ensure_ascii=False)}\n\n"
-                except _json.JSONDecodeError:
-                    continue
-
-            succeeded = True
-            break
-        except (requests.Timeout, requests.ConnectionError) as exc:
+        if "exception" in outcome:
+            exc = outcome["exception"]
             if attempt < max_attempts and _is_retryable_exception(exc):
                 logger.warning("[Report] Attempt %d/%d failed (%s), retrying", attempt, max_attempts, type(exc).__name__)
-                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': '网络或模型暂时不稳定，正在自动重试...'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(_retry_sleep_seconds(attempt))
-                continue
-            logger.error("[Report] Generation failed after %d attempt(s): %s", attempt, exc, exc_info=True)
-            yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
-            return
-        except requests.HTTPError as exc:
-            if attempt < max_attempts and _is_retryable_exception(exc):
-                logger.warning("[Report] Attempt %d/%d HTTPError (%s), retrying", attempt, max_attempts, exc)
-                yield f"data: {_json.dumps({'type': 'report_retrying', 'attempt': attempt + 1, 'max_attempts': max_attempts, 'message': '网络或模型暂时不稳定，正在自动重试...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {_json.dumps({'type': 'report_progress', 'message': '网络或模型暂时不稳定，准备重试...'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(_retry_sleep_seconds(attempt))
                 continue
             logger.error("[Report] Generation failed after %d attempt(s): %s", attempt, exc, exc_info=True)
             yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
             return
 
-    if not succeeded or not full_content:
-        logger.error("[Report] No content received from LLM after %d attempt(s)", max_attempts)
-        yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+        if not full_content:
+            if attempt < max_attempts:
+                logger.warning("[Report] Empty response on attempt %d/%d, retrying", attempt, max_attempts)
+                yield f"data: {_json.dumps({'type': 'report_progress', 'message': 'AI 模型未返回内容，准备重试...'}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(_retry_sleep_seconds(attempt))
+                continue
+            logger.error("[Report] No content received from LLM after %d attempt(s)", max_attempts)
+            yield f"data: {_json.dumps({'type': 'report_error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
+            return
+
+        succeeded = True
+        break
+
+    if not succeeded:
         return
 
     logger.info("[Report] LLM response received: content_len=%d, first_200=%s", len(full_content), full_content[:200])

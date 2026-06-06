@@ -942,6 +942,7 @@
         _customDateActive: false,
         _generating: false,
         _pendingSections: [],
+        _currentReader: null,
 
         init: function () {
             if (this._initialized) return;
@@ -998,6 +999,9 @@
 
             var selectAll = $("report-select-all");
             if (selectAll) selectAll.addEventListener("change", function () { self._toggleSelectAll(this.checked); });
+
+            var cancelBtn = $("report-cancel-btn");
+            if (cancelBtn) cancelBtn.addEventListener("click", function () { self._cancelReport(); });
         },
 
         _switchMode: function () {
@@ -1244,14 +1248,30 @@
                     self._readReportSSE(body);
                 })
                 .catch(function (err) {
+                    if (err.name === "AbortError") return;
+                    self._currentReader = null;
+                    self._generating = false;
                     self._showLoading(false);
                     self._showError(err.message);
                 });
         },
 
+        _cancelReport: function () {
+            if (this._currentReader) {
+                try {
+                    this._currentReader.cancel().catch(function () {});
+                } catch (e) {}
+                this._currentReader = null;
+            }
+            this._generating = false;
+            this._showLoading(false);
+            this._showError("已取消报告生成");
+        },
+
         _readReportSSE: function (body) {
             var self = this;
             var reader = body.getReader();
+            self._currentReader = reader;
             var decoder = new TextDecoder("utf-8");
             var buffer = "";
             var doneReceived = false;
@@ -1259,6 +1279,7 @@
             function readNext() {
                 return reader.read().then(function (chunk) {
                     if (chunk.done) {
+                        if (self._currentReader === reader) self._currentReader = null;
                         if (!doneReceived) {
                             console.error("[ReportSSE] Stream ended without report_done");
                             self._generating = false;
@@ -1288,11 +1309,13 @@
                                 self._renderSection(event.section);
                             } else if (event.type === "report_done") {
                                 doneReceived = true;
+                                if (self._currentReader === reader) self._currentReader = null;
                                 self._generating = false;
                                 self._showLoading(false);
                                 return;
                             } else if (event.type === "report_error") {
                                 doneReceived = true;
+                                if (self._currentReader === reader) self._currentReader = null;
                                 self._generating = false;
                                 self._showLoading(false);
                                 self._showError(event.message);

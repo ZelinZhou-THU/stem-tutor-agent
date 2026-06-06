@@ -230,6 +230,74 @@ async def _save_run_state(run_id: str, user_id: int, state: dict):
     meta["failed"] = result.get("status") == "failed"
     result["run_meta"] = meta
     await database.update_run(run_id, result, status=result.get("status"))
+    try:
+        await _auto_record_mastery(user_id, state)
+    except Exception:
+        logging.getLogger(__name__).warning("auto_record_mastery failed for user %s", user_id, exc_info=True)
+
+
+async def _auto_record_mastery(user_id: int, state: dict):
+    diagnoses = state.get("diagnosis_results", [])
+    if not diagnoses:
+        return
+    mastery = await database.get_mastery(user_id)
+    errors = mastery.get("errors", {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    subject_id = (state.get("run_meta") or {}).get("subject_id", "calculus")
+    diagnosed_codes = set(_get_attr(d, "error_code", "") for d in diagnoses if _get_attr(d, "error_code", ""))
+    for d in diagnoses:
+        error_code = _get_attr(d, "error_code", "")
+        if not error_code:
+            continue
+        if error_code not in errors:
+            errors[error_code] = {
+                "total": 0, "mastered": False, "timestamps": [],
+                "auto_mastered": False, "last_seen": None,
+                "subject_ids": [], "consecutive_correct": {},
+            }
+        entry = errors[error_code]
+        entry["total"] = entry.get("total", 0) + 1
+        ts_list = entry.get("timestamps", [])
+        ts_list.append(now_iso)
+        if len(ts_list) > 50:
+            ts_list[:] = ts_list[-50:]
+        entry["timestamps"] = ts_list
+        entry["last_seen"] = now_iso
+        sids = entry.get("subject_ids", [])
+        if subject_id not in sids:
+            sids.append(subject_id)
+        entry["subject_ids"] = sids
+        cc = entry.get("consecutive_correct", {})
+        if isinstance(cc, int):
+            cc = {}
+        cc[subject_id] = 0
+        entry["consecutive_correct"] = cc
+    for code in list(errors.keys()):
+        if code in diagnosed_codes:
+            continue
+        cc = errors[code].get("consecutive_correct", {})
+        if isinstance(cc, int):
+            cc = {}
+        cc[subject_id] = cc.get(subject_id, 0) + 1
+        errors[code]["consecutive_correct"] = cc
+    mastery["errors"] = errors
+    history = mastery.get("analysis_history", [])
+    error_codes = [_get_attr(d, "error_code", "") for d in diagnoses if _get_attr(d, "error_code", "")]
+    steps = state.get("normalized_steps", [])
+    verifications = state.get("verification_results", [])
+    correct_count = sum(1 for v in verifications if _get_attr(v, "label", "") == "correct")
+    history.append({
+        "run_id": (state.get("run_meta") or {}).get("run_id", ""),
+        "date": now_iso,
+        "error_codes": error_codes,
+        "subject_id": subject_id,
+        "step_count": len(steps),
+        "correct_count": correct_count,
+    })
+    if len(history) > 200:
+        history[:] = history[-200:]
+    mastery["analysis_history"] = history
+    await database.save_mastery(user_id, mastery)
 
 
 async def _save_run_error(run_id: str, user_id: int, error_msg: str, initial_state: dict):
@@ -2326,6 +2394,24 @@ async def get_report_data(
                     "subject": subj,
                 })
 
+    mastery_data = await database.get_mastery(user_id)
+    mastery_errors = mastery_data.get("errors", {})
+    mastery_summary = {
+        "total_error_types": len(mastery_errors),
+        "mastered_count": sum(1 for e in mastery_errors.values() if e.get("mastered") or e.get("auto_mastered")),
+        "mastered_items": [
+            {"error_code": code, "total_encounters": e.get("total", 0)}
+            for code, e in mastery_errors.items()
+            if e.get("mastered") or e.get("auto_mastered")
+        ],
+        "learning_items": [
+            {"error_code": code, "total_encounters": e.get("total", 0), "last_seen": e.get("last_seen", "")}
+            for code, e in mastery_errors.items()
+            if not e.get("mastered") and not e.get("auto_mastered") and e.get("total", 0) >= 2
+        ],
+        "recent_analysis_count": len(mastery_data.get("analysis_history", [])[-10:]),
+    }
+
     return {
         "time_range": {
             "start": first_ts,
@@ -2342,6 +2428,7 @@ async def get_report_data(
         "error_evolution": error_evolution,
         "improvement_signals": improvement_signals,
         "taxonomy_summary": taxonomy_summary,
+        "mastery_summary": mastery_summary,
     }
 
 

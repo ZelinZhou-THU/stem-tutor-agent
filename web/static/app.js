@@ -4415,9 +4415,6 @@
             var _mastered = _md && _md.errors && _md.errors[d.error_code] && _md.errors[d.error_code].mastered;
             html += '<button type="button" class="btn-mastered-toggle' + (_mastered ? ' mastered' : '') + '" data-error-code="' + esc(d.error_code) + '">' + (_mastered ? '已掌握' : '标记已掌握') + '</button>';
             html += "</div>";
-            if (typeof MasteryModule !== "undefined" && MasteryModule.recordEncounter) {
-                MasteryModule.recordEncounter(d.error_code);
-            }
         });
         container.innerHTML = html;
         section.style.display = "";
@@ -5392,33 +5389,108 @@
             if (emptyEl) emptyEl.style.display = "none";
             if (contentEl) contentEl.style.display = "";
 
+            var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered || data.errors[k].auto_mastered; }).length;
+
+            function calcProgress(entry) {
+                if (entry.mastered || entry.auto_mastered) return 1.0;
+                var ccMap = entry.consecutive_correct;
+                var consecutive = 0;
+                if (ccMap && typeof ccMap === "object") {
+                    var vals = Object.keys(ccMap).map(function (k) { return ccMap[k]; });
+                    if (vals.length) consecutive = Math.max.apply(null, vals);
+                }
+                var total = entry.total || 0;
+                var base = Math.min(consecutive * 0.25, 0.75);
+                var penalty = total > 3 ? Math.max(0, 1 - (total - 3) * 0.1) : 1;
+                return Math.max(0, Math.min(base * penalty, 0.79));
+            }
+
             var radarCanvas = $("mastery-radar-chart");
             if (radarCanvas && window.Chart) {
                 var labels = errorKeys.map(function (k) { return _humanizeErrorCode(k); });
                 var totalData = errorKeys.map(function (k) { return data.errors[k].total; });
-                var masteredCount = errorKeys.filter(function (k) { return data.errors[k].mastered; }).length;
+                var maxTotal = Math.max.apply(null, totalData.concat([1]));
+                var masteryData = errorKeys.map(function (k) { return calcProgress(data.errors[k]); });
+                var freqNorm = totalData.map(function (t) { return t / maxTotal; });
 
                 if (radarCanvas._chart) radarCanvas._chart.destroy();
                 radarCanvas._chart = new Chart(radarCanvas.getContext("2d"), {
                     type: "radar",
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: "出现次数",
-                            data: totalData,
-                            backgroundColor: "rgba(37,99,235,0.15)",
-                            borderColor: "rgba(37,99,235,0.8)",
-                            borderWidth: 2,
-                            pointBackgroundColor: "rgba(37,99,235,1)"
-                        }]
+                        datasets: [
+                            {
+                                label: "掌握度",
+                                data: masteryData,
+                                backgroundColor: "rgba(34,197,94,0.15)",
+                                borderColor: "rgba(34,197,94,0.8)",
+                                borderWidth: 2,
+                                pointBackgroundColor: "rgba(34,197,94,1)"
+                            },
+                            {
+                                label: "出现频次",
+                                data: freqNorm,
+                                backgroundColor: "rgba(239,68,68,0.08)",
+                                borderColor: "rgba(239,68,68,0.6)",
+                                borderDash: [5, 5],
+                                borderWidth: 1.5,
+                                pointBackgroundColor: "rgba(239,68,68,0.8)"
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                        plugins: { legend: { display: false } }
+                        scales: { r: { beginAtZero: true, max: 1, ticks: { stepSize: 0.2 } } },
+                        plugins: { legend: { display: true, position: "bottom" } }
                     }
                 });
+            }
+
+            var trajectoryCanvas = $("mastery-trajectory-chart");
+            if (trajectoryCanvas && window.Chart) {
+                var history = data.analysis_history || [];
+                if (!history.length) {
+                    var tw = trajectoryCanvas.parentElement;
+                    if (tw) tw.innerHTML = '<p style="text-align:center;padding:2rem;color:var(--text-muted,#888)">暂无轨迹数据，完成更多分析后将在此展示学习趋势</p>';
+                } else {
+                var dateErrors = {};
+                history.forEach(function (h) {
+                    var date = (h.date || "").substring(0, 10);
+                    if (!date) return;
+                    if (!dateErrors[date]) dateErrors[date] = {};
+                    (h.error_codes || []).forEach(function (code) {
+                        dateErrors[date][code] = (dateErrors[date][code] || 0) + 1;
+                    });
+                });
+                var sortedCodes = errorKeys.slice().sort(function (a, b) {
+                    return (data.errors[b].total || 0) - (data.errors[a].total || 0);
+                }).slice(0, 5);
+                var dates = Object.keys(dateErrors).sort();
+                var tColors = ["#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6", "#10b981"];
+                var tDatasets = sortedCodes.map(function (code, idx) {
+                    return {
+                        label: _humanizeErrorCode(code),
+                        data: dates.map(function (d) { return (dateErrors[d] || {})[code] || 0; }),
+                        borderColor: tColors[idx],
+                        backgroundColor: tColors[idx] + "20",
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 3,
+                    };
+                });
+                if (trajectoryCanvas._chart) trajectoryCanvas._chart.destroy();
+                trajectoryCanvas._chart = new Chart(trajectoryCanvas.getContext("2d"), {
+                    type: "line",
+                    data: { labels: dates, datasets: tDatasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                        plugins: { legend: { display: true, position: "bottom" } }
+                    }
+                });
+                }
             }
 
             var progressList = container.querySelector(".mastery-progress-list");
@@ -5427,12 +5499,14 @@
                 errorKeys.forEach(function (code) {
                     var e = data.errors[code];
                     var human = _humanizeErrorCode(code);
-                    var statusText = e.mastered ? "已掌握" : "学习中";
-                    var statusClass = e.mastered ? "mastered" : "learning";
+                    var progress = calcProgress(e);
+                    var pct = Math.round(progress * 100);
+                    var hue = Math.round(progress * 140);
+                    var statusText = (e.mastered || e.auto_mastered) ? "已掌握" : (pct >= 60 ? "进步中" : "学习中");
                     phtml += '<div class="mastery-item">';
                     phtml += '<div class="mastery-label">' + esc(human) + '</div>';
-                    phtml += '<div class="mastery-bar-bg"><div class="mastery-bar-fill ' + statusClass + '" style="width:' + (e.mastered ? 100 : Math.min(e.total * 20, 80)) + '%;"></div></div>';
-                    phtml += '<div class="mastery-status ' + statusClass + '">' + statusText + ' (' + e.total + '次)</div>';
+                    phtml += '<div class="mastery-bar-bg"><div class="mastery-bar-fill" style="width:' + pct + '%;background:hsl(' + hue + ',65%,45%)"></div></div>';
+                    phtml += '<div class="mastery-status" style="color:hsl(' + hue + ',65%,45%)">' + statusText + ' (' + e.total + '次 · ' + pct + '%)</div>';
                     phtml += "</div>";
                 });
                 progressList.innerHTML = phtml;
@@ -5445,12 +5519,32 @@
                 var totalMastered = masteredCount;
                 var totalPractice = (data.practice_history || []).length;
                 var correctPractice = (data.practice_history || []).filter(function (p) { return p.correct; }).length;
+                var hasWeaknessConquered = errorKeys.some(function (k) { var e = data.errors[k]; return e.total >= 3 && (e.mastered || e.auto_mastered); });
+                var analysisHistory = data.analysis_history || [];
+                var hasZeroErrorRun = analysisHistory.some(function (h) { return h.step_count > 0 && (h.error_codes || []).length === 0; });
+                var hasSevenDayStreak = (function () {
+                    var dates = [];
+                    analysisHistory.forEach(function (h) { var d = (h.date || "").substring(0, 10); if (d) dates.push(d); });
+                    var unique = dates.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort();
+                    if (unique.length < 2) return false;
+                    var streak = 1, maxStreak = 1;
+                    for (var i = 1; i < unique.length; i++) {
+                        var prev = new Date(unique[i - 1]), curr = new Date(unique[i]);
+                        if ((curr - prev) / 86400000 === 1) { streak++; if (streak > maxStreak) maxStreak = streak; }
+                        else streak = 1;
+                    }
+                    return maxStreak >= 7;
+                })();
                 var milestones = [
                     { title: "初次诊断", desc: "完成第一次错误诊断", achieved: totalEncounters >= 1 },
                     { title: "五次诊断", desc: "累计 5 次错误诊断", achieved: totalEncounters >= 5 },
+                    { title: "诊断专家", desc: "累计 20 次错误诊断", achieved: totalEncounters >= 20 },
                     { title: "首次掌握", desc: "标记第一个概念为已掌握", achieved: totalMastered >= 1 },
+                    { title: "弱点攻克", desc: "一个出现 ≥3 次的错误被标记已掌握", achieved: hasWeaknessConquered },
+                    { title: "零错误突破", desc: "某次分析全部步骤正确", achieved: hasZeroErrorRun },
                     { title: "练习达人", desc: "完成 10 次练习", achieved: totalPractice >= 10 },
-                    { title: "正确率 80%", desc: "练习正确率达到 80%", achieved: totalPractice >= 5 && (correctPractice / totalPractice) >= 0.8 }
+                    { title: "正确率 80%", desc: "练习正确率达到 80%", achieved: totalPractice >= 5 && (correctPractice / totalPractice) >= 0.8 },
+                    { title: "勤学不辍", desc: "连续 7 天有学习记录", achieved: hasSevenDayStreak }
                 ];
                 var mhtml = "";
                 milestones.forEach(function (m) {

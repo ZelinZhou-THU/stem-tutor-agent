@@ -777,8 +777,35 @@ async def save_user_settings(data: dict = Body(...), user: dict = Depends(get_cu
 
 @app.get("/api/user/mastery")
 async def get_user_mastery(user: dict = Depends(get_current_user)):
+    from datetime import datetime, timedelta, timezone
     from web.database import get_mastery as db_get_mastery
-    return await db_get_mastery(user["id"])
+    data = await db_get_mastery(user["id"])
+    errors = data.get("errors", {})
+    total_types = len(errors)
+    mastered_types = sum(1 for e in errors.values() if e.get("mastered") or e.get("auto_mastered"))
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+    week_ago_ts = now.timestamp() - 7 * 86400
+    recent_active = []
+    weak_areas = []
+    strong_areas = []
+    for code, entry in errors.items():
+        ts_list = entry.get("timestamps", [])
+        if any(
+            (isinstance(t, str) and t >= week_ago) or
+            (isinstance(t, (int, float)) and t / 1000 >= week_ago_ts)
+            for t in ts_list
+        ):
+            recent_active.append(code)
+        if entry.get("mastered") or entry.get("auto_mastered"):
+            strong_areas.append(code)
+        elif entry.get("total", 0) >= 2:
+            weak_areas.append(code)
+    data["mastery_score"] = round(mastered_types / total_types, 2) if total_types > 0 else 0
+    data["recent_active_errors"] = recent_active
+    data["strong_areas"] = strong_areas
+    data["weak_areas"] = weak_areas
+    return data
 
 
 @app.post("/api/user/mastery")

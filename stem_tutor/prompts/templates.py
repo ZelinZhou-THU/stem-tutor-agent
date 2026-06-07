@@ -294,7 +294,7 @@ def report_prompt(
 
     heatmap_data = aggregated_data.get("heatmap_data", {})
     if heatmap_data:
-        parts.append("### 知识维度 × 科目掌握度矩阵（值 0=完全未掌握，1=完全掌握）\n\n")
+        parts.append(        "### 知识盲区矩阵（值 0=未掌握, 1=完全掌握；按 run 粒度扣除已理解的诊断）\n\n")
         parts.append(f"维度：{_json.dumps(heatmap_data.get('skills', []), ensure_ascii=False)}\n")
         parts.append(f"科目：{_json.dumps(heatmap_data.get('subjects', []), ensure_ascii=False)}\n")
         matrix = heatmap_data.get("matrix", [])

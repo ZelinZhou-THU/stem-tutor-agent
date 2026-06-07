@@ -2236,6 +2236,20 @@ async def get_report_data(
     first_ts = runs_data[0].get("run_meta", {}).get("started_at", "")[:10]
     last_ts = runs_data[-1].get("run_meta", {}).get("completed_at", "")[:10]
 
+    mastery_data = await database.get_mastery(user_id)
+
+    resolved_diagnoses_set: set[tuple[str, str, str, str]] = set()
+    for hist_entry in mastery_data.get("analysis_history", []):
+        hist_run_id = hist_entry.get("run_id", "")
+        if not hist_run_id:
+            continue
+        for r in (hist_entry.get("resolved_diagnoses") or []):
+            ec = r.get("error_code", "")
+            sid = r.get("step_id", "")
+            subj = r.get("subject_id", "")
+            if ec and sid and subj:
+                resolved_diagnoses_set.add((hist_run_id, ec, sid, subj))
+
     error_counts: dict[str, dict] = {}
     subject_errors: dict[str, dict[str, int]] = {}
     skill_subject_matrix: dict[str, dict[str, list[float]]] = {}
@@ -2256,6 +2270,7 @@ async def get_report_data(
 
         diagnoses = data.get("diagnoses", [])
         steps = data.get("steps", [])
+        run_id = meta.get("run_id", "")
 
         for d in diagnoses:
             error_code = d.get("error_code", "UNKNOWN")
@@ -2277,7 +2292,6 @@ async def get_report_data(
                     "_run_ids": set(),
                 }
             error_counts[error_code]["count"] += 1
-            run_id = data.get("run_meta", {}).get("run_id", "")
             if run_id and run_id not in error_counts[error_code]["_run_ids"]:
                 error_counts[error_code]["_run_ids"].add(run_id)
                 error_counts[error_code]["runs_involved"] += 1
@@ -2286,11 +2300,14 @@ async def get_report_data(
                 subject_errors[subject_key] = {}
             subject_errors[subject_key][category_zh] = subject_errors[subject_key].get(category_zh, 0) + 1
 
-            if category_zh not in skill_subject_matrix:
-                skill_subject_matrix[category_zh] = {}
-            if subject_key not in skill_subject_matrix[category_zh]:
-                skill_subject_matrix[category_zh][subject_key] = []
-            skill_subject_matrix[category_zh][subject_key].append(1)
+            diag_step_id = d.get("step_id") or d.get("step_index") or ""
+            is_resolved = (run_id, error_code, str(diag_step_id), subject_id) in resolved_diagnoses_set
+            if not is_resolved:
+                if category_zh not in skill_subject_matrix:
+                    skill_subject_matrix[category_zh] = {}
+                if subject_key not in skill_subject_matrix[category_zh]:
+                    skill_subject_matrix[category_zh][subject_key] = []
+                skill_subject_matrix[category_zh][subject_key].append(1)
 
         for s in steps:
             label = s.get("label", "")
@@ -2400,7 +2417,6 @@ async def get_report_data(
                     "subject": subj,
                 })
 
-    mastery_data = await database.get_mastery(user_id)
     mastery_errors = mastery_data.get("errors", {})
     mastery_summary = {
         "total_error_types": len(mastery_errors),

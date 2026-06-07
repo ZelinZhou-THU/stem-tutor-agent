@@ -2238,6 +2238,16 @@ async def get_report_data(
 
     mastery_data = await database.get_mastery(user_id)
 
+    valid_run_ids: set[str] = {
+        d.get("run_meta", {}).get("run_id", "")
+        for d in runs_data
+    }
+    valid_run_ids.discard("")
+    mastery_data["analysis_history"] = [
+        h for h in mastery_data.get("analysis_history", [])
+        if h.get("run_id", "") in valid_run_ids
+    ]
+
     resolved_diagnoses_set: set[tuple[str, str, str, str]] = set()
     for hist_entry in mastery_data.get("analysis_history", []):
         hist_run_id = hist_entry.get("run_id", "")
@@ -2249,6 +2259,16 @@ async def get_report_data(
             subj = r.get("subject_id", "")
             if ec and sid and subj:
                 resolved_diagnoses_set.add((hist_run_id, ec, sid, subj))
+
+    error_codes_in_history: set[str] = set()
+    for hist_entry in mastery_data["analysis_history"]:
+        for ec in (hist_entry.get("error_codes") or []):
+            if ec:
+                error_codes_in_history.add(ec)
+    mastery_data["errors"] = {
+        ec: v for ec, v in mastery_data.get("errors", {}).items()
+        if ec in error_codes_in_history
+    }
 
     error_counts: dict[str, dict] = {}
     subject_errors: dict[str, dict[str, int]] = {}

@@ -883,3 +883,193 @@ def _test_resolved_outside_time_window_no_effect_async():
 
 def test_resolved_outside_time_window_no_effect():
     _test_resolved_outside_time_window_no_effect_async()
+
+
+# =============================================================================
+# Tests for get_report_data filtering mastery by currently-existing run_ids
+# (i.e. cleaning up after a run has been deleted)
+# =============================================================================
+
+
+def _make_mastery_with_runs(run_ids: list[str], resolved_per_run: dict | None = None) -> dict:
+    """Build mastery_data with analysis_history entries for the given run_ids.
+
+    Each entry has a unique error_code so mastery_summary.total_error_types
+    can be checked: run 'r1' -> E1, run 'r2' -> E2, etc.
+    resolved_per_run: {run_id: [(error_code, step_id, subject_id), ...]}
+    """
+    resolved_per_run = resolved_per_run or {}
+    history = []
+    for i, rid in enumerate(run_ids):
+        ec = f"E{i+1}"
+        history.append({
+            "run_id": rid,
+            "date": f"2026-05-{15 - i:02d}T00:00:00+00:00",
+            "error_codes": [ec],
+            "subject_id": "calculus",
+            "step_count": 3,
+            "correct_count": 0,
+            "resolved": False,
+            "resolved_diagnoses": [
+                {
+                    "error_code": e_code,
+                    "step_id": s_id,
+                    "subject_id": s_subj,
+                    "resolved_at": "2026-06-01T00:00:00+00:00",
+                }
+                for (e_code, s_id, s_subj) in resolved_per_run.get(rid, [])
+            ],
+        })
+    errors = {}
+    for i, _ in enumerate(run_ids):
+        ec = f"E{i+1}"
+        errors[ec] = {
+            "total": 1,
+            "mastered": False,
+            "timestamps": ["2026-05-15T00:00:00+00:00"],
+            "auto_mastered": False,
+            "last_seen": "2026-05-15T00:00:00+00:00",
+            "subject_ids": ["calculus"],
+            "consecutive_correct": {"calculus": 0},
+        }
+    return {"errors": errors, "analysis_history": history}
+
+
+def _run_get_report_data_with_mastery(runs, mastery):
+    return asyncio.run(_call_get_report_data(runs, mastery))
+
+
+def _test_deleted_run_excluded_from_mastery_summary_async():
+    """After a run is deleted, its analysis_history entry should not
+    contribute to mastery_summary. We simulate deletion by passing only
+    the surviving runs to get_report_data (the deleted one is no longer
+    in the runs list).
+    """
+    run1 = _make_run_state("run1", "calculus", [
+        {"error_code": "E1", "category": "Algebraic Manipulation Errors", "step_id": "S1", "step_index": 0},
+    ], _recent_timestamp(5))
+    run2 = _make_run_state("run2", "calculus", [
+        {"error_code": "E2", "category": "Conceptual Confusion", "step_id": "S1", "step_index": 0},
+    ], _recent_timestamp(3))
+
+    mastery = _make_mastery_with_runs(["run1", "run2"])
+
+    full_report = _run_get_report_data_with_mastery(
+        [_make_db_row(run1), _make_db_row(run2)],
+        mastery,
+    )
+    after_delete_report = _run_get_report_data_with_mastery(
+        [_make_db_row(run2)],
+        mastery,
+    )
+
+    full_total = full_report["mastery_summary"]["total_error_types"]
+    after_total = after_delete_report["mastery_summary"]["total_error_types"]
+    assert full_total == 2, f"Both runs exist: expected 2 error types, got {full_total}"
+    assert after_total == 1, (
+        f"run1 deleted: expected 1 error type (E2 only), got {after_total}"
+    )
+
+
+def test_deleted_run_excluded_from_mastery_summary():
+    _test_deleted_run_excluded_from_mastery_summary_async()
+
+
+def _test_deleted_run_excluded_from_resolved_summary_async():
+    """After a run is deleted, its resolved markers should not count
+    in resolved_summary.
+    """
+    run1 = _make_run_state("run1", "calculus", [
+        {"error_code": "E1", "category": "Algebraic Manipulation Errors", "step_id": "S1", "step_index": 0},
+    ], _recent_timestamp(5))
+    run2 = _make_run_state("run2", "calculus", [
+        {"error_code": "E2", "category": "Conceptual Confusion", "step_id": "S2", "step_index": 0},
+    ], _recent_timestamp(3))
+
+    mastery = _make_mastery_with_runs(
+        ["run1", "run2"],
+        resolved_per_run={
+            "run1": [("E1", "S1", "calculus")],
+            "run2": [("E2", "S2", "calculus")],
+        },
+    )
+
+    full_report = _run_get_report_data_with_mastery(
+        [_make_db_row(run1), _make_db_row(run2)],
+        mastery,
+    )
+    after_delete_report = _run_get_report_data_with_mastery(
+        [_make_db_row(run2)],
+        mastery,
+    )
+
+    full_total = full_report["resolved_summary"]["total_resolved"]
+    after_total = after_delete_report["resolved_summary"]["total_resolved"]
+    full_codes = set(full_report["resolved_summary"]["by_error_code"].keys())
+    after_codes = set(after_delete_report["resolved_summary"]["by_error_code"].keys())
+
+    assert full_total == 2, f"Both runs exist: expected 2 resolved, got {full_total}"
+    assert after_total == 1, f"run1 deleted: expected 1 resolved, got {after_total}"
+    assert full_codes == {"E1", "E2"}, f"Both runs: expected E1+E2, got {full_codes}"
+    assert after_codes == {"E2"}, (
+        f"run1 deleted: only E2 should remain, got {after_codes}"
+    )
+
+
+def test_deleted_run_excluded_from_resolved_summary():
+    _test_deleted_run_excluded_from_resolved_summary_async()
+
+
+def _test_deleted_run_excluded_from_recent_analysis_count_async():
+    """recent_analysis_count should reflect only existing runs."""
+    runs = []
+    for i in range(5):
+        runs.append(_make_run_state(
+            f"run{i+1}", "calculus",
+            [{"error_code": f"E{i+1}", "category": "Algebraic Manipulation Errors",
+              "step_id": "S1", "step_index": 0}],
+            _recent_timestamp(5 - i),
+        ))
+
+    mastery = _make_mastery_with_runs([f"run{i+1}" for i in range(5)])
+
+    full_report = _run_get_report_data_with_mastery(
+        [_make_db_row(r) for r in runs],
+        mastery,
+    )
+    after_delete_report = _run_get_report_data_with_mastery(
+        [_make_db_row(r) for r in runs[2:]],
+        mastery,
+    )
+
+    full_count = full_report["mastery_summary"]["recent_analysis_count"]
+    after_count = after_delete_report["mastery_summary"]["recent_analysis_count"]
+    assert full_count == 5, f"5 runs: expected 5, got {full_count}"
+    assert after_count == 3, (
+        f"2 runs deleted: expected 3 remaining, got {after_count}"
+    )
+
+
+def test_deleted_run_excluded_from_recent_analysis_count():
+    _test_deleted_run_excluded_from_recent_analysis_count_async()
+
+
+def _test_kept_run_includes_mastery_async():
+    """Control: runs that still exist DO contribute to mastery_summary."""
+    run1 = _make_run_state("run1", "calculus", [
+        {"error_code": "E1", "category": "Algebraic Manipulation Errors", "step_id": "S1", "step_index": 0},
+    ], _recent_timestamp(5))
+
+    mastery = _make_mastery_with_runs(["run1"])
+
+    report = _run_get_report_data_with_mastery(
+        [_make_db_row(run1)],
+        mastery,
+    )
+
+    total = report["mastery_summary"]["total_error_types"]
+    assert total == 1, f"Single run with E1: expected 1 error type, got {total}"
+
+
+def test_kept_run_includes_mastery():
+    _test_kept_run_includes_mastery_async()

@@ -107,7 +107,10 @@ def make_diagnose_error_node(provider: LLMProvider):
 
         incorrect_steps = []
         for v in state["verification_results"]:
-            if v.label == VerificationLabel.CORRECT:
+            if v.label in (VerificationLabel.CORRECT, VerificationLabel.UNCLEAR):
+                if v.label == VerificationLabel.UNCLEAR:
+                    if "diagnosis_skip_unclear_step" not in flags:
+                        flags.append("diagnosis_skip_unclear_step")
                 continue
             step = step_map[v.step_id]
             incorrect_steps.append((step.normalized_text, v.step_id, v.evidence))

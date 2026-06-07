@@ -61,6 +61,105 @@ def test_diagnose_unknown_error_code_fallback_to_taxonomy():
     assert out["diagnosis_results"][0].error_code == "NOTATION_UNCLEAR"
 
 
+def test_diagnose_error_skips_unclear_steps():
+    """Regression test for PR #26: when verify_steps labels a step as
+    UNCLEAR (typically because the LLM returned invalid JSON and the
+    schema fallback fired), the diagnose_error node MUST skip it.
+
+    Previously, UNCLEAR steps were treated as "incorrect" and fed to
+    the diagnosis LLM, which would then manufacture a fake diagnosis
+    (e.g., COEFFICIENT_OMISSION) based on the bogus evidence "LLM
+    returned invalid format". That fake diagnosis would propagate to
+    the final feedback, falsely telling the student they had an error.
+    """
+    from stem_tutor.providers.mock_provider import MockProvider
+    node = make_diagnose_error_node(MockProvider())
+
+    state = {
+        "problem_input": ProblemInput(problem_id="p1", problem_text="test", topic_tags=[]),
+        "reference_solution": {"reference_text": "", "key_assertions": []},
+        "subject_id": "calculus",
+        "normalized_steps": [
+            SolutionStep(step_id="S1", raw_text="step1", normalized_text="step1"),
+            SolutionStep(step_id="S2", raw_text="step2", normalized_text="step2"),
+            SolutionStep(step_id="S3", raw_text="step3", normalized_text="step3"),
+        ],
+        "verification_results": [
+            VerificationResult(
+                step_id="S1",
+                label=VerificationLabel.CORRECT,
+                evidence="ok",
+                confidence=1.0,
+            ),
+            VerificationResult(
+                step_id="S2",
+                label=VerificationLabel.UNCLEAR,
+                evidence="LLM 返回格式无效。",
+                confidence=0.2,
+                violated_principles=["schema_validation"],
+            ),
+            VerificationResult(
+                step_id="S3",
+                label=VerificationLabel.UNCLEAR,
+                evidence="LLM 返回格式无效。",
+                confidence=0.2,
+                violated_principles=["schema_validation"],
+            ),
+        ],
+        "trace": [],
+        "uncertainty_flags": [],
+    }
+    out = node(state)
+
+    assert out["diagnosis_results"] == [], (
+        f"diagnosis_results should be empty for all-UNCLEAR verification, got {out['diagnosis_results']}"
+    )
+    assert "diagnosis_skip_unclear_step" in out["uncertainty_flags"], (
+        "expected diagnosis_skip_unclear_step flag to be set"
+    )
+
+
+def test_diagnose_error_still_runs_on_incorrect_math():
+    """Sanity check: the UNCLEAR filter must NOT skip INCORRECT_MATH
+    steps. Only UNCLEAR (and the pre-existing CORRECT) are filtered.
+    """
+    from stem_tutor.providers.mock_provider import MockProvider
+    node = make_diagnose_error_node(MockProvider())
+
+    state = {
+        "problem_input": ProblemInput(problem_id="p1", problem_text="test", topic_tags=[]),
+        "reference_solution": {"reference_text": "", "key_assertions": []},
+        "subject_id": "calculus",
+        "normalized_steps": [
+            SolutionStep(step_id="S1", raw_text="good", normalized_text="good"),
+            SolutionStep(step_id="S2", raw_text="bad", normalized_text="bad"),
+        ],
+        "verification_results": [
+            VerificationResult(
+                step_id="S1",
+                label=VerificationLabel.CORRECT,
+                evidence="ok",
+                confidence=1.0,
+            ),
+            VerificationResult(
+                step_id="S2",
+                label=VerificationLabel.INCORRECT_MATH,
+                evidence="real error: forgot to flip sign",
+                confidence=0.9,
+            ),
+        ],
+        "trace": [],
+        "uncertainty_flags": [],
+    }
+    out = node(state)
+
+    assert len(out["diagnosis_results"]) == 1
+    assert out["diagnosis_results"][0].step_id == "S2"
+    assert "diagnosis_skip_unclear_step" not in out["uncertainty_flags"], (
+        "flag should NOT be set when no UNCLEAR step was skipped"
+    )
+
+
 # =============================================================================
 # Tests for verification_extra prompt rules (OCR tolerance + step-skip tolerance)
 # =============================================================================

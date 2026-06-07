@@ -115,6 +115,20 @@ def test_fallback_verification_extra_includes_ocr_and_skip_rules():
         "(integral bounds, sign, absolute value, etc.)"
     )
 
+    assert "工具结果优先" in text, (
+        "verification_extra must include the tool-result priority rule "
+        "to prevent LLM from overriding integrator outputs"
+    )
+    assert "execute_python" in text, (
+        "tool-priority rule must reference execute_python"
+    )
+    assert "具体" in text and "实质错误" in text, (
+        "verification_extra must require concrete error before flagging"
+    )
+    assert "模糊判断" in text, (
+        "concrete-error rule must explicitly mention vague judgments as insufficient"
+    )
+
 
 def test_fallback_verification_extra_rule_order_ocr_and_skip_first():
     """Lenient rules (OCR tolerance, step-skip tolerance) must come BEFORE
@@ -161,6 +175,7 @@ def test_calculus_verification_extra_matches_fallback():
         "OCR", "字形", "跳步", "(a)", "(b)", "CORRECT",
         "内部矛盾", "示例", "zxy",
         "等于 1", "积分上下限",
+        "工具结果优先", "execute_python", "具体", "实质错误", "模糊判断",
     ]:
         assert keyword in calculus_text, (
             f"calculus.yaml verification_extra missing keyword: {keyword}"

@@ -88,8 +88,9 @@ def test_fallback_verification_extra_includes_ocr_and_skip_rules():
     assert "CORRECT" in text, (
         "verification_extra must reference final-answer CORRECT status"
     )
-    assert "唯一" in text or "关键判断" in text, (
-        "verification_extra must include guard clause to prevent over-relaxation"
+    assert "关键判断" in text, (
+        "verification_extra must include the key-judgment vs routine-calculation "
+        "distinction for the step-skip rule"
     )
 
     assert "内部矛盾" in text or "步骤内部矛盾" in text, (
@@ -101,6 +102,42 @@ def test_fallback_verification_extra_includes_ocr_and_skip_rules():
     )
     assert "R = zxy" in text or "zxy" in text, (
         "example must reference the canonical zxy vs 2xy case"
+    )
+
+    assert "等于 1" in text, (
+        "step-skip rule must include the '= 1 constant factor' canonical case"
+    )
+    assert "∫sinφ" in text or "sinφ" in text, (
+        "step-skip example must reference the sinφ integration case"
+    )
+    assert "积分上下限" in text, (
+        "verification_extra must enumerate key-judgment categories "
+        "(integral bounds, sign, absolute value, etc.)"
+    )
+
+
+def test_fallback_verification_extra_rule_order_ocr_and_skip_first():
+    """Lenient rules (OCR tolerance, step-skip tolerance) must come BEFORE
+    the strict cross-step coherence rules, so the LLM considers them first.
+    Regression lock for PR #25: the rule order was the root cause of S3
+    being repeatedly misjudged as incorrect_math.
+    """
+    prompts = _fallback_prompts()
+    text = prompts.get("verification_extra", "")
+
+    pos_skip = text.find("跳步")
+    pos_ocr = text.find("OCR")
+    pos_cross = text.find("跨步连贯性")
+    pos_incorrect = text.find("incorrect_math")
+
+    assert pos_skip != -1 and pos_ocr != -1, "must contain 跳步 and OCR"
+    assert pos_cross != -1 and pos_incorrect != -1, "must contain 跨步连贯性 and incorrect_math"
+
+    assert pos_skip < pos_cross, (
+        f"rule 跳步 (pos {pos_skip}) must come before 跨步连贯性 (pos {pos_cross})"
+    )
+    assert pos_ocr < pos_cross, (
+        f"rule OCR (pos {pos_ocr}) must come before 跨步连贯性 (pos {pos_cross})"
     )
 
 
@@ -123,6 +160,7 @@ def test_calculus_verification_extra_matches_fallback():
     for keyword in [
         "OCR", "字形", "跳步", "(a)", "(b)", "CORRECT",
         "内部矛盾", "示例", "zxy",
+        "等于 1", "积分上下限",
     ]:
         assert keyword in calculus_text, (
             f"calculus.yaml verification_extra missing keyword: {keyword}"

@@ -92,6 +92,17 @@ def test_fallback_verification_extra_includes_ocr_and_skip_rules():
         "verification_extra must include guard clause to prevent over-relaxation"
     )
 
+    assert "内部矛盾" in text or "步骤内部矛盾" in text, (
+        "verification_extra must explicitly address the 'internal contradiction' "
+        "case where input has typo but output is mathematically correct"
+    )
+    assert "示例" in text, (
+        "verification_extra must include an example to anchor LLM behavior"
+    )
+    assert "R = zxy" in text or "zxy" in text, (
+        "example must reference the canonical zxy vs 2xy case"
+    )
+
 
 def test_calculus_verification_extra_matches_fallback():
     """The calculus subject's verification_extra must contain the same
@@ -109,7 +120,10 @@ def test_calculus_verification_extra_matches_fallback():
         config = yaml.safe_load(f)
     calculus_text = config.get("prompts", {}).get("verification_extra", "")
 
-    for keyword in ["OCR", "字形", "跳步", "(a)", "(b)", "CORRECT"]:
+    for keyword in [
+        "OCR", "字形", "跳步", "(a)", "(b)", "CORRECT",
+        "内部矛盾", "示例", "zxy",
+    ]:
         assert keyword in calculus_text, (
             f"calculus.yaml verification_extra missing keyword: {keyword}"
         )

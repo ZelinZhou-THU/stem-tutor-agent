@@ -41,6 +41,22 @@ _META_THINKING_PREFIXES = (
 _MATH_INDICATORS = ("=", "\\boxed", "$", "∫", "√", "frac", "**", "\\\\")
 
 
+# PR #27: progressive hints for reference generation retry loop.
+# Each hint is appended to the user_content on the Nth attempt (1-indexed).
+# Intensity escalates from soft ("重要") to strong ("IRON RULE") to draw
+# LLM attention to the failure point without over-using emphasis.
+_MAX_REFERENCE_ATTEMPTS = 4
+_REFERENCE_HINTS = [
+    "",  # attempt 1: original prompt, no hint
+    "**重要**：请确保返回合法的 JSON 格式，不要用 markdown 代码块包裹。",
+    "**CRITICAL**：reference_text 字段必须包含完整解答，长度至少 200 字符；"
+    "key_assertions 至少 2 条。",
+    "**IRON RULE**：严格按以下 JSON schema 返回，"
+    '{"reference_text": "完整解答", "key_assertions": ["断言1", "断言2"]}。'
+    "不要再输出任何额外文本。",
+]
+
+
 def _is_failed_preview(preview: str) -> bool:
     if not preview:
         return False
@@ -350,6 +366,58 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
         state=state,
     )
 
+    # PR #27: retry-with-progressive-hints for LLM schema/degraded failures.
+    # If the strategy chain produced degraded or empty output, retry the
+    # direct provider call with progressively more emphatic hints, up to
+    # _MAX_REFERENCE_ATTEMPTS times. Each retry gives the LLM a stronger
+    # signal about what went wrong.
+    _local_retry_flags: list[str] = []
+    if (not outcome.data) or _is_degraded(outcome.data.get("reference_text", "")):
+        retry_history: list[tuple] = []
+        for attempt in range(1, _MAX_REFERENCE_ATTEMPTS):
+            hints = _REFERENCE_HINTS[1:attempt + 1]
+            try:
+                retry_raw = provider.generate_reference_solution(
+                    problem,
+                    hints=hints,
+                )
+            except Exception as exc:
+                logging.warning(
+                    f"[generate_reference_solution] Retry attempt {attempt} "
+                    f"raised exception: {exc}"
+                )
+                retry_history.append((attempt, f"exception: {exc}"))
+                continue
+            retry_text = retry_raw.get("reference_text", "")
+            retry_history.append((attempt, f"len={len(retry_text)}"))
+            if (
+                isinstance(retry_raw, dict)
+                and retry_text
+                and not _is_degraded(retry_text)
+            ):
+                _local_retry_flags.append("reference_retry_with_hints")
+                _local_retry_flags.append(
+                    f"reference_retry_succeeded_at_attempt_{attempt}"
+                )
+                logging.info(
+                    f"[generate_reference_solution] Retry attempt {attempt} succeeded"
+                )
+                retry_history.append(("success", attempt))
+                outcome = type(outcome)(
+                    data=retry_raw,
+                    quality="degraded",
+                    confidence=0.55,
+                    strategy_name="text_llm+retry",
+                )
+                break
+            retry_history.append(("degraded", attempt))
+        else:
+            _local_retry_flags.append("reference_retry_exhausted")
+            logging.warning(
+                f"[generate_reference_solution] All {_MAX_REFERENCE_ATTEMPTS} "
+                f"retry attempts failed. History: {retry_history}"
+            )
+
     quality_signals = {
         "reference_quality": outcome.quality,
         "reference_strategy": outcome.strategy_name,
@@ -453,7 +521,7 @@ def _run_new_path(provider: LLMProvider, state: TutorGraphState) -> TutorGraphSt
     return_state = {
         "reference_solution": parsed.model_dump(),
         "reference_computation_hints": hints,
-        "uncertainty_flags": flags,
+        "uncertainty_flags": sorted(set(flags) | set(_local_retry_flags)),
         "trace": trace,
         "run_meta": run_meta,
         "tool_calls_log": existing_logs + new_tool_logs,

@@ -349,7 +349,11 @@ class OpenAICompatibleProvider(LLMProvider):
             "formula_format": str(raw.get("formula_format", "latex_like")),
         }
 
-    def generate_reference_solution(self, problem_text: str) -> dict[str, Any]:
+    def generate_reference_solution(
+        self,
+        problem_text: str,
+        hints: list[str] | None = None,
+    ) -> dict[str, Any]:
         prompt = f"题目: {problem_text}"
         schema = '{"reference_text": "string", "key_assertions": ["string"]}'
         user_content = (
@@ -359,6 +363,8 @@ class OpenAICompatibleProvider(LLMProvider):
             "请提供完整的分步解答。所有输出请使用中文。"
             "数学表达式请用 $...$ 包裹行内公式，用 $$...$$ 包裹独立公式。"
         )
+        if hints:
+            user_content += "\n\n" + "\n\n".join(hints)
         
         payload = {
             "model": self.model_name,

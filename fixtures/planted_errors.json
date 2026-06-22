@@ -1,0 +1,215 @@
+{
+  "cases": [
+    {
+      "case_id": "planted-001",
+      "problem_input": {
+        "problem_id": "p-planted-001",
+        "problem_text": "求 y = sin(x^2) 的导数。",
+        "topic_tags": ["derivative", "chain_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 令 u = x^2，则 y = sin(u)\n2) dy/du = cos(u)\n3) 因此 dy/dx = cos(x^2)",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S3",
+      "gold_diagnosis_codes": ["CHAIN_RULE_MISUSE"]
+    },
+    {
+      "case_id": "planted-002",
+      "problem_input": {
+        "problem_id": "p-planted-002",
+        "problem_text": "求 f(x) = x^2 * ln(x) 的导数。",
+        "topic_tags": ["derivative", "product_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) (x^2)' = 2x\n2) (ln x)' = 1/x\n3) f'(x) = 2x * (1/x) = 2",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S3",
+      "gold_diagnosis_codes": ["PRODUCT_RULE_MISUSE"]
+    },
+    {
+      "case_id": "planted-003",
+      "problem_input": {
+        "problem_id": "p-planted-003",
+        "problem_text": "求 g(x) = (x^2+1)/(x-1) 的导数。",
+        "topic_tags": ["derivative", "quotient_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 分子 u = x^2+1, u' = 2x\n2) 分母 v = x-1, v' = 1\n3) g'(x) = (2x(x-1) + (x^2+1)) / (x-1)^2\n4) 化简得 g'(x) = (3x^2 - 2x + 1) / (x-1)^2",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "incorrect_math"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S3",
+      "gold_diagnosis_codes": ["QUOTIENT_RULE_MISUSE"]
+    },
+    {
+      "case_id": "planted-004",
+      "problem_input": {
+        "problem_id": "p-planted-004",
+        "problem_text": "求 h(x) = x^3 - 2x^2 + x - 1 的导数。",
+        "topic_tags": ["derivative", "power_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) x^3 的导数 = 3x^2\n2) -2x^2 的导数 = 4x\n3) x 的导数 = 1，-1 的导数 = 0\n4) h'(x) = 3x^2 + 4x + 1",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "incorrect_math"},
+        {"step_id": "S3", "label": "correct"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S2",
+      "gold_diagnosis_codes": ["SIGN_ARITHMETIC_ERROR"]
+    },
+    {
+      "case_id": "planted-005",
+      "problem_input": {
+        "problem_id": "p-planted-005",
+        "problem_text": "计算不定积分 ∫ 6x cos(x^2) dx。",
+        "topic_tags": ["integral", "substitution"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 令 u = x^2, du = 2x dx, 即 x dx = du/2\n2) 原式 = 6 ∫ cos(u) * (du/2)\n3) = ∫ cos(u) du\n4) = sin(u) + C = sin(x^2) + C",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "incorrect_math"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S3",
+      "gold_diagnosis_codes": ["COEFFICIENT_OMISSION"]
+    },
+    {
+      "case_id": "planted-006",
+      "problem_input": {
+        "problem_id": "p-planted-006",
+        "problem_text": "计算不定积分 ∫ (2x + e^x) dx。",
+        "topic_tags": ["integral", "indefinite"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) ∫2x dx = x^2\n2) ∫e^x dx = e^x\n3) 因此 ∫(2x + e^x) dx = x^2 + e^x",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S3",
+      "gold_diagnosis_codes": ["INTEGRATION_CONSTANT_OMISSION"]
+    },
+    {
+      "case_id": "planted-007",
+      "problem_input": {
+        "problem_id": "p-planted-007",
+        "problem_text": "计算 ∫ 2x sqrt(1+x^2) dx。",
+        "topic_tags": ["integral", "substitution"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 令 u = 1+x^2，du = x dx\n2) 原式 = 2 ∫ sqrt(u) du\n3) = 2 * (2/3) u^(3/2) + C\n4) = (4/3)(1+x^2)^(3/2) + C",
+      "gold_verification": [
+        {"step_id": "S1", "label": "incorrect_math"},
+        {"step_id": "S2", "label": "incorrect_math"},
+        {"step_id": "S3", "label": "incorrect_math"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["SUBSTITUTION_MAPPING_MISMATCH"]
+    },
+    {
+      "case_id": "planted-008",
+      "problem_input": {
+        "problem_id": "p-planted-008",
+        "problem_text": "用分部积分法计算 ∫ x cos(x) dx。",
+        "topic_tags": ["integral", "integration_by_parts"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 选择 u = cos x, dv = x dx\n2) 则 du = -sin x dx, v = x^2/2\n3) ∫x cos x dx = (x^2/2)cos x + ∫(x^2/2)sin x dx\n4) 最终结果 = (x^2/2)cos x",
+      "gold_verification": [
+        {"step_id": "S1", "label": "incorrect_math"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "correct"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S1",
+      "gold_diagnosis_codes": ["INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT"]
+    },
+    {
+      "case_id": "planted-009",
+      "problem_input": {
+        "problem_id": "p-planted-009",
+        "problem_text": "讨论函数 f(x) = (x^2 - 1)/(x - 1) 在 x = 1 处的连续性。",
+        "topic_tags": ["limit", "continuity", "domain"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 化简 f(x) = (x^2-1)/(x-1) = x+1（当 x≠1 时）\n2) lim(x→1) f(x) = lim(x→1)(x+1) = 2\n3) f(1) = (1-1)/(1-1) = 0/0 未定义\n4) 因为极限存在且 f(1) = 2，所以 f 在 x=1 处连续",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "correct"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S4",
+      "gold_diagnosis_codes": ["DOMAIN_CONDITION_IGNORED"]
+    },
+    {
+      "case_id": "planted-010",
+      "problem_input": {
+        "problem_id": "p-planted-010",
+        "problem_text": "计算定积分 ∫(0到1) (3x^2 + 2x) dx。",
+        "topic_tags": ["integral", "definite"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) 原函数 F(x) = x^3 + x^2\n2) F(1) = 1^3 + 1^2 = 1 + 1 = 3\n3) F(0) = 0\n4) 积分值 = F(1) - F(0) = 3 - 0 = 3",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "incorrect_math"},
+        {"step_id": "S3", "label": "correct"},
+        {"step_id": "S4", "label": "incorrect_math"}
+      ],
+      "gold_first_error_step": "S2",
+      "gold_diagnosis_codes": ["FINAL_CALCULATION_ERROR"]
+    },
+    {
+      "case_id": "planted-011",
+      "problem_input": {
+        "problem_id": "p-planted-011",
+        "problem_text": "计算不定积分 ∫ (3x^2 + 2x) dx。",
+        "topic_tags": ["integral", "indefinite"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) ∫3x^2 dx = x^3\n2) ∫2x dx = x^2\n3) ∫(3x^2 + 2x) dx = x^3 + x^2 + C",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "correct"}
+      ],
+      "gold_first_error_step": null,
+      "gold_diagnosis_codes": []
+    },
+    {
+      "case_id": "planted-012",
+      "problem_input": {
+        "problem_id": "p-planted-012",
+        "problem_text": "求 f(x) = x^4 + 2x^2 的导数。",
+        "topic_tags": ["derivative", "power_rule"],
+        "expected_format": "text"
+      },
+      "raw_student_solution": "1) (x^4)' = 4x^3\n2) (2x^2)' = 4x\n3) f'(x) = 4x^3 + 4x",
+      "gold_verification": [
+        {"step_id": "S1", "label": "correct"},
+        {"step_id": "S2", "label": "correct"},
+        {"step_id": "S3", "label": "correct"}
+      ],
+      "gold_first_error_step": null,
+      "gold_diagnosis_codes": []
+    }
+  ]
+}

@@ -51,6 +51,8 @@ def run_comparison(cases_file: Path, output_dir: Path) -> dict:
         "avg_first_error_hit",
         "avg_feedback_proxy",
         "avg_review_relevance_proxy",
+        "avg_error_detection_rate",
+        "avg_correct_confirmation_rate",
         "avg_low_conf_trigger_rate",
         "avg_real_provider_failure_rate",
     ]
@@ -91,6 +93,8 @@ def _print_comparison_table(c: dict) -> None:
         "avg_first_error_hit": "First Error Step Hit",
         "avg_feedback_proxy": "Feedback Proxy",
         "avg_review_relevance_proxy": "Review Relevance",
+        "avg_error_detection_rate": "Problem-Level Detection",
+        "avg_correct_confirmation_rate": "Problem-Level Confirm",
         "avg_low_conf_trigger_rate": "Low-Conf Trigger Rate",
         "avg_real_provider_failure_rate": "Provider Failure Rate",
     }

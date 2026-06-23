@@ -107,6 +107,35 @@ def _normalize_items(items: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
+_NON_CORRECT_LABELS = {"incorrect_math", "inconsistent_or_unsupported", "unclear"}
+
+
+def _error_detection_rate(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -> float:
+    """Problem-level: did pred flag ANY step as non-correct when gold has errors?
+
+    Segmentation-invariant — does not depend on step_id matching.
+    Returns 1.0 if error detected, 0.0 if missed, -1.0 if gold has no errors (N/A).
+    """
+    gold_has_error = any(g.get("label") not in (None, "correct") for g in gold)
+    if not gold_has_error:
+        return -1.0  # N/A for correct cases
+    pred_has_error = any(p.get("label") in _NON_CORRECT_LABELS for p in pred)
+    return 1.0 if pred_has_error else 0.0
+
+
+def _correct_confirmation_rate(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -> float:
+    """Problem-level: did pred flag NO steps as non-correct when gold is all correct?
+
+    Segmentation-invariant — measures false positive at problem level.
+    Returns 1.0 if correctly confirmed, 0.0 if false alarm, -1.0 if gold has errors (N/A).
+    """
+    gold_has_error = any(g.get("label") not in (None, "correct") for g in gold)
+    if gold_has_error:
+        return -1.0  # N/A for error cases
+    pred_has_error = any(p.get("label") in _NON_CORRECT_LABELS for p in pred)
+    return 0.0 if pred_has_error else 1.0
+
+
 def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -> dict[str, Any]:
     payload = json.loads(cases_file.read_text(encoding="utf-8"))
     cases = payload.get("cases", [])
@@ -168,6 +197,9 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
                 for err in provider_error_types:
                     provider_error_type_counter[err] += 1
 
+        error_detection = _error_detection_rate(pred_verify, case.get("gold_verification", []))
+        correct_confirm = _correct_confirmation_rate(pred_verify, case.get("gold_verification", []))
+
         rows.append(
             {
                 "case_id": case.get("case_id", "unknown"),
@@ -178,6 +210,8 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
                 "first_error_hit": first_error_hit,
                 "feedback_proxy": feedback_proxy,
                 "review_relevance_proxy": review_proxy,
+                "error_detection_rate": error_detection,
+                "correct_confirmation_rate": correct_confirm,
                 "low_conf_triggered": low_conf_triggered,
                 "real_provider_failed": real_provider_failed,
                 "mode": mode,
@@ -199,6 +233,11 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
     avg_real_provider_failure_rate = sum(r["real_provider_failed"] for r in rows) / n if n else 0.0
     avg_uncertainty_flags = sum(len(r["uncertainty_flags"]) for r in rows) / n if n else 0.0
 
+    error_cases = [r for r in rows if r["error_detection_rate"] >= 0]
+    correct_cases = [r for r in rows if r["correct_confirmation_rate"] >= 0]
+    avg_error_detection = sum(r["error_detection_rate"] for r in error_cases) / len(error_cases) if error_cases else 0.0
+    avg_correct_confirm = sum(r["correct_confirmation_rate"] for r in correct_cases) / len(correct_cases) if correct_cases else 0.0
+
     return {
         "num_cases": n,
         "avg_verification_accuracy": round(avg_verify, 4),
@@ -208,6 +247,8 @@ def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -
         "avg_first_error_hit": round(avg_first_error_hit, 4),
         "avg_feedback_proxy": round(avg_feedback_proxy, 4),
         "avg_review_relevance_proxy": round(avg_review_proxy, 4),
+        "avg_error_detection_rate": round(avg_error_detection, 4),
+        "avg_correct_confirmation_rate": round(avg_correct_confirm, 4),
         "avg_low_conf_trigger_rate": round(avg_low_conf_trigger_rate, 4),
         "avg_real_provider_failure_rate": round(avg_real_provider_failure_rate, 4),
         "avg_uncertainty_flags": round(avg_uncertainty_flags, 4),

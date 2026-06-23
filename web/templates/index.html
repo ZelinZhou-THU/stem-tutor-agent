@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数理基础课程学习辅导系统</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📐</text></svg>">
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="stylesheet" href="/static/style.css?v=8">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
@@ -85,6 +85,10 @@
             <a href="#admin" id="nav-admin" class="nav-item" data-page="admin" style="display:none;">
                 <span class="nav-icon">🛡️</span>
                 <span class="nav-text">管理员面板</span>
+            </a>
+            <a href="#subjects" id="nav-subjects" class="nav-item" data-page="subjects" style="display:none;">
+                <span class="nav-icon">📚</span>
+                <span class="nav-text">学科配置</span>
             </a>
         </nav>
 
@@ -1048,6 +1052,18 @@
                 </div>
             </section>
 
+            <section id="page-subjects" class="page">
+                <div class="page-header-bar">
+                    <h3>📚 学科配置</h3>
+                    <button type="button" id="subject-create-btn" class="btn-primary btn-sm">➕ 新建学科</button>
+                </div>
+                <div id="subject-loading" class="admin-empty-hint" style="text-align:center;padding:40px;">加载中...</div>
+                <div id="subject-empty" class="admin-empty-hint" style="display:none;text-align:center;padding:40px;">暂无学科配置</div>
+                <div id="subject-content" style="display:none;">
+                    <div class="subject-cards-grid" id="subject-cards-grid"></div>
+                </div>
+            </section>
+
         </div>
 
         <footer class="main-footer">
@@ -1148,7 +1164,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=18"></script>
+    <script src="/static/app.js?v=19"></script>
 
     <div id="confirm-overlay" class="confirm-overlay" style="display:none;">
         <div class="confirm-dialog">
@@ -1157,6 +1173,67 @@
             <div class="confirm-actions">
                 <button type="button" id="confirm-cancel" class="btn-secondary">取消</button>
                 <button type="button" id="confirm-ok" class="btn-danger">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="subject-editor-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:900px;">
+            <div class="modal-header">
+                <span id="subject-editor-title">编辑学科配置</span>
+                <button type="button" id="subject-editor-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height:75vh;overflow-y:auto;">
+                <div style="margin-bottom:12px;display:flex;gap:12px;">
+                    <div style="flex:1;">
+                        <label style="font-size:12px;color:var(--text-muted,#888);">学科 ID</label>
+                        <input type="text" id="subject-edit-id" class="setting-control" readonly style="width:100%;margin-top:4px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:12px;color:var(--text-muted,#888);">显示名称</label>
+                        <input type="text" id="subject-edit-name" class="setting-control" readonly style="width:100%;margin-top:4px;">
+                    </div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:12px;color:var(--text-muted,#888);">YAML 配置</label>
+                </div>
+                <textarea id="subject-yaml-editor" class="yaml-editor-textarea" spellcheck="false" placeholder="YAML 内容..."></textarea>
+                <div id="subject-editor-error" class="subject-editor-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="subject-delete-btn" class="btn-danger btn-sm" style="float:left;">删除学科</button>
+                <button type="button" id="subject-save-btn" class="btn-primary">保存</button>
+                <button type="button" id="subject-cancel-btn" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="subject-create-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <span>新建学科</span>
+                <button type="button" id="subject-create-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--text-muted,#888);">学科 ID（小写字母+数字+下划线）</label>
+                    <input type="text" id="create-subject-id" class="setting-control" placeholder="如：discrete_math" style="width:100%;margin-top:4px;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--text-muted,#888);">显示名称</label>
+                    <input type="text" id="create-subject-name" class="setting-control" placeholder="如：离散数学" style="width:100%;margin-top:4px;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:var(--text-muted,#888);">克隆自（可选）</label>
+                    <select id="create-clone-from" class="setting-control" style="width:100%;margin-top:4px;">
+                        <option value="">— 空白模板 —</option>
+                    </select>
+                </div>
+                <div id="subject-create-error" class="subject-editor-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="subject-create-confirm" class="btn-primary">创建</button>
+                <button type="button" id="subject-create-cancel" class="btn-secondary">取消</button>
             </div>
         </div>
     </div>

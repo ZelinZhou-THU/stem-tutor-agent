@@ -124,3 +124,16 @@ class SubjectRegistry:
         if config is None:
             return None
         return config.model_dump()
+
+    @classmethod
+    def reload(cls) -> None:
+        """Clear cache and reload all YAML files."""
+        cls._registry = {}
+        cls.initialize()
+
+    @classmethod
+    def subjects_dir(cls) -> Path:
+        """Return the subjects directory path."""
+        if cls._subjects_dir is None:
+            cls.initialize()
+        return cls._subjects_dir or Path(__file__).parent

@@ -78,7 +78,7 @@
 
     /* ===== Router ===== */
     var AppRouter = {
-        pages: ["new", "queue", "history", "stats", "report", "logs", "settings", "admin"],
+        pages: ["new", "queue", "history", "stats", "report", "logs", "settings", "admin", "subjects"],
         currentPage: "new",
 
         init: function () {
@@ -121,7 +121,7 @@
 
         navigate: function (page, skipHash) {
             if (!page || this.pages.indexOf(page) < 0) page = "new";
-            if (page === "admin") {
+            if (page === "admin" || page === "subjects") {
                 try {
                     var currentUser = JSON.parse(localStorage.getItem("stem_tutor_user") || "null");
                     if (!currentUser || !currentUser.is_admin) page = "new";
@@ -149,7 +149,8 @@
                 report: "\u5b66\u4e60\u62a5\u544a",
                 logs: "\u8c03\u8bd5\u65e5\u5fd7",
                 settings: "\u8bbe\u7f6e",
-                admin: "\u7ba1\u7406\u5458\u9762\u677f"
+                admin: "\u7ba1\u7406\u5458\u9762\u677f",
+                subjects: "\u5b66\u79d1\u914d\u7f6e"
             };
             var titleEl = $("page-title");
             if (titleEl) titleEl.textContent = titles[page] || page;
@@ -165,6 +166,7 @@
             if (page === "settings") SettingsModule.loadValues();
             if (page === "logs") LogsModule.init();
             if (page === "admin" && typeof AdminPanel !== "undefined") AdminPanel.load();
+            if (page === "subjects" && typeof SubjectAdminModule !== "undefined") SubjectAdminModule.load();
             var newBtn = $("btn-new-diagnosis");
             if (newBtn) newBtn.style.display = page === "new" ? "" : "none";
         },
@@ -2344,9 +2346,11 @@
             var nameEl = $("user-display-name");
             var infoEl = $("user-info");
             var adminNav = $("nav-admin");
+            var subjNav = $("nav-subjects");
             if (nameEl && user) nameEl.textContent = user.username || "";
             if (infoEl) infoEl.style.display = "flex";
             if (adminNav) adminNav.style.display = user && user.is_admin ? "" : "none";
+            if (subjNav) subjNav.style.display = user && user.is_admin ? "" : "none";
         },
 
         _bindEvents: function () {
@@ -2462,8 +2466,10 @@
             localStorage.removeItem(this.USER_KEY);
             var infoEl = $("user-info");
             var adminNav = $("nav-admin");
+            var subjNav = $("nav-subjects");
             if (infoEl) infoEl.style.display = "none";
             if (adminNav) adminNav.style.display = "none";
+            if (subjNav) subjNav.style.display = "none";
             this.showAuthScreen();
         },
 
@@ -3305,6 +3311,260 @@
 
     window.AdminPanel = AdminPanel;
 
+    /* ===== Subject Admin Module ===== */
+    var SubjectAdminModule = {
+        _loaded: false,
+        _subjects: [],
+        _editingId: null,
+        _originalYaml: "",
+
+        init: function () {
+            var self = this;
+            var createBtn = $("subject-create-btn");
+            if (createBtn) createBtn.addEventListener("click", function () { self._openCreateModal(); });
+
+            var saveBtn = $("subject-save-btn");
+            if (saveBtn) saveBtn.addEventListener("click", function () { self._save(); });
+
+            var cancelBtn = $("subject-cancel-btn");
+            if (cancelBtn) cancelBtn.addEventListener("click", function () { self._closeEditor(); });
+
+            var closeBtn = $("subject-editor-close");
+            if (closeBtn) closeBtn.addEventListener("click", function () { self._closeEditor(); });
+
+            var delBtn = $("subject-delete-btn");
+            if (delBtn) delBtn.addEventListener("click", function () { self._delete(); });
+
+            var createConfirm = $("subject-create-confirm");
+            if (createConfirm) createConfirm.addEventListener("click", function () { self._createSubject(); });
+
+            var createCancel = $("subject-create-cancel");
+            if (createCancel) createCancel.addEventListener("click", function () { self._closeCreateModal(); });
+
+            var createClose = $("subject-create-close");
+            if (createClose) createClose.addEventListener("click", function () { self._closeCreateModal(); });
+        },
+
+        load: function () {
+            var self = this;
+            var loading = $("subject-loading");
+            var empty = $("subject-empty");
+            var content = $("subject-content");
+            if (loading) loading.style.display = "";
+            if (empty) empty.style.display = "none";
+            if (content) content.style.display = "none";
+
+            fetch("/api/admin/subjects", { headers: AuthModule.getAuthHeader() })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    self._subjects = data || [];
+                    if (loading) loading.style.display = "none";
+                    if (!self._subjects.length) {
+                        if (empty) empty.style.display = "";
+                        return;
+                    }
+                    if (content) content.style.display = "";
+                    self._renderCards();
+                })
+                .catch(function (err) {
+                    if (loading) loading.textContent = "加载失败: " + (err.message || "未知错误");
+                });
+        },
+
+        _renderCards: function () {
+            var grid = $("subject-cards-grid");
+            if (!grid) return;
+            var self = this;
+            var html = "";
+            for (var i = 0; i < this._subjects.length; i++) {
+                var s = this._subjects[i];
+                html += '<div class="subject-card" data-subject-id="' + s.subject_id + '">';
+                html += '<div class="subject-card-header">';
+                html += '<span class="subject-card-icon">📘</span>';
+                html += '<div>';
+                html += '<div class="subject-card-name">' + self._esc(s.display_name) + '</div>';
+                html += '<div class="subject-card-id">' + self._esc(s.subject_id) + '</div>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="subject-card-stats">';
+                html += '<span class="subject-stat">🏷️ ' + s.taxonomy_count + ' 错误类型</span>';
+                html += '<span class="subject-stat">📌 ' + s.topic_count + ' 主题</span>';
+                html += '<span class="subject-stat">⚙️ ' + s.rule_count + ' 规则</span>';
+                if (s.has_budget) html += '<span class="subject-stat">💰 预算</span>';
+                html += '</div>';
+                html += '</div>';
+            }
+            grid.innerHTML = html;
+            grid.querySelectorAll(".subject-card").forEach(function (card) {
+                card.addEventListener("click", function () {
+                    self._openEditor(card.getAttribute("data-subject-id"));
+                });
+            });
+        },
+
+        _openEditor: function (subjectId) {
+            var self = this;
+            this._editingId = subjectId;
+            var modal = $("subject-editor-modal");
+            var titleEl = $("subject-editor-title");
+            var idEl = $("subject-edit-id");
+            var nameEl = $("subject-edit-name");
+            var editor = $("subject-yaml-editor");
+            var errDiv = $("subject-editor-error");
+            var delBtn = $("subject-delete-btn");
+
+            if (titleEl) titleEl.textContent = "编辑学科配置";
+            if (idEl) idEl.value = subjectId;
+            if (errDiv) errDiv.style.display = "none";
+            if (editor) editor.value = "加载中...";
+
+            var subj = null;
+            for (var i = 0; i < this._subjects.length; i++) {
+                if (this._subjects[i].subject_id === subjectId) {
+                    subj = this._subjects[i];
+                    break;
+                }
+            }
+            if (nameEl && subj) nameEl.value = subj.display_name;
+            if (delBtn) delBtn.style.display = "";
+
+            fetch("/api/admin/subjects/" + encodeURIComponent(subjectId), { headers: AuthModule.getAuthHeader() })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (editor) editor.value = data.yaml_content || "";
+                    self._originalYaml = data.yaml_content || "";
+                })
+                .catch(function (err) {
+                    if (editor) editor.value = "加载失败: " + (err.message || "");
+                });
+
+            if (modal) modal.style.display = "";
+        },
+
+        _closeEditor: function () {
+            var modal = $("subject-editor-modal");
+            if (modal) modal.style.display = "none";
+            this._editingId = null;
+            this._originalYaml = "";
+        },
+
+        _save: function () {
+            var self = this;
+            if (!this._editingId) return;
+            var editor = $("subject-yaml-editor");
+            var errDiv = $("subject-editor-error");
+            var yaml = editor ? editor.value : "";
+
+            if (errDiv) errDiv.style.display = "none";
+
+            fetch("/api/admin/subjects/" + encodeURIComponent(this._editingId), {
+                method: "PUT",
+                headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
+                body: JSON.stringify({ yaml_content: yaml })
+            })
+                .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "保存失败"); return d; }); })
+                .then(function () {
+                    ExportModule._showToast("保存成功");
+                    self._originalYaml = yaml;
+                    self.load();
+                })
+                .catch(function (err) {
+                    if (errDiv) {
+                        errDiv.textContent = err.message || "保存失败";
+                        errDiv.style.display = "";
+                    }
+                });
+        },
+
+        _delete: function () {
+            var self = this;
+            if (!this._editingId) return;
+
+            if (!window.confirm("确认删除学科 " + this._editingId + "？此操作不可撤销。")) return;
+
+            fetch("/api/admin/subjects/" + encodeURIComponent(this._editingId), {
+                method: "DELETE",
+                headers: AuthModule.getAuthHeader()
+            })
+                .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "删除失败"); return d; }); })
+                .then(function () {
+                    ExportModule._showToast("已删除");
+                    self._closeEditor();
+                    self.load();
+                })
+                .catch(function (err) {
+                    alert("删除失败: " + (err.message || ""));
+                });
+        },
+
+        _openCreateModal: function () {
+            var self = this;
+            var modal = $("subject-create-modal");
+            var select = $("create-clone-from");
+
+            if (select) {
+                var html = '<option value="">— 空白模板 —</option>';
+                for (var i = 0; i < this._subjects.length; i++) {
+                    var s = this._subjects[i];
+                    html += '<option value="' + s.subject_id + '">克隆 ' + self._esc(s.display_name) + ' (' + s.subject_id + ')</option>';
+                }
+                select.innerHTML = html;
+            }
+
+            var errDiv = $("subject-create-error");
+            if (errDiv) errDiv.style.display = "none";
+
+            if (modal) modal.style.display = "";
+        },
+
+        _closeCreateModal: function () {
+            var modal = $("subject-create-modal");
+            if (modal) modal.style.display = "none";
+        },
+
+        _createSubject: function () {
+            var self = this;
+            var idInput = $("create-subject-id");
+            var nameInput = $("create-subject-name");
+            var cloneSelect = $("create-clone-from");
+            var errDiv = $("subject-create-error");
+
+            var sid = idInput ? idInput.value.trim() : "";
+            var sname = nameInput ? nameInput.value.trim() : "";
+            var clone = cloneSelect ? cloneSelect.value : "";
+
+            if (errDiv) errDiv.style.display = "none";
+
+            fetch("/api/admin/subjects", {
+                method: "POST",
+                headers: Object.assign({ "Content-Type": "application/json" }, AuthModule.getAuthHeader()),
+                body: JSON.stringify({ subject_id: sid, display_name: sname, clone_from: clone })
+            })
+                .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || "创建失败"); return d; }); })
+                .then(function () {
+                    ExportModule._showToast("学科创建成功");
+                    self._closeCreateModal();
+                    self.load();
+                    if (idInput) idInput.value = "";
+                    if (nameInput) nameInput.value = "";
+                })
+                .catch(function (err) {
+                    if (errDiv) {
+                        errDiv.textContent = err.message || "创建失败";
+                        errDiv.style.display = "";
+                    }
+                });
+        },
+
+        _esc: function (s) {
+            var div = document.createElement("div");
+            div.textContent = s || "";
+            return div.innerHTML;
+        }
+    };
+
+    window.SubjectAdminModule = SubjectAdminModule;
+
     function openCropModal(file, callback) {
         cropCallback = callback;
         var reader = new FileReader();
@@ -3350,6 +3610,7 @@
         ExportModule.init();
         MasteryModule.init();
         AdminPanel.init();
+        SubjectAdminModule.init();
 
         // Bind history filters
         ["history-filter-subject", "history-filter-status"].forEach(function (id) {

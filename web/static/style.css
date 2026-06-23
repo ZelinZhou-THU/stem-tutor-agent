@@ -4769,3 +4769,79 @@ textarea {
     color: var(--text-primary);
     font-size: 14px;
 }
+
+/* ===== Subject Admin ===== */
+.subject-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 4px 0;
+}
+.subject-card {
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.subject-card:hover {
+    border-color: var(--accent, #4a9eff);
+    box-shadow: 0 4px 12px rgba(74,158,255,0.15);
+}
+.subject-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.subject-card-icon {
+    font-size: 28px;
+}
+.subject-card-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.subject-card-id {
+    font-size: 12px;
+    color: var(--text-muted, #888);
+    font-family: monospace;
+}
+.subject-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.subject-stat {
+    font-size: 12px;
+    color: var(--text-muted, #888);
+    background: var(--bg-tertiary, rgba(255,255,255,0.04));
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+.yaml-editor-textarea {
+    width: 100%;
+    min-height: 520px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 12px;
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    border-radius: 8px;
+    background: var(--bg-primary, #1a1a2e);
+    color: var(--text-primary, #eee);
+    resize: vertical;
+    tab-size: 2;
+    white-space: pre;
+    overflow-x: auto;
+}
+.subject-editor-error {
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 13px;
+}

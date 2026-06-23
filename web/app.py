@@ -1155,6 +1155,181 @@ async def admin_export_problems(
     )
 
 
+def _subjects_dir():
+    from stem_tutor.subjects.loader import SubjectRegistry
+    return SubjectRegistry.subjects_dir()
+
+
+def _reload_subject_cache():
+    from stem_tutor.subjects.loader import SubjectRegistry
+    from stem_tutor.subjects.context import clear_context_cache
+    SubjectRegistry.reload()
+    clear_context_cache()
+
+
+@app.get("/api/admin/subjects")
+async def admin_list_subjects(admin: dict = Depends(get_admin_user)):
+    from stem_tutor.subjects.loader import SubjectRegistry
+    import os
+
+    SubjectRegistry.initialize()
+    subjects_dir = _subjects_dir()
+    result = []
+    for sid in SubjectRegistry.list_ids():
+        config = SubjectRegistry.get(sid)
+        if config is None:
+            continue
+        file_path = subjects_dir / f"{sid}.yaml"
+        stat = os.stat(file_path) if file_path.exists() else None
+        result.append({
+            "subject_id": sid,
+            "display_name": config.display_name,
+            "display_name_en": config.display_name_en,
+            "taxonomy_count": len(config.error_taxonomy),
+            "topic_count": len(config.topic_keywords) if config.topic_keywords else 0,
+            "rule_count": len(config.rule_adjustments) if config.rule_adjustments else 0,
+            "has_budget": bool(config.budget_overrides),
+            "file_size": stat.st_size if stat else 0,
+            "file_mtime": stat.st_mtime if stat else 0,
+        })
+    return result
+
+
+@app.get("/api/admin/subjects/{subject_id}")
+async def admin_get_subject(subject_id: str, admin: dict = Depends(get_admin_user)):
+    file_path = _subjects_dir() / f"{subject_id}.yaml"
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content={"detail": f"学科 {subject_id} 不存在"})
+    yaml_content = file_path.read_text(encoding="utf-8")
+    return {"subject_id": subject_id, "yaml_content": yaml_content, "file_path": str(file_path)}
+
+
+@app.put("/api/admin/subjects/{subject_id}")
+async def admin_update_subject(subject_id: str, req: dict = Body(...), admin: dict = Depends(get_admin_user)):
+    import yaml as _yaml
+    from stem_tutor.subjects.loader import SubjectConfigModel
+
+    yaml_content = req.get("yaml_content", "")
+    if not yaml_content.strip():
+        return JSONResponse(status_code=400, content={"detail": "YAML 内容不能为空"})
+
+    try:
+        data = _yaml.safe_load(yaml_content)
+    except _yaml.YAMLError as e:
+        return JSONResponse(status_code=400, content={"detail": f"YAML 语法错误: {e}"})
+
+    if not isinstance(data, dict):
+        return JSONResponse(status_code=400, content={"detail": "YAML 根节点必须是字典"})
+
+    data["subject_id"] = subject_id
+    try:
+        SubjectConfigModel(**data)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"detail": f"配置验证失败: {e}"})
+
+    file_path = _subjects_dir() / f"{subject_id}.yaml"
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content={"detail": f"学科 {subject_id} 不存在"})
+    file_path.write_text(yaml_content, encoding="utf-8")
+    _reload_subject_cache()
+    return {"ok": True, "subject_id": subject_id}
+
+
+@app.post("/api/admin/subjects")
+async def admin_create_subject(req: dict = Body(...), admin: dict = Depends(get_admin_user)):
+    import re
+    import yaml as _yaml
+    from stem_tutor.subjects.loader import SubjectRegistry, SubjectConfigModel
+
+    subject_id = req.get("subject_id", "").strip()
+    display_name = req.get("display_name", "").strip()
+    clone_from = req.get("clone_from", "").strip()
+
+    if not subject_id or not re.match(r'^[a-z][a-z0-9_]*$', subject_id):
+        return JSONResponse(status_code=400, content={"detail": "subject_id 必须以小写字母开头，只能包含小写字母、数字、下划线"})
+    if not display_name:
+        return JSONResponse(status_code=400, content={"detail": "显示名称不能为空"})
+
+    subjects_dir = _subjects_dir()
+    file_path = subjects_dir / f"{subject_id}.yaml"
+    if file_path.exists():
+        return JSONResponse(status_code=400, content={"detail": f"学科 {subject_id} 已存在"})
+
+    if clone_from:
+        src = subjects_dir / f"{clone_from}.yaml"
+        if not src.exists():
+            return JSONResponse(status_code=400, content={"detail": f"克隆源 {clone_from} 不存在"})
+        yaml_content = src.read_text(encoding="utf-8")
+        data = _yaml.safe_load(yaml_content)
+        if isinstance(data, dict):
+            data["subject_id"] = subject_id
+            data["display_name"] = display_name
+            yaml_content = _yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    else:
+        yaml_content = f"""subject_id: {subject_id}
+display_name: {display_name}
+display_name_en: ""
+
+error_taxonomy:
+  NOTATION_UNCLEAR:
+    category: Reasoning Quality Issues
+    short_desc: 符号或表达不够清晰
+    cues: []
+
+topic_keywords: {{}}
+
+prompts:
+  system_role: "你是一位经验丰富的{display_name}老师。"
+  verification_role: "你是一位{display_name}阅卷老师，请逐步验证学生的解答。"
+  verification_extra: ""
+  final_answer_role: ""
+  final_answer_extra: ""
+  diagnosis_extra: ""
+  feedback_extra: ""
+  review_problem_extra: ""
+  review_problem_all_correct_extra: ""
+
+sympy_postprocess:
+  strip_prefixes: []
+  derivative_patterns: []
+
+rule_adjustments: []
+
+mock:
+  reference_solution:
+    reference_text: ""
+    key_assertions: []
+  review_problems: []
+"""
+
+    try:
+        data = _yaml.safe_load(yaml_content)
+        SubjectConfigModel(**data)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"detail": f"生成的配置验证失败: {e}"})
+
+    file_path.write_text(yaml_content, encoding="utf-8")
+    _reload_subject_cache()
+    return {"ok": True, "subject_id": subject_id}
+
+
+@app.delete("/api/admin/subjects/{subject_id}")
+async def admin_delete_subject(subject_id: str, admin: dict = Depends(get_admin_user)):
+    from stem_tutor.subjects.loader import SubjectRegistry
+
+    SubjectRegistry.initialize()
+    if len(SubjectRegistry.list_ids()) <= 1:
+        return JSONResponse(status_code=400, content={"detail": "至少保留一个学科，无法删除"})
+
+    file_path = _subjects_dir() / f"{subject_id}.yaml"
+    if not file_path.exists():
+        return JSONResponse(status_code=404, content={"detail": f"学科 {subject_id} 不存在"})
+
+    file_path.unlink()
+    _reload_subject_cache()
+    return {"ok": True, "subject_id": subject_id}
+
+
 if __name__ == "__main__":
     import uvicorn
 

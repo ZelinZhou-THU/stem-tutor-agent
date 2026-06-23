@@ -101,3 +101,8 @@ def get_subject_context(subject_id: str = "calculus") -> SubjectContext:
 
 def list_subject_ids() -> list[str]:
     return SubjectRegistry.list_ids()
+
+
+def clear_context_cache() -> None:
+    """Clear the context cache so changes to subject YAML take effect."""
+    _context_cache.clear()

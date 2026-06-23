@@ -110,6 +110,7 @@ prompts:
     10. 必须有具体错误才 flag：仅当你能指出**具体的、可验证的**错误时（如：具体的符号错误、具体的系数错误、具体的积分上下限错误、具体的等式等价性问题），才能判为 incorrect_math。「看起来不对」「感觉像重复」「可能有问题」等模糊判断**不构成**实质错误，不足以 flag。如果你的判断只是「我对这段数学的理解跟学生写法不一致」，但说不出具体哪里错——**默认判 correct**。
     【示例 1】学生 S3 写「∭(z²+x²+y²) dxdydz = ∭ρ²·ρ² sinφ dρdθdφ = ∭ρ⁴ sinφ dρdθdφ」。如果 LLM 想 flag「被积函数重复」，但说不出「哪个 ρ² 是错的、应为什么」，那这个判断就是模糊的，不构成实质错误 → 判 correct。
     【示例 2】学生写「x²+y² = r²，体积元 = r sinθ dr dθ dφ」，后续 r³sinθ 计算正确 → 不要 flag「r² × r sinθ 像是 r³ 错」——这是极坐标标准写法 → 判 correct。
+    11. 不定积分常数检查：如果当前步骤是不定积分的最终结果（即步骤中包含 ∫ 和 dx，但不包含积分上下限），且结果中缺少积分常数 +C，应判为 incorrect_math。注意：积分常数 C 不属于规则 4 中的「常规计算」，不可省略。此规则仅适用于不定积分；定积分（有上下限，如 ∫₀¹）不需要 +C。
   final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
   final_answer_extra: "请先自己求解，然后与学生答案对比。对精确值要求严格。请用中文输出 explanation 字段。"
   diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
@@ -144,14 +145,6 @@ rule_adjustments:
     label: "inconsistent_or_unsupported"
     evidence: "Step uses an inference marker without a concrete equivalence."
     violated_principles: ["insufficient_justification"]
-  - conditions:
-      - type: contains
-        value: "u ="
-      - type: not_contains
-        value: "du"
-    label: "incorrect_math"
-    evidence: "Substitution appears without differential mapping."
-    violated_principles: ["substitution_mapping"]
 
 budget_overrides:
   reference:

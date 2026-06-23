@@ -173,12 +173,6 @@ def _get_rule_adjustments(subject_id: str = "calculus") -> list[dict[str, Any]]:
                 "evidence": "Step uses an inference marker without a concrete equivalence.",
                 "violated_principles": ["insufficient_justification"],
             },
-            {
-                "conditions": [{"type": "contains", "value": "u ="}, {"type": "not_contains", "value": "du"}],
-                "label": "incorrect_math",
-                "evidence": "Substitution appears without differential mapping.",
-                "violated_principles": ["substitution_mapping"],
-            },
         ]
 
 

@@ -46,7 +46,7 @@ def poll_batch_status(
         resp = requests.get(
             f"{base_url}/batch/{batch_id}/status",
             headers={"Authorization": f"Bearer {token}"},
-            timeout=10,
+            timeout=120,
         )
         resp.raise_for_status()
         status = resp.json()

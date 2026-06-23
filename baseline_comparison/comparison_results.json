@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "agent_model": "qwen/qwen3.6-plus",
+    "baseline_model": "qwen/qwen3.6-plus",
+    "agent_items": 22,
+    "baseline_items": 22
+  },
+  "phase1": {
+    "agent": {
+      "tp": 4,
+      "fn": 1,
+      "fp": 2,
+      "tn": 3,
+      "detection_recall": 0.8,
+      "false_positive_rate": 0.4,
+      "code_accuracy": 0.2
+    },
+    "baseline": {
+      "tp": 4,
+      "fn": 1,
+      "fp": 2,
+      "tn": 3,
+      "detection_recall": 0.8,
+      "false_positive_rate": 0.4,
+      "code_accuracy": 0.6
+    }
+  },
+  "phase2": {
+    "agent": {
+      "verification_accuracy": 0.9236,
+      "lenient_verification_accuracy": 0.9375,
+      "error_step_accuracy": 1.0,
+      "correct_step_accuracy": 0.9167,
+      "diagnosis_hit": 0.8333,
+      "error_step_recall": 0.9792,
+      "taxonomy_category_hit": 0.9167,
+      "first_error_hit": 0.8333,
+      "feedback_proxy": 0.9167,
+      "review_relevance_proxy": 0.8333
+    },
+    "baseline": {
+      "verification_accuracy": 0.9375,
+      "lenient_verification_accuracy": 0.9375,
+      "error_step_accuracy": 0.9583,
+      "correct_step_accuracy": 1.0,
+      "diagnosis_hit": 0.9167,
+      "error_step_recall": 0.9583,
+      "taxonomy_category_hit": 0.9167,
+      "first_error_hit": 1.0,
+      "feedback_proxy": 1.0,
+      "review_relevance_proxy": 1.0
+    }
+  }
+}

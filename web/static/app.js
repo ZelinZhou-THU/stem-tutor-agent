@@ -6016,7 +6016,13 @@
                 var statusLabel = {pending:"等待中",running:"运行中",paused:"已暂停",completed:"已完成",cancelled:"已取消"}[b.status] || b.status;
                 html += '<div class="batch-card" data-batch-id="' + b.id + '">';
                 html += '<div class="batch-card-header">';
-                html += '<span class="batch-card-meta">' + (settings.subject_id || "微积分") + ' | ' + (settings.depth || "标准") + ' | ' + (b.created_at || "") + '</span>';
+                var modeRaw = settings.mode || "workflow_r1";
+                var modeLabel = modeRaw.startsWith("baseline") ? "Baseline" : "Workflow";
+                var modeClass = modeRaw.startsWith("baseline") ? "batch-mode-baseline" : "batch-mode-workflow";
+                html += '<div class="batch-card-meta">';
+                html += '<span class="batch-mode-badge ' + modeClass + '">' + modeLabel + '</span>';
+                html += '<span class="batch-card-meta-text">' + (settings.subject_id || "微积分") + ' | ' + (settings.depth || "标准") + ' | ' + (b.created_at || "") + '</span>';
+                html += '</div>';
                 html += '<span class="batch-status-badge ' + statusClass + '">' + statusLabel + '</span>';
                 html += '</div>';
                 html += '<div class="batch-card-progress">';

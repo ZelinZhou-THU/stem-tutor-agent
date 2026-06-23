@@ -4614,7 +4614,37 @@ textarea {
 }
 .batch-card:hover { border-color: var(--accent, #00d4ff); }
 .batch-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.batch-card-meta { font-size: 13px; color: var(--text-muted, #888); }
+.batch-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-muted, #888);
+}
+.batch-card-meta-text {
+    font-size: 13px;
+    color: var(--text-muted, #888);
+}
+.batch-mode-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+}
+.batch-mode-workflow {
+    background: rgba(74, 158, 255, 0.15);
+    color: #4a9eff;
+    border: 1px solid rgba(74, 158, 255, 0.4);
+}
+.batch-mode-baseline {
+    background: rgba(255, 159, 67, 0.15);
+    color: #ff9f43;
+    border: 1px solid rgba(255, 159, 67, 0.4);
+}
 .batch-card-progress { margin: 10px 0; }
 .batch-progress-bar {
     height: 8px; background: var(--border-color, #333); border-radius: 4px; overflow: hidden;

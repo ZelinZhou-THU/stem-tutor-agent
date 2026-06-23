@@ -74,6 +74,8 @@ prompts:
     3. 检查守恒定律的适用条件是否满足
     4. 只有当步骤本身存在物理错误，或完全无法理解时，才判为 incorrect_math 或 unclear
     5. 请用中文输出 evidence 字段，说明判断依据
+    6. 工具结果优先：如果 execute_python 工具已对当前步骤进行了验证（如 sympy 化简、数值计算等），**工具的数值结果应当作为权威依据**。不要基于对数学符号的字面解读来推翻工具的计算结果，除非你能指出工具结果与学生表达式之间的具体矛盾。
+    7. 必须有具体错误才 flag：仅当你能指出**具体的、可验证的**错误时，才能判为 incorrect_math。「看起来不对」「感觉像有问题」等模糊判断**不构成**实质错误，不足以 flag。如果你说不出具体哪里错——**默认判 correct**。
   final_answer_role: "你是一位{subject_name}阅卷老师。请判断学生的最终答案是否正确。"
   final_answer_extra: "请先自己求解，然后与学生答案对比。注意检查单位、量纲和有效数字。请用中文输出 explanation 字段。"
   diagnosis_extra: "请诊断学生错误的根本原因，使用一个错误类型代码。请用中文输出 root_cause_hypothesis 和 supporting_evidence 字段。"
@@ -100,14 +102,6 @@ rule_adjustments:
     label: "inconsistent_or_unsupported"
     evidence: "Step uses an inference marker without a concrete equivalence."
     violated_principles: ["insufficient_justification"]
-  - conditions:
-      - type: contains
-        value: "conservation"
-      - type: not_contains
-        value: "condition"
-    label: "unclear"
-    evidence: "Conservation law stated without verifying applicable conditions."
-    violated_principles: ["clarity"]
 
 budget_overrides:
   reference:

@@ -713,6 +713,8 @@ textarea {
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    min-width: 72px;
 }
 
 .btn-secondary:hover {

@@ -31,7 +31,7 @@ flowchart TD
     subgraph "Multi-strategy Verification Chain"
         D
         S1["SymPy Symbolic"] --> S2["Numerical Sampling"]
-        S2 --> S3["Agent Tools (21)"]
+        S2 --> S3["Agent Tools (19)"]
         S3 --> S4["LLM Text Reasoning"]
         S4 --> S5["Rule Fallback"]
     end
@@ -45,27 +45,31 @@ Paste your solution into ChatGPT and it says *"This is incorrect."* STEM Tutor A
 
 | Generic LLM Chat | STEM Tutor Agent |
 |---|---|
-| "Your answer is wrong" | Pinpoints **exact step** with error code |
-| No structured verification | **Multi-strategy chain**: SymPy → numerical → agent tools → LLM → rules |
+| "Your answer is wrong" | Pinpoints **exact step** with error code and confidence |
+| No structured verification | **4-layer verification chain**: SymPy → numerical → agent tools → LLM |
 | One-shot feedback | **Follow-up chat** to drill into any step |
 | No practice problems | Auto-generates **targeted review problems** based on weak points |
 | Text-only input | **OCR + image crop + LaTeX preview** |
 | No progress tracking | **Learning reports** aggregating knowledge gaps across problems |
+| Single-subject, hard-coded | **8 STEM subjects** via YAML configs, extensible through UI |
+| Black-box output | **Structured intermediate outputs** (normalized steps, reference solution, trace, tool-call logs) |
 
 ## Key Features
 
-- 🔢 **Multi-strategy Verification** — 5-layer chain (SymPy symbolic → numerical sampling → 21 agent tools → LLM reasoning → rule fallback) verifies every step with mathematical rigor
-- 🎯 **Structured Error Diagnosis** — 9 error codes across 4 categories (rule application, algebraic manipulation, theorem misuse, conceptual confusion) with evidence chains and confidence scores
+- 🔢 **Multi-strategy Verification** — 4-layer verification chain (SymPy symbolic → numerical sampling → agent tools → LLM reasoning) verifies every step with mathematical rigor
+- 🎯 **Structured Error Diagnosis** — 16 error codes across 5 categories (rule application, differentiation, integration, algebraic manipulation, theorem misuse, reasoning quality) with evidence chains and confidence scores
 - 📝 **Targeted Practice Generation** — Auto-generates 1–3 review problems targeting identified weak points, not random exercises
 - 🧪 **8 STEM Subjects** — Calculus, Linear Algebra, Mechanics, Electromagnetism, Optics, Quantum Mechanics, Relativity, Thermodynamics with per-subject YAML configs and error taxonomy
-- 🖥️ **Full Web UI** — FastAPI + vanilla JS SPA with OCR upload (crop + drag-and-drop), KaTeX preview, SSE streaming, follow-up chat, batch queue, user accounts, and admin panel
-- ⚡ **Budget-Aware Agent** — Global budget pool + per-node time quotas; 3 depth levels (`quick` / `standard` / `thorough`) with automatic fallback to lightweight strategies
+- 🖥️ **Full Web UI** — FastAPI + vanilla JS SPA with OCR upload (crop + drag-and-drop), KaTeX preview, SSE streaming, follow-up chat, batch queue with WORKFLOW/BASELINE mode badges, user accounts, and admin panel
+- 🛠️ **Admin YAML Configuration** — Built-in YAML editor UI for managing subject configurations (taxonomy, prompts, rules, budgets) with live hot-reloading; supports creating new subjects from templates
+- 📊 **Evaluation Data & Reproducibility** — `baseline_comparison/` directory contains pre-exported evaluation JSONs and a standalone `compute_comparison.py` script that reproduces all reported metrics without API keys or database access
+- ⚡ **Budget-Aware Agent** — Global budget pool + per-node time quotas; configurable depth levels (`no_ref` / `with_ref`) with automatic fallback to lightweight strategies (implemented but disabled by default for accuracy)
 
 ## Quick Start
 
 ### Requirements
 
-- Python 3.11 – 3.12
+- Python 3.11 (required; the project was developed in a conda environment. Python >=3.13 may encounter pydantic compatibility issues)
 
 ### Install & Run
 
@@ -80,7 +84,7 @@ pip install -e ".[dev]"
 python -m web.app
 ```
 
-Visit http://localhost:8000. First startup auto-creates admin account: `admin / admin123`.
+Visit http://localhost:8000. First startup auto-creates an admin account with a random password saved to `data/admin_password.txt`; the system requires a password change on first login, after which the file is deleted.
 
 ### Configuration
 
@@ -174,7 +178,7 @@ stem-tutor-agent/
 | `finalize_report` | Report assembly |
 
 <details>
-<summary>🔧 Agent Tool Chain (21 tools)</summary>
+<summary>🔧 Agent Tool Chain (19 tools)</summary>
 
 | Module | Tool | Description |
 |--------|------|-------------|
@@ -376,7 +380,7 @@ The project reads `key.env` from the workspace root (see `key.env.example`), wit
 | `STEM_TUTOR_TIMEOUT` | Request timeout (seconds) | `300` |
 | `STEM_TUTOR_MAX_RETRIES` | Maximum retries | `1` |
 | `STEM_TUTOR_ALLOW_MOCK_FALLBACK` | Allow fallback to mock | `true` |
-| `STEM_TUTOR_DEPTH` | Analysis depth (`quick` / `standard` / `thorough`) | `standard` |
+| `STEM_TUTOR_DEPTH` | Analysis depth (`no_ref` / `with_ref`) | `with_ref` |
 | `STEM_TUTOR_SIMPLE_FASTPATH` | Enable simple question fast path | `true` |
 | `STEM_TUTOR_DETERMINISTIC_VERIFY` | Enable deterministic verification priority | `true` |
 | `STEM_TUTOR_REFERENCE_MAX_TOOL_ROUNDS` | Max tool rounds for reference solution | `1` |
@@ -486,14 +490,14 @@ Supports 4 model groups: `reasoning` / `fast` / `ocr` / `baseline`. Each node ca
 - **Domain Knowledge Separation** — Error taxonomy in `taxonomy/`, subject config in `subjects/`
 - **Swappable Providers** — Provider interface supports seamless mock / real LLM switching
 - **Structured Output First** — All nodes output Pydantic models for stable structure
-- **Budget-Aware Degradation** — Global budget pool with automatic fallback to lightweight strategies
+- **Budget-Aware Degradation** — Global budget pool with automatic fallback to lightweight strategies (disabled by default for accuracy)
 
 ## Notes
 
 - This is a course final project oriented engineering prototype
 - Focus on explainability and verifiability, prioritizing process trustworthiness
 - Contributions welcome — please maintain clear module boundaries
-- First startup auto-creates admin account: `admin / admin123`
+- First startup auto-creates an admin account with a random password stored in `data/admin_password.txt`
 - Visit `http://localhost:8000/#admin` for the admin panel (requires admin login)
 
 ## Disclaimer

@@ -1,0 +1,4511 @@
+{
+  "metadata": {
+    "mode": "baseline_qwen",
+    "model": "qwen/qwen3.6-plus",
+    "total_items": 22,
+    "phase1_items": 10,
+    "phase2_items": 12,
+    "exported_at": "2026-06-23T22:27:55.505234"
+  },
+  "phase1_aggregate": {
+    "tp": 4,
+    "fn": 1,
+    "fp": 2,
+    "tn": 3,
+    "detection_recall": 0.8,
+    "false_positive_rate": 0.4,
+    "code_accuracy": 0.6
+  },
+  "phase2_aggregate": {
+    "verification_accuracy": 0.9375,
+    "lenient_verify_acc": 0.9375,
+    "error_step_accuracy": 0.9583,
+    "correct_step_accuracy": 1.0,
+    "diagnosis_hit": 0.9167,
+    "error_step_recall": 0.9583,
+    "taxonomy_category_hit": 0.9167,
+    "first_error_hit": 1.0
+  },
+  "items": [
+    {
+      "seq": 0,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(2)_第九周作业_Q13.3-6(1)",
+      "gold_labels": {
+        "is_correct": false,
+        "error_type_raw": "算术错误",
+        "error_code": "FINAL_CALCULATION_ERROR",
+        "error_category": "Algebraic Manipulation Errors",
+        "error_explanation": "截面法：$\\iiint x\\,dV=\\int_0^1 x\\cdot\\pi ab(x^2+1)\\,dx=\\pi ab\\int_0^1(x^3+x)dx$。学生算 $\\int_0^1(x^3+x)dx=2/3$，实际 $[x^4/4+x^2/2]_0^1=1/4+1/2=3/4$。正确结果 $\\pi ab\\cdot 3/4=3\\pi ab/4$，非 $2\\pi ab/3$。($y$ 部分由对称性为0)",
+        "reference": "$3\\pi ab/4$",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "学生仅给出最终答案 $2\\pi ab/3$。正确解法：由区域关于 $y=0$ 对称且被积函数 $y$ 为奇函数，得 $\\iiint_\\Omega y\\,dV=0$。原式化为 $\\iiint_\\Omega x\\,dV$。采用截面法，固定 $x\\in[0,1]$ 时截面为椭圆 $\\frac{y^2}{a^2}+\\frac{z^2}{b^2}\\le x^2+1$，其半轴长为 $a\\sqrt{x^2+1}$ 与 $b\\sqrt{x^2+1}$，面积 $S(x)=\\pi ab(x^2+1)$。故积分值为 $\\int_0^1 x\\cdot S(x)\\,dx = \\pi ab\\int_0^1 (x^3+x)\\,dx = \\pi ab\\left[\\frac{x^4}{4}+\\frac{x^2}{2}\right]_0^1 = \\frac{3\\pi ab}{4}$。学生答案与正确值不符。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "三重积分的奇偶对称性",
+              "截面法（先二后一）",
+              "定积分基本运算"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S1",
+            "error_code": "FINAL_CALCULATION_ERROR",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生可能未正确写出截面面积表达式，或在计算 $\\int_0^1 x(x^2+1)dx$ 时出现幂函数积分错误；亦可能混淆了区域体积计算与含权函数 $x$ 的积分，导致系数与幂次偏差。",
+            "supporting_evidence": "正确答案为 $\\frac{3\\pi ab}{4}$，学生给出 $2\\pi ab/3$。由于缺乏中间步骤，数值差异显著，符合积分运算或公式套用失误的特征。",
+            "confidence": 0.9
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 $\\iiint_\\Omega z \\, dxdydz$，其中 $\\Omega$ 为球体 $x^2+y^2+z^2 \\le R^2$。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "巩固利用对称性快速判断积分为零的技巧，避免盲目展开计算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 $\\iiint_\\Omega x \\, dxdydz$，其中 $\\Omega$ 由 $z=0, z=1$ 及 $x^2+y^2 \\le z$ 围成。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "练习“先二后一”截面法，截面为圆，面积含 $z$，需正确建立并计算定积分。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 $\\iiint_\\Omega (x^2+y) \\, dxdydz$，其中 $\\Omega: 0\\le z \\le 2, \\frac{x^2}{4}+\\frac{y^2}{9} \\le z^2$。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "综合考察对称性消元、变截面椭圆面积计算及多项式定积分，贴近原题难度与考点。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "答案错误。本题核心在于利用对称性消去 $y$ 项，并运用“先二后一”截面法将三重积分化为单变量定积分。正确结果为 $\\frac{3\\pi ab}{4}$。",
+          "likely_cause": "未熟练掌握三重积分的截面法及对称性简化技巧，或定积分计算失误。",
+          "review_concepts": [
+            "三重积分的奇偶对称性",
+            "截面法（先二后一）",
+            "椭圆面积公式 $S=\\pi \\cdot \text{半长轴} \\cdot \text{半短轴}$",
+            "幂函数定积分计算"
+          ],
+          "next_action": "请补充完整解题步骤：1. 说明对称性如何消去 $y$；2. 写出 $x$ 处截面椭圆的半轴长及面积 $S(x)$；3. 列出并计算定积分 $\\int_0^1 x S(x) dx$。",
+          "caution_note": "注意被积函数中的 $x$ 是权重因子，不能直接计算区域体积。截面面积随 $x$ 变化，需准确代入积分式并逐项积分。"
+        },
+        "uncertainty_flags": [
+          "学生仅提交最终数值，未展示推导过程，无法精确定位是概念理解偏差还是纯算术失误。"
+        ],
+        "run_meta": {
+          "run_id": "0c9677b5-6637-4ea8-a4b9-8d5b967eab74",
+          "started_at": "2026-06-23T00:08:32.380755+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "学生仅给出最终答案 $2\\pi ab/3$。正确解法：由区域关于 $y=0$ 对称且被积函数 $y$ 为奇函数，得 $\\iiint_\\Omega y\\,dV=0$。原式化为 $\\iiint_\\Omega x\\,dV$。采用截面法，固定 $x\\in[0,1]$ 时截面为椭圆 $\\frac{y^2}{a^2}+\\frac{z^2}{b^2}\\le x^2+1$，其半轴长为 $a\\sqrt{x^2+1}$ 与 $b\\sqrt{x^2+1}$，面积 $S(x)=\\pi ab(x^2+1)$。故积分值为 $\\int_0^1 x\\cdot S(x)\\,dx = \\pi ab\\int_0^1 (x^3+x)\\,dx = \\pi ab\\left[\\frac{x^4}{4}+\\frac{x^2}{2}\right]_0^1 = \\frac{3\\pi ab}{4}$。学生答案与正确值不符。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "三重积分的奇偶对称性",
+              "截面法（先二后一）",
+              "定积分基本运算"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S1",
+            "error_code": "FINAL_CALCULATION_ERROR",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生可能未正确写出截面面积表达式，或在计算 $\\int_0^1 x(x^2+1)dx$ 时出现幂函数积分错误；亦可能混淆了区域体积计算与含权函数 $x$ 的积分，导致系数与幂次偏差。",
+            "supporting_evidence": "正确答案为 $\\frac{3\\pi ab}{4}$，学生给出 $2\\pi ab/3$。由于缺乏中间步骤，数值差异显著，符合积分运算或公式套用失误的特征。",
+            "confidence": 0.9
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "答案错误。本题核心在于利用对称性消去 $y$ 项，并运用“先二后一”截面法将三重积分化为单变量定积分。正确结果为 $\\frac{3\\pi ab}{4}$。",
+          "likely_cause": "未熟练掌握三重积分的截面法及对称性简化技巧，或定积分计算失误。",
+          "review_concepts": [
+            "三重积分的奇偶对称性",
+            "截面法（先二后一）",
+            "椭圆面积公式 $S=\\pi \\cdot \text{半长轴} \\cdot \text{半短轴}$",
+            "幂函数定积分计算"
+          ],
+          "next_action": "请补充完整解题步骤：1. 说明对称性如何消去 $y$；2. 写出 $x$ 处截面椭圆的半轴长及面积 $S(x)$；3. 列出并计算定积分 $\\int_0^1 x S(x) dx$。",
+          "caution_note": "注意被积函数中的 $x$ 是权重因子，不能直接计算区域体积。截面面积随 $x$ 变化，需准确代入积分式并逐项积分。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 $\\iiint_\\Omega z \\, dxdydz$，其中 $\\Omega$ 为球体 $x^2+y^2+z^2 \\le R^2$。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "巩固利用对称性快速判断积分为零的技巧，避免盲目展开计算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 $\\iiint_\\Omega x \\, dxdydz$，其中 $\\Omega$ 由 $z=0, z=1$ 及 $x^2+y^2 \\le z$ 围成。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "练习“先二后一”截面法，截面为圆，面积含 $z$，需正确建立并计算定积分。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 $\\iiint_\\Omega (x^2+y) \\, dxdydz$，其中 $\\Omega: 0\\le z \\le 2, \\frac{x^2}{4}+\\frac{y^2}{9} \\le z^2$。",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "综合考察对称性消元、变截面椭圆面积计算及多项式定积分，贴近原题难度与考点。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [
+          "学生仅提交最终数值，未展示推导过程，无法精确定位是概念理解偏差还是纯算术失误。"
+        ],
+        "run_meta": {
+          "run_id": "0c9677b5-6637-4ea8-a4b9-8d5b967eab74",
+          "started_at": "2026-06-23T00:08:32.380755+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "FINAL_CALCULATION_ERROR"
+        ],
+        "error_code_match": true
+      }
+    },
+    {
+      "seq": 1,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第12次作业_Q3(2)",
+      "gold_labels": {
+        "is_correct": false,
+        "error_type_raw": "计算错误-漏乘系数",
+        "error_code": "COEFFICIENT_OMISSION",
+        "error_category": "Algebraic Manipulation Errors",
+        "error_explanation": "学生在化简 $3B(3,1/2)$ 时漏乘系数 3，写成 $B(3,1/2)=16/15$，而正确结果应为 $3B(3,1/2)=3\\cdot16/15=16/5$。",
+        "reference": "$3B(3,1/2)=3\\cdot\\Gamma(3)\\Gamma(1/2)/\\Gamma(7/2)=3\\cdot2\\sqrt\\pi/(15\\sqrt\\pi/8)=48/15=16/5$。",
+        "label_source": "ta_comment"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "换元 $t = x^{1/3}$ 正确，积分转化为 $3 \\int_0^1 t^2 (1-t)^{-1/2} dt = 3B(3, 1/2)$，符合Beta函数定义。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "学生计算 $3B(3, 1/2)$ 得 $16/15$，但正确值应为 $3 \times \\frac{\\Gamma(3)\\Gamma(1/2)}{\\Gamma(7/2)} = 3 \times \\frac{2 \\cdot \\sqrt{\\pi}}{(15/8)\\sqrt{\\pi}} = \\frac{16}{5}$。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "Beta函数与Gamma函数转换关系",
+              "系数乘法运算"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S2",
+            "error_code": "COEFFICIENT_OMISSION",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生在计算 $3B(3, 1/2)$ 时遗漏了系数3，直接使用了 $B(3, 1/2) = 16/15$ 的结果而未乘以3。",
+            "supporting_evidence": "正确计算需将Beta函数值乘以换元产生的系数3，学生结果 $16/15$ 仅为 $B(3, 1/2)$ 的值。",
+            "confidence": 0.9
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 $\\int_0^1 \\frac{dx}{\\sqrt{1-x^{1/2}}}$，使用换元 $t = x^{1/2}$ 并关联Beta函数。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "巩固换元系数处理与Beta函数转换，难度较低。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 $\\int_0^1 x^{2/3}(1-x)^{-1/3} dx$ 的精确值，需正确应用Gamma函数性质。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化Gamma函数递推与系数跟踪，中等难度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "验证 $\\int_0^1 \\frac{dx}{(1-x^{1/4})^{3/4}} = 4B(4, 1/4)$ 并计算其数值结果。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "综合换元、Beta函数及系数处理，需完整推导步骤。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "换元步骤正确，但最终计算遗漏了系数3，导致结果错误。",
+          "likely_cause": "未完整跟踪换元引入的系数，或Beta函数数值计算时疏忽乘法步骤。",
+          "review_concepts": [
+            "Beta函数与Gamma函数关系",
+            "定积分换元系数处理",
+            "特殊函数数值计算"
+          ],
+          "next_action": "重新计算 $3B(3, 1/2)$，验证Gamma函数递推公式及系数乘法。",
+          "caution_note": "换元后需严格保留所有系数，特殊函数计算需逐步验证中间结果。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "590ada9f-ad6e-4975-9f62-b30a313af4ed",
+          "started_at": "2026-06-23T00:10:18.935507+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "换元 $t = x^{1/3}$ 正确，积分转化为 $3 \\int_0^1 t^2 (1-t)^{-1/2} dt = 3B(3, 1/2)$，符合Beta函数定义。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "学生计算 $3B(3, 1/2)$ 得 $16/15$，但正确值应为 $3 \times \\frac{\\Gamma(3)\\Gamma(1/2)}{\\Gamma(7/2)} = 3 \times \\frac{2 \\cdot \\sqrt{\\pi}}{(15/8)\\sqrt{\\pi}} = \\frac{16}{5}$。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "Beta函数与Gamma函数转换关系",
+              "系数乘法运算"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S2",
+            "error_code": "COEFFICIENT_OMISSION",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生在计算 $3B(3, 1/2)$ 时遗漏了系数3，直接使用了 $B(3, 1/2) = 16/15$ 的结果而未乘以3。",
+            "supporting_evidence": "正确计算需将Beta函数值乘以换元产生的系数3，学生结果 $16/15$ 仅为 $B(3, 1/2)$ 的值。",
+            "confidence": 0.9
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "换元步骤正确，但最终计算遗漏了系数3，导致结果错误。",
+          "likely_cause": "未完整跟踪换元引入的系数，或Beta函数数值计算时疏忽乘法步骤。",
+          "review_concepts": [
+            "Beta函数与Gamma函数关系",
+            "定积分换元系数处理",
+            "特殊函数数值计算"
+          ],
+          "next_action": "重新计算 $3B(3, 1/2)$，验证Gamma函数递推公式及系数乘法。",
+          "caution_note": "换元后需严格保留所有系数，特殊函数计算需逐步验证中间结果。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 $\\int_0^1 \\frac{dx}{\\sqrt{1-x^{1/2}}}$，使用换元 $t = x^{1/2}$ 并关联Beta函数。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "巩固换元系数处理与Beta函数转换，难度较低。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 $\\int_0^1 x^{2/3}(1-x)^{-1/3} dx$ 的精确值，需正确应用Gamma函数性质。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化Gamma函数递推与系数跟踪，中等难度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "验证 $\\int_0^1 \\frac{dx}{(1-x^{1/4})^{3/4}} = 4B(4, 1/4)$ 并计算其数值结果。",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "综合换元、Beta函数及系数处理，需完整推导步骤。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "590ada9f-ad6e-4975-9f62-b30a313af4ed",
+          "started_at": "2026-06-23T00:10:18.935507+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "COEFFICIENT_OMISSION"
+        ],
+        "error_code_match": true
+      }
+    },
+    {
+      "seq": 2,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第8次作业_Q6",
+      "gold_labels": {
+        "is_correct": false,
+        "error_type_raw": "概念遗漏-忽略奇点",
+        "error_code": "DOMAIN_CONDITION_IGNORED",
+        "error_category": "Theorem/Condition Misuse",
+        "error_explanation": "学生正确算出 $d^2y/dx^2=\\frac1{9\\sin t\\cos^4 t}>0$（在两段内），但忽略了 $t=\\pi/2$ 处 $\\cos t=0$ 导致 $d^2y/dx^2$ 不存在（$x=0$ 处曲线有尖点/奇点）。应分段讨论 $[0,\\pi/2)$ 和 $(\\pi/2,\\pi]$，跨奇点不满足凸性：取 $t\\in(0,\\pi/2)$ 验证 $\\frac12 f(-x(t))+\\frac12 f(x(t))=f(x(t))<f(0)$ 违反凸定义。故 $f$ 在 $[-3,3]$ 整体不是凸函数，仅在 $[-3,0]$、$[0,3]$ 各自严格凸。",
+        "reference": "$f$ 定义域 $[-3,3]$，为偶函数。$t\\ne 0,\\pi/2,\\pi$ 时 $f''(x)=\\frac1{9\\cos^4 t\\sin t}>0$，故 $f$ 在 $[-3,0]$、$[0,3]$ 上均严格凸。但 $f$ 在 $[0,3]$ 严格递减，取 $t\\in(0,\\pi/2)$：$\\frac12 f(-x(t))+\\frac12 f(x(t))=f(x(t))<f(0)=f(\\frac12(-x(t))+\\frac12 x(t))$，故 $f$ 在 $[-3,3]$ 上不是凸函数。",
+        "label_source": "ta_comment"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "一阶导数计算正确：dy/dx = (dy/dt)/(dx/dt) = -tan t。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "二阶导数计算正确：d²y/dx² = d/dt(dy/dx)/dx/dt = 1/(9 sin t cos⁴t)，在给定区间内符号恒正。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求参数方程x=2cos t, y=2sin t (0≤t≤2π)的二阶导数，并讨论其凸凹性。",
+            "related_weakness_code": "PARAMETRIC_DIFFERENTIATION",
+            "rationale": "巩固参数方程一阶、二阶导数的计算步骤。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "分析曲线x=t³-3t, y=t²在t∈(-2,2)内的拐点位置。",
+            "related_weakness_code": "INFLECTION_POINTS",
+            "rationale": "结合二阶导数符号变化判断拐点，强化凸凹性分析能力。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "证明星形线x=a cos³θ, y=a sin³θ在θ∈(0,π/2)段为严格凸函数。",
+            "related_weakness_code": "CONVEXITY_PROOF",
+            "rationale": "深化对参数方程凸凹性严格证明的理解。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答过程正确，参数方程二阶导数计算与凸凹性判断均无误。",
+          "likely_cause": null,
+          "review_concepts": [
+            "参数方程求导法则",
+            "二阶导数与凸凹性关系"
+          ],
+          "next_action": "可进一步练习含参数方程的曲率计算或拐点分析问题。",
+          "caution_note": "注意参数方程中dx/dt=0的点（如t=π/2）需单独讨论，但本题已合理排除。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "2bf09e7c-5897-4486-af47-68e27eed5b6e",
+          "started_at": "2026-06-23T00:11:04.240610+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "一阶导数计算正确：dy/dx = (dy/dt)/(dx/dt) = -tan t。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "二阶导数计算正确：d²y/dx² = d/dt(dy/dx)/dx/dt = 1/(9 sin t cos⁴t)，在给定区间内符号恒正。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答过程正确，参数方程二阶导数计算与凸凹性判断均无误。",
+          "likely_cause": null,
+          "review_concepts": [
+            "参数方程求导法则",
+            "二阶导数与凸凹性关系"
+          ],
+          "next_action": "可进一步练习含参数方程的曲率计算或拐点分析问题。",
+          "caution_note": "注意参数方程中dx/dt=0的点（如t=π/2）需单独讨论，但本题已合理排除。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求参数方程x=2cos t, y=2sin t (0≤t≤2π)的二阶导数，并讨论其凸凹性。",
+            "related_weakness_code": "PARAMETRIC_DIFFERENTIATION",
+            "rationale": "巩固参数方程一阶、二阶导数的计算步骤。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "分析曲线x=t³-3t, y=t²在t∈(-2,2)内的拐点位置。",
+            "related_weakness_code": "INFLECTION_POINTS",
+            "rationale": "结合二阶导数符号变化判断拐点，强化凸凹性分析能力。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "证明星形线x=a cos³θ, y=a sin³θ在θ∈(0,π/2)段为严格凸函数。",
+            "related_weakness_code": "CONVEXITY_PROOF",
+            "rationale": "深化对参数方程凸凹性严格证明的理解。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "2bf09e7c-5897-4486-af47-68e27eed5b6e",
+          "started_at": "2026-06-23T00:11:04.240610+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "FN",
+        "detected": false,
+        "agent_diagnosis_codes": [],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 3,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第7次作业_Q17",
+      "gold_labels": {
+        "is_correct": false,
+        "error_type_raw": "定理误用-洛必达法则条件不满足",
+        "error_code": "DOMAIN_CONDITION_IGNORED",
+        "error_category": "Theorem/Condition Misuse",
+        "error_explanation": "不满足L'Hôpital法则条件(f(0)=1使lnf(x)→0但分子分母不同时→0的形式不符),应改用定义拆分: lim=[(f(sinx)-1)/sinx]·[sinx/x]·[x/(f(x)-1)]=f'(0)·1·1/f'(0)=1。学生直接套洛必达属于回答语法错误。",
+        "reference": "用定义: lim=[(f(sinx)-1)/sinx]·[sinx/x]·[x/(f(x)-1)] = f'(0)·1·1/f'(0)=1",
+        "label_source": "ta_comment"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确识别极限为0/0型不定式，符合洛必达法则应用前提。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "分子导数计算遗漏链式法则中的cosx项，正确应为f'(sinx)·cosx。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "链式法则"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "分母导数计算错误，lnf(x)的导数应为f'(x)/f(x)，而非1/f(x)。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "链式法则",
+              "对数函数求导规则"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "基于错误导数代入计算，虽结果数值巧合正确，但推导过程不成立。",
+            "confidence": 0.85,
+            "violated_principles": [
+              "逻辑一致性"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S2",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导规则应用错误",
+            "root_cause_hypothesis": "未掌握复合函数求导的链式法则，遗漏内层函数sinx的导数cosx。",
+            "supporting_evidence": "分子导数表达式缺少cosx因子，导致后续代入值错误。",
+            "confidence": 0.95
+          },
+          {
+            "step_id": "S3",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导规则应用错误",
+            "root_cause_hypothesis": "混淆对数函数与复合函数求导规则，未乘以f'(x)。",
+            "supporting_evidence": "分母导数错误写为1/f(x)，正确形式需包含f'(x)/f(x)。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "已知g(0)=2, g'(0)=3，求lim_{x→0} [g(cosx)-2]/x²。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "强化复合函数求导与洛必达法则结合应用，注意内层函数导数。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设h(x)在x=0处可导且h(0)=1，求lim_{x→0} [ln(h(x²))]/x。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "训练多层复合函数求导及极限化简能力。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "已知f(0)=0, f'(0)=2，求lim_{x→0} [f(sinx)-f(x)]/x³。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "综合考察链式法则、泰勒展开与洛必达法则的灵活选择。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "洛必达法则应用时链式法则使用错误，导致导数计算不准确。",
+          "likely_cause": "对复合函数求导规则掌握不牢固，未系统验证每一步导数推导。",
+          "review_concepts": [
+            "链式法则",
+            "洛必达法则适用条件",
+            "对数函数求导"
+          ],
+          "next_action": "重新推导分子分母导数，严格应用链式法则并验证每一步。",
+          "caution_note": "使用洛必达法则前需确认导数存在且分母导数非零，避免形式化套用。"
+        },
+        "uncertainty_flags": [
+          "学生具体求导步骤未完整提供，诊断基于典型错误模式推断。",
+          "结果形式错误的具体表现未明确，可能涉及表达式结构或数值计算偏差。"
+        ],
+        "run_meta": {
+          "run_id": "0af61b05-2953-4179-b638-da51cf68f786",
+          "started_at": "2026-06-23T00:11:54.352379+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确识别极限为0/0型不定式，符合洛必达法则应用前提。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "分子导数计算遗漏链式法则中的cosx项，正确应为f'(sinx)·cosx。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "链式法则"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "分母导数计算错误，lnf(x)的导数应为f'(x)/f(x)，而非1/f(x)。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "链式法则",
+              "对数函数求导规则"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "基于错误导数代入计算，虽结果数值巧合正确，但推导过程不成立。",
+            "confidence": 0.85,
+            "violated_principles": [
+              "逻辑一致性"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S2",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导规则应用错误",
+            "root_cause_hypothesis": "未掌握复合函数求导的链式法则，遗漏内层函数sinx的导数cosx。",
+            "supporting_evidence": "分子导数表达式缺少cosx因子，导致后续代入值错误。",
+            "confidence": 0.95
+          },
+          {
+            "step_id": "S3",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导规则应用错误",
+            "root_cause_hypothesis": "混淆对数函数与复合函数求导规则，未乘以f'(x)。",
+            "supporting_evidence": "分母导数错误写为1/f(x)，正确形式需包含f'(x)/f(x)。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "洛必达法则应用时链式法则使用错误，导致导数计算不准确。",
+          "likely_cause": "对复合函数求导规则掌握不牢固，未系统验证每一步导数推导。",
+          "review_concepts": [
+            "链式法则",
+            "洛必达法则适用条件",
+            "对数函数求导"
+          ],
+          "next_action": "重新推导分子分母导数，严格应用链式法则并验证每一步。",
+          "caution_note": "使用洛必达法则前需确认导数存在且分母导数非零，避免形式化套用。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "已知g(0)=2, g'(0)=3，求lim_{x→0} [g(cosx)-2]/x²。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "强化复合函数求导与洛必达法则结合应用，注意内层函数导数。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设h(x)在x=0处可导且h(0)=1，求lim_{x→0} [ln(h(x²))]/x。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "训练多层复合函数求导及极限化简能力。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "已知f(0)=0, f'(0)=2，求lim_{x→0} [f(sinx)-f(x)]/x³。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "综合考察链式法则、泰勒展开与洛必达法则的灵活选择。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [
+          "学生具体求导步骤未完整提供，诊断基于典型错误模式推断。",
+          "结果形式错误的具体表现未明确，可能涉及表达式结构或数值计算偏差。"
+        ],
+        "run_meta": {
+          "run_id": "0af61b05-2953-4179-b638-da51cf68f786",
+          "started_at": "2026-06-23T00:11:54.352379+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "CHAIN_RULE_MISUSE"
+        ],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 4,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第1次作业_Q3",
+      "gold_labels": {
+        "is_correct": false,
+        "error_type_raw": "证明不严谨-遗漏步骤",
+        "error_code": "UNSUPPORTED_JUMP",
+        "error_category": "Reasoning Quality Issues",
+        "error_explanation": "未先说明inf A+inf B是A+B的下界（即∀x∈A,y∈B有x+y≥inf A+inf B），直接跳到上界ε论证，证明不完整。",
+        "reference": "先证下界：∀x∈A,y∈B，x≥inf A且y≥inf B，故x+y≥inf A+inf B，即inf A+inf B是A+B的下界。再用ε论证证inf(A+B)≤inf A+inf B。",
+        "label_source": "ta_comment"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "学生仅利用 $\\epsilon$ 定义证明了 $\\inf(A+B) \\le \\inf A + \\inf B$，完全遗漏了证明 $\\inf(A+B) \\ge \\inf A + \\inf B$ 的关键步骤。证明实数等式必须同时完成“$\\le$”与“$\\ge$”两个方向的推导。此外，由 $x+y < \\inf A + \\inf B + \\epsilon_1 + \\epsilon_2$ 推出结论时，未明确说明“由 $\\epsilon$ 的任意性可得”，逻辑链条略显跳跃。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "确界相等证明的双向性要求",
+              "$\\epsilon$-论证的严密性规范"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S1",
+            "error_code": "UNSUPPORTED_JUMP",
+            "category": "证明逻辑不完整",
+            "root_cause_hypothesis": "学生可能误认为只需证明单向不等式即可，或对确界定义中“最大下界”的双重性质（下界性+逼近性）理解不全面，导致遗漏利用下界定义证明反向不等式的步骤。",
+            "supporting_evidence": "解答中仅出现基于 $\\epsilon$ 的逼近论证，未提及对任意 $z \\in A+B$ 有 $z \\ge \\inf A + \\inf B$ 的下界性讨论。",
+            "confidence": 0.9
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "设 $A$ 为非空有界数集，$c>0$ 为常数。证明 $\\inf(cA) = c \\inf A$，其中 $cA = \\{cx \\mid x \\in A\\}$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "巩固确界的基本性质与 $\\epsilon$ 论证的双向结构，难度较低，适合作为热身。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设 $A, B$ 为非空有界数集，且 $A \\subseteq B$。证明 $\\inf B \\le \\inf A$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "训练利用集合包含关系推导确界不等式的能力，强化对下界定义的理解。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设 $A, B$ 为非空有界数集，且 $A, B \\subseteq (0, +\\infty)$。定义 $A \\cdot B = \\{xy \\mid x \\in A, y \\in B\\}$，证明 $\\inf(A \\cdot B) = \\inf A \\cdot \\inf B$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "将加法确界推广至乘法情形，需处理正数条件与更复杂的 $\\epsilon$ 放缩，全面检验双向证明能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "解答仅完成了 $\\inf(A+B) \\le \\inf A + \\inf B$ 的单向证明，遗漏了反向不等式 $\\inf(A+B) \\ge \\inf A + \\inf B$ 的推导，导致等式证明不完整。",
+          "likely_cause": "对确界相等证明的标准结构（双向不等式夹逼）不熟悉，或误将单向逼近视为充分条件。",
+          "review_concepts": [
+            "确界（infimum）的定义与双重性质",
+            "实数等式证明的双向不等式法",
+            "$\\epsilon$-语言在分析证明中的规范书写"
+          ],
+          "next_action": "补充证明 $\\inf(A+B) \\ge \\inf A + \\inf B$：由下界定义，对任意 $x\\in A, y\\in B$ 有 $x\\ge \\inf A, y\\ge \\inf B$，故 $x+y \\ge \\inf A + \\inf B$，说明 $\\inf A + \\inf B$ 是 $A+B$ 的一个下界，因此 $\\inf(A+B) \\ge \\inf A + \\inf B$。结合已证部分即可得证。",
+          "caution_note": "在数学分析中证明两个量相等时，务必检查是否完成了“$\\le$”和“$\\ge$”两个方向的论证，缺一不可。切勿将单向推导直接等同于等式成立。"
+        },
+        "uncertainty_flags": [
+          "学生解答极为简略，可能仅展示了核心难点部分，需确认是否因考试时间不足或认为另一半显然成立而主动省略。"
+        ],
+        "run_meta": {
+          "run_id": "34b6e5dc-819e-4419-96c9-8cde16cb0a70",
+          "started_at": "2026-06-23T00:15:29.788753+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "学生仅利用 $\\epsilon$ 定义证明了 $\\inf(A+B) \\le \\inf A + \\inf B$，完全遗漏了证明 $\\inf(A+B) \\ge \\inf A + \\inf B$ 的关键步骤。证明实数等式必须同时完成“$\\le$”与“$\\ge$”两个方向的推导。此外，由 $x+y < \\inf A + \\inf B + \\epsilon_1 + \\epsilon_2$ 推出结论时，未明确说明“由 $\\epsilon$ 的任意性可得”，逻辑链条略显跳跃。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "确界相等证明的双向性要求",
+              "$\\epsilon$-论证的严密性规范"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S1",
+            "error_code": "UNSUPPORTED_JUMP",
+            "category": "证明逻辑不完整",
+            "root_cause_hypothesis": "学生可能误认为只需证明单向不等式即可，或对确界定义中“最大下界”的双重性质（下界性+逼近性）理解不全面，导致遗漏利用下界定义证明反向不等式的步骤。",
+            "supporting_evidence": "解答中仅出现基于 $\\epsilon$ 的逼近论证，未提及对任意 $z \\in A+B$ 有 $z \\ge \\inf A + \\inf B$ 的下界性讨论。",
+            "confidence": 0.9
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "解答仅完成了 $\\inf(A+B) \\le \\inf A + \\inf B$ 的单向证明，遗漏了反向不等式 $\\inf(A+B) \\ge \\inf A + \\inf B$ 的推导，导致等式证明不完整。",
+          "likely_cause": "对确界相等证明的标准结构（双向不等式夹逼）不熟悉，或误将单向逼近视为充分条件。",
+          "review_concepts": [
+            "确界（infimum）的定义与双重性质",
+            "实数等式证明的双向不等式法",
+            "$\\epsilon$-语言在分析证明中的规范书写"
+          ],
+          "next_action": "补充证明 $\\inf(A+B) \\ge \\inf A + \\inf B$：由下界定义，对任意 $x\\in A, y\\in B$ 有 $x\\ge \\inf A, y\\ge \\inf B$，故 $x+y \\ge \\inf A + \\inf B$，说明 $\\inf A + \\inf B$ 是 $A+B$ 的一个下界，因此 $\\inf(A+B) \\ge \\inf A + \\inf B$。结合已证部分即可得证。",
+          "caution_note": "在数学分析中证明两个量相等时，务必检查是否完成了“$\\le$”和“$\\ge$”两个方向的论证，缺一不可。切勿将单向推导直接等同于等式成立。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "设 $A$ 为非空有界数集，$c>0$ 为常数。证明 $\\inf(cA) = c \\inf A$，其中 $cA = \\{cx \\mid x \\in A\\}$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "巩固确界的基本性质与 $\\epsilon$ 论证的双向结构，难度较低，适合作为热身。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设 $A, B$ 为非空有界数集，且 $A \\subseteq B$。证明 $\\inf B \\le \\inf A$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "训练利用集合包含关系推导确界不等式的能力，强化对下界定义的理解。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设 $A, B$ 为非空有界数集，且 $A, B \\subseteq (0, +\\infty)$。定义 $A \\cdot B = \\{xy \\mid x \\in A, y \\in B\\}$，证明 $\\inf(A \\cdot B) = \\inf A \\cdot \\inf B$。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "将加法确界推广至乘法情形，需处理正数条件与更复杂的 $\\epsilon$ 放缩，全面检验双向证明能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [
+          "学生解答极为简略，可能仅展示了核心难点部分，需确认是否因考试时间不足或认为另一半显然成立而主动省略。"
+        ],
+        "run_meta": {
+          "run_id": "34b6e5dc-819e-4419-96c9-8cde16cb0a70",
+          "started_at": "2026-06-23T00:15:29.788753+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "UNSUPPORTED_JUMP"
+        ],
+        "error_code_match": true
+      }
+    },
+    {
+      "seq": 5,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第12次作业_Q5(5)",
+      "gold_labels": {
+        "is_correct": true,
+        "error_type_raw": "",
+        "error_code": "",
+        "error_category": "",
+        "error_explanation": "",
+        "reference": "$y=((1/3)x^{3/2}+C)^2$，及 $y\\equiv0$。",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "学生给出的通解 $y=((1/3)x^{3/2}+C)^2$ 与特解 $y\\equiv0$ 均正确。原方程为可分离变量型，分离得 $y^{-1/2}dy=x^{1/2}dx$，积分得 $2\\sqrt{y}=\\frac{2}{3}x^{3/2}+C_1$，整理后即得通解。同时 $y=0$ 代入原方程左右均为 $0$，是有效的平衡解，学生已完整补充。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求解微分方程 $\\frac{dy}{dx} = \\sqrt{x}y$ ($x>0$)，并写出通解。",
+            "related_weakness_code": "SEPARABLE_ODE_PRACTICE",
+            "rationale": "巩固基础的可分离变量法积分技巧，熟悉指数与根式的积分运算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求解微分方程 $\\frac{dy}{dx} = y^{2/3}$，并讨论是否存在常数解。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "强化对除以含 $y$ 项时可能丢失的常数解（奇解）的检验意识。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求解 $\\frac{dy}{dx} = \\sqrt{xy}$ ($x>0$) 满足初始条件 $y(1)=1$ 的特解，并指出该特解成立的最大区间。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "综合考察通解应用、初始条件代入以及解的有效定义域分析，提升严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答完全正确。准确使用了分离变量法，并正确补充了因除以 $\\sqrt{y}$ 而可能遗漏的零解 $y\\equiv0$。",
+          "likely_cause": null,
+          "review_concepts": [
+            "可分离变量微分方程的标准解法",
+            "奇解/平衡解的识别与补充",
+            "解的定义域与常数 $C$ 的隐含约束"
+          ],
+          "next_action": "建议进一步练习带有初始条件的定解问题，并明确写出解成立的有效区间（如 $\\frac{1}{3}x^{3/2}+C \\ge 0$）。",
+          "caution_note": "在分离变量时，若两边同除以含未知函数的表达式（如 $\\sqrt{y}$），务必单独检验该表达式为零时是否满足原方程，以防漏解。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "5534f593-a873-46f1-a7d9-73fabb3ccdd9",
+          "started_at": "2026-06-23T00:17:36.696998+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "学生给出的通解 $y=((1/3)x^{3/2}+C)^2$ 与特解 $y\\equiv0$ 均正确。原方程为可分离变量型，分离得 $y^{-1/2}dy=x^{1/2}dx$，积分得 $2\\sqrt{y}=\\frac{2}{3}x^{3/2}+C_1$，整理后即得通解。同时 $y=0$ 代入原方程左右均为 $0$，是有效的平衡解，学生已完整补充。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答完全正确。准确使用了分离变量法，并正确补充了因除以 $\\sqrt{y}$ 而可能遗漏的零解 $y\\equiv0$。",
+          "likely_cause": null,
+          "review_concepts": [
+            "可分离变量微分方程的标准解法",
+            "奇解/平衡解的识别与补充",
+            "解的定义域与常数 $C$ 的隐含约束"
+          ],
+          "next_action": "建议进一步练习带有初始条件的定解问题，并明确写出解成立的有效区间（如 $\\frac{1}{3}x^{3/2}+C \\ge 0$）。",
+          "caution_note": "在分离变量时，若两边同除以含未知函数的表达式（如 $\\sqrt{y}$），务必单独检验该表达式为零时是否满足原方程，以防漏解。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求解微分方程 $\\frac{dy}{dx} = \\sqrt{x}y$ ($x>0$)，并写出通解。",
+            "related_weakness_code": "SEPARABLE_ODE_PRACTICE",
+            "rationale": "巩固基础的可分离变量法积分技巧，熟悉指数与根式的积分运算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求解微分方程 $\\frac{dy}{dx} = y^{2/3}$，并讨论是否存在常数解。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "强化对除以含 $y$ 项时可能丢失的常数解（奇解）的检验意识。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求解 $\\frac{dy}{dx} = \\sqrt{xy}$ ($x>0$) 满足初始条件 $y(1)=1$ 的特解，并指出该特解成立的最大区间。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "综合考察通解应用、初始条件代入以及解的有效定义域分析，提升严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "5534f593-a873-46f1-a7d9-73fabb3ccdd9",
+          "started_at": "2026-06-23T00:17:36.696998+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TN",
+        "detected": false,
+        "agent_diagnosis_codes": [],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 6,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第1次作业_Q2",
+      "gold_labels": {
+        "is_correct": true,
+        "error_type_raw": "",
+        "error_code": "",
+        "error_category": "",
+        "error_explanation": "",
+        "reference": "∀x∈A∩B，x≥inf A且x≥inf B，故x≥max{inf A,inf B}，从而inf(A∩B)≥max{inf A,inf B}。",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "∀x∈A∩B，x同时属于A和B，故x≥inf A且x≥inf B成立。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "由S1可知inf A和inf B均为A∩B的下界，符合下界定义。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "错误推导inf(A∩B)≥inf A≥inf B。下确界定义要求inf(A∩B)≥max{inf A, inf B}，但学生未证明inf A≥inf B，直接链式推导缺乏依据。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "下确界最大性原理",
+              "不等式传递性误用"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "UNSUPPORTED_JUMP",
+            "category": "逻辑推理缺陷",
+            "root_cause_hypothesis": "学生混淆了下确界的比较逻辑，误认为inf A与inf B存在固定大小关系，未通过max函数处理两者关系。",
+            "supporting_evidence": "正确结论需同时满足inf(A∩B)≥inf A和inf(A∩B)≥inf B，学生却直接假设inf A≥inf B导致链式不等式断裂。",
+            "confidence": 0.9
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "设A,B为非空有界数集，证明inf(A∪B)=min{inf A, inf B}。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "巩固并集下确界与min函数的关系，强化集合运算与确界性质的联系。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "若A⊆B且A,B非空有界，证明inf B≤inf A≤sup A≤sup B。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "通过子集关系训练确界不等式链的严谨推导。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设A_n为单调递减有界数列集合，证明inf(∩A_n)=lim inf A_n。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "结合极限与确界概念，提升复杂集合交的下确界分析能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "步骤S3错误假设inf A≥inf B，未正确使用max函数处理下确界比较。",
+          "likely_cause": "对下确界定义中“最大下界”的理解不足，忽略需同时满足两个不等式条件。",
+          "review_concepts": [
+            "下确界定义与性质",
+            "集合交的下界分析",
+            "max/min函数在不等式中的应用"
+          ],
+          "next_action": "重新推导inf(A∩B)与inf A、inf B的关系，明确max{inf A, inf B}的数学意义。",
+          "caution_note": "处理多集合下确界时，需严格区分单个下界与最大下界的逻辑关系。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "0891e1d2-3c24-4e43-9d54-8354e159c434",
+          "started_at": "2026-06-23T00:19:07.469880+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "∀x∈A∩B，x同时属于A和B，故x≥inf A且x≥inf B成立。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "由S1可知inf A和inf B均为A∩B的下界，符合下界定义。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "错误推导inf(A∩B)≥inf A≥inf B。下确界定义要求inf(A∩B)≥max{inf A, inf B}，但学生未证明inf A≥inf B，直接链式推导缺乏依据。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "下确界最大性原理",
+              "不等式传递性误用"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "UNSUPPORTED_JUMP",
+            "category": "逻辑推理缺陷",
+            "root_cause_hypothesis": "学生混淆了下确界的比较逻辑，误认为inf A与inf B存在固定大小关系，未通过max函数处理两者关系。",
+            "supporting_evidence": "正确结论需同时满足inf(A∩B)≥inf A和inf(A∩B)≥inf B，学生却直接假设inf A≥inf B导致链式不等式断裂。",
+            "confidence": 0.9
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "步骤S3错误假设inf A≥inf B，未正确使用max函数处理下确界比较。",
+          "likely_cause": "对下确界定义中“最大下界”的理解不足，忽略需同时满足两个不等式条件。",
+          "review_concepts": [
+            "下确界定义与性质",
+            "集合交的下界分析",
+            "max/min函数在不等式中的应用"
+          ],
+          "next_action": "重新推导inf(A∩B)与inf A、inf B的关系，明确max{inf A, inf B}的数学意义。",
+          "caution_note": "处理多集合下确界时，需严格区分单个下界与最大下界的逻辑关系。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "设A,B为非空有界数集，证明inf(A∪B)=min{inf A, inf B}。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "巩固并集下确界与min函数的关系，强化集合运算与确界性质的联系。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "若A⊆B且A,B非空有界，证明inf B≤inf A≤sup A≤sup B。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "通过子集关系训练确界不等式链的严谨推导。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设A_n为单调递减有界数列集合，证明inf(∩A_n)=lim inf A_n。",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "结合极限与确界概念，提升复杂集合交的下确界分析能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "0891e1d2-3c24-4e43-9d54-8354e159c434",
+          "started_at": "2026-06-23T00:19:07.469880+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "FP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "UNSUPPORTED_JUMP"
+        ],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 7,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第7次作业_Q19",
+      "gold_labels": {
+        "is_correct": true,
+        "error_type_raw": "",
+        "error_code": "",
+        "error_category": "",
+        "error_explanation": "",
+        "reference": "Taylor+Lagrange余项: f(0),f(1)展开联立得f'''(ξ₁)+f'''(ξ₂)=24,由连续性∃ξ使f'''(ξ)=12",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "选取$x_0=1/2$进行泰勒展开是合理策略。利用已知条件$f'(1/2)=0$，展开至二阶并保留三阶拉格朗日余项$f(x)=f(1/2)+\\frac{f''(1/2)}{2}(x-1/2)^2+\\frac{f'''(\\xi)}{6}(x-1/2)^3$，方向正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "将$x=0$与$x=1$分别代入展开式，两式相减可精确消去未知量$f(1/2)$与$f''(1/2)$。计算得$\\frac{f'''(\\xi_1)+f'''(\\xi_2)}{48}=\\frac{1}{2}$，即$f'''(\\xi_1)+f'''(\\xi_2)=24$，算术与代数推导无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "由题设$f\\in C^3[0,1]$可知$f'''(x)$在$[0,1]$上连续。根据连续函数介值定理，$f'''$必能取到区间内任意两函数值的平均值，即$\\frac{f'''(\\xi_1)+f'''(\\xi_2)}{2}=12$，故存在$\\xi$使$f'''(\\xi)=12$，逻辑严密。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "设$f\\in C^2[0,1]$，且$f(0)=f(1)=0$，$f(1/2)=1$。证明：$\\exists \\xi\\in(0,1)$，使得$f''(\\xi)\\le -8$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "巩固在区间中点处进行泰勒展开并利用端点条件消元的技巧，同时练习二阶导数估计的书写规范。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设$f\\in C^3[0,1]$，$f(0)=0$，$f'(0)=0$，$f(1)=1$。证明：$\\exists \\xi\\in(0,1)$，使得$f'''(\\xi)=6$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "对比端点展开与中点展开的差异，强化对泰勒余项系数及代数运算的熟练度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设$f\\in C^2[a,b]$，证明存在$\\eta\\in(a,b)$，使得$f(b)=f(a)+f'(\\frac{a+b}{2})(b-a)+\\frac{f''(\\eta)}{24}(b-a)^3$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "深入理解中点泰勒展开的误差项推导，要求完整展示联立、消元及介值定理的应用过程，提升证明题的严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题思路完全正确，核心方法（中点泰勒展开+联立消元+介值定理）运用得当，逻辑链条完整且结论准确。",
+          "likely_cause": null,
+          "review_concepts": [
+            "泰勒公式（带拉格朗日余项）",
+            "连续函数的介值定理",
+            "利用对称点构造等式消去中间项"
+          ],
+          "next_action": "建议在书写时补充完整的展开式与余项表达式，明确写出$f'''$的连续性条件及介值定理的具体应用对象（平均值），以符合严格阅卷标准。",
+          "caution_note": "跳步虽能体现思路，但在正式考试中易因“过程不完整”被扣分。务必写出$f(x)=f(x_0)+f'(x_0)(x-x_0)+\\frac{f''(x_0)}{2}(x-x_0)^2+\\frac{f'''(\\xi)}{6}(x-x_0)^3$的具体代入与化简过程。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "2b27e263-8b07-4747-97ef-7650bf4e5cdb",
+          "started_at": "2026-06-23T00:19:46.382759+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "选取$x_0=1/2$进行泰勒展开是合理策略。利用已知条件$f'(1/2)=0$，展开至二阶并保留三阶拉格朗日余项$f(x)=f(1/2)+\\frac{f''(1/2)}{2}(x-1/2)^2+\\frac{f'''(\\xi)}{6}(x-1/2)^3$，方向正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "将$x=0$与$x=1$分别代入展开式，两式相减可精确消去未知量$f(1/2)$与$f''(1/2)$。计算得$\\frac{f'''(\\xi_1)+f'''(\\xi_2)}{48}=\\frac{1}{2}$，即$f'''(\\xi_1)+f'''(\\xi_2)=24$，算术与代数推导无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "由题设$f\\in C^3[0,1]$可知$f'''(x)$在$[0,1]$上连续。根据连续函数介值定理，$f'''$必能取到区间内任意两函数值的平均值，即$\\frac{f'''(\\xi_1)+f'''(\\xi_2)}{2}=12$，故存在$\\xi$使$f'''(\\xi)=12$，逻辑严密。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题思路完全正确，核心方法（中点泰勒展开+联立消元+介值定理）运用得当，逻辑链条完整且结论准确。",
+          "likely_cause": null,
+          "review_concepts": [
+            "泰勒公式（带拉格朗日余项）",
+            "连续函数的介值定理",
+            "利用对称点构造等式消去中间项"
+          ],
+          "next_action": "建议在书写时补充完整的展开式与余项表达式，明确写出$f'''$的连续性条件及介值定理的具体应用对象（平均值），以符合严格阅卷标准。",
+          "caution_note": "跳步虽能体现思路，但在正式考试中易因“过程不完整”被扣分。务必写出$f(x)=f(x_0)+f'(x_0)(x-x_0)+\\frac{f''(x_0)}{2}(x-x_0)^2+\\frac{f'''(\\xi)}{6}(x-x_0)^3$的具体代入与化简过程。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "设$f\\in C^2[0,1]$，且$f(0)=f(1)=0$，$f(1/2)=1$。证明：$\\exists \\xi\\in(0,1)$，使得$f''(\\xi)\\le -8$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "巩固在区间中点处进行泰勒展开并利用端点条件消元的技巧，同时练习二阶导数估计的书写规范。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "设$f\\in C^3[0,1]$，$f(0)=0$，$f'(0)=0$，$f(1)=1$。证明：$\\exists \\xi\\in(0,1)$，使得$f'''(\\xi)=6$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "对比端点展开与中点展开的差异，强化对泰勒余项系数及代数运算的熟练度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "设$f\\in C^2[a,b]$，证明存在$\\eta\\in(a,b)$，使得$f(b)=f(a)+f'(\\frac{a+b}{2})(b-a)+\\frac{f''(\\eta)}{24}(b-a)^3$。",
+            "related_weakness_code": "PROCEDURE_RIGOR",
+            "rationale": "深入理解中点泰勒展开的误差项推导，要求完整展示联立、消元及介值定理的应用过程，提升证明题的严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "2b27e263-8b07-4747-97ef-7650bf4e5cdb",
+          "started_at": "2026-06-23T00:19:46.382759+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TN",
+        "detected": false,
+        "agent_diagnosis_codes": [],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 8,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第8次作业_Q5",
+      "gold_labels": {
+        "is_correct": true,
+        "error_type_raw": "",
+        "error_code": "",
+        "error_category": "",
+        "error_explanation": "",
+        "reference": "$f''(x)=(x-2)e^{-x}$，$(2,+\\infty)$ 正、$(-\\infty,2)$ 负。$[2,+\\infty)$ 严格凸，$(-\\infty,2]$ 严格凹，拐点 $(2,2e^{-2})$。",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "一阶导数 $f'(x) = (1-x)e^{-x}$ 和二阶导数 $f''(x) = (x-2)e^{-x}$ 计算正确，符合乘积法则与链式法则。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "将 $x=2$ 称为“驻点”错误。驻点应为一阶导数为零的点（此处为 $x=1$），而 $x=2$ 是二阶导数为零的拐点候选点。",
+            "confidence": 0.9,
+            "violated_principles": [
+              "驻点定义混淆"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "二阶导数符号分析正确：$x<2$ 时 $f''(x)<0$（凹），$x>2$ 时 $f''(x)>0$（凸）。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "correct",
+            "evidence": "凸凹区间划分与拐点坐标 $(2, 2e^{-2})$ 结论正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S2",
+            "error_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "category": "概念混淆",
+            "root_cause_hypothesis": "混淆了驻点（一阶导数为零）与拐点候选点（二阶导数为零）的定义。",
+            "supporting_evidence": "学生将二阶导数零点 $x=2$ 错误标记为驻点，而实际驻点应为 $f'(x)=0$ 的解 $x=1$。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求 $g(x) = x^2 e^{-x}$ 的驻点与拐点，并说明判断依据。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "强化区分一阶导数零点（驻点）与二阶导数零点（拐点候选点）的应用场景。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "分析 $h(x) = \\ln(x^2 + 1)$ 的凸凹区间，验证拐点是否存在。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "练习通过二阶导数符号变化确定凸凹性，巩固拐点判定流程。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "证明函数 $k(x) = e^{x} \\sin x$ 在 $[0, 2\\pi]$ 内恰有两个拐点。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "综合应用导数计算与符号分析，提升复杂函数拐点判定的严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "导数计算与符号分析正确，但术语使用存在概念混淆。",
+          "likely_cause": "未严格区分驻点与拐点的数学定义。",
+          "review_concepts": [
+            "驻点与拐点的定义差异",
+            "二阶导数判别法"
+          ],
+          "next_action": "复习一阶/二阶导数的几何意义，明确驻点、极值点、拐点的判定条件。",
+          "caution_note": "术语准确性影响逻辑严谨性，需区分不同临界点的定义。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "379bc79e-48b7-43e7-a849-46f0e0adecde",
+          "started_at": "2026-06-23T00:22:00.691871+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "一阶导数 $f'(x) = (1-x)e^{-x}$ 和二阶导数 $f''(x) = (x-2)e^{-x}$ 计算正确，符合乘积法则与链式法则。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "将 $x=2$ 称为“驻点”错误。驻点应为一阶导数为零的点（此处为 $x=1$），而 $x=2$ 是二阶导数为零的拐点候选点。",
+            "confidence": 0.9,
+            "violated_principles": [
+              "驻点定义混淆"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "二阶导数符号分析正确：$x<2$ 时 $f''(x)<0$（凹），$x>2$ 时 $f''(x)>0$（凸）。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "correct",
+            "evidence": "凸凹区间划分与拐点坐标 $(2, 2e^{-2})$ 结论正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S2",
+            "error_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "category": "概念混淆",
+            "root_cause_hypothesis": "混淆了驻点（一阶导数为零）与拐点候选点（二阶导数为零）的定义。",
+            "supporting_evidence": "学生将二阶导数零点 $x=2$ 错误标记为驻点，而实际驻点应为 $f'(x)=0$ 的解 $x=1$。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "导数计算与符号分析正确，但术语使用存在概念混淆。",
+          "likely_cause": "未严格区分驻点与拐点的数学定义。",
+          "review_concepts": [
+            "驻点与拐点的定义差异",
+            "二阶导数判别法"
+          ],
+          "next_action": "复习一阶/二阶导数的几何意义，明确驻点、极值点、拐点的判定条件。",
+          "caution_note": "术语准确性影响逻辑严谨性，需区分不同临界点的定义。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求 $g(x) = x^2 e^{-x}$ 的驻点与拐点，并说明判断依据。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "强化区分一阶导数零点（驻点）与二阶导数零点（拐点候选点）的应用场景。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "分析 $h(x) = \\ln(x^2 + 1)$ 的凸凹区间，验证拐点是否存在。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "练习通过二阶导数符号变化确定凸凹性，巩固拐点判定流程。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "证明函数 $k(x) = e^{x} \\sin x$ 在 $[0, 2\\pi]$ 内恰有两个拐点。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "综合应用导数计算与符号分析，提升复杂函数拐点判定的严谨性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "379bc79e-48b7-43e7-a849-46f0e0adecde",
+          "started_at": "2026-06-23T00:22:00.691871+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "FP",
+        "detected": true,
+        "agent_diagnosis_codes": [
+          "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL"
+        ],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 9,
+      "phase": "phase1_real_homework",
+      "case_id": "微积分A(1)_第12次作业_Q4(1)",
+      "gold_labels": {
+        "is_correct": true,
+        "error_type_raw": "",
+        "error_code": "",
+        "error_category": "",
+        "error_explanation": "",
+        "reference": "$y=Ce^{-5x}+e^x/6$。",
+        "label_source": "llm_compare"
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "学生正确识别方程为一阶线性ODE，并应用积分因子法得到通解。积分因子计算为$e^{5x}$，特解积分$\\int e^{6x}dx = \\frac{1}{6}e^{6x}$正确，最终通解形式符合标准解法。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "解ODE $dy/dx - 2y = e^{3x}$",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "巩固积分因子法应用，注意常数项处理。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "解ODE $dy/dx + y/x = x^2$（$x>0$）",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "练习含定义域限制的线性ODE，强化积分因子与定义域关联。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "解ODE $dy/dx + (\tan x)y = \\sec x$，并讨论解在$x=\\pi/2$处的行为",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "结合三角函数与定义域分析，提升复杂系数ODE处理能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答完全正确，通解形式与计算过程均符合一阶线性ODE的标准解法。",
+          "likely_cause": null,
+          "review_concepts": [
+            "积分因子法",
+            "一阶线性微分方程通解结构",
+            "指数函数积分"
+          ],
+          "next_action": "建议补充中间步骤（如积分因子推导、分部积分过程）以强化逻辑连贯性。",
+          "caution_note": "注意非齐次项为指数函数时，特解形式需与齐次解线性无关。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "081a0575-a504-4166-84f8-58dc25b38357",
+          "started_at": "2026-06-23T00:23:02.142264+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "学生正确识别方程为一阶线性ODE，并应用积分因子法得到通解。积分因子计算为$e^{5x}$，特解积分$\\int e^{6x}dx = \\frac{1}{6}e^{6x}$正确，最终通解形式符合标准解法。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解答完全正确，通解形式与计算过程均符合一阶线性ODE的标准解法。",
+          "likely_cause": null,
+          "review_concepts": [
+            "积分因子法",
+            "一阶线性微分方程通解结构",
+            "指数函数积分"
+          ],
+          "next_action": "建议补充中间步骤（如积分因子推导、分部积分过程）以强化逻辑连贯性。",
+          "caution_note": "注意非齐次项为指数函数时，特解形式需与齐次解线性无关。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "解ODE $dy/dx - 2y = e^{3x}$",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "巩固积分因子法应用，注意常数项处理。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "解ODE $dy/dx + y/x = x^2$（$x>0$）",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "练习含定义域限制的线性ODE，强化积分因子与定义域关联。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "解ODE $dy/dx + (\tan x)y = \\sec x$，并讨论解在$x=\\pi/2$处的行为",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "结合三角函数与定义域分析，提升复杂系数ODE处理能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "081a0575-a504-4166-84f8-58dc25b38357",
+          "started_at": "2026-06-23T00:23:02.142264+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "classification": "TN",
+        "detected": false,
+        "agent_diagnosis_codes": [],
+        "error_code_match": false
+      }
+    },
+    {
+      "seq": 10,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-001",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S3",
+        "gold_diagnosis_codes": [
+          "CHAIN_RULE_MISUSE"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确设置中间变量 u = x²，将原函数转化为 y = sin(u)，符合复合函数结构。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确计算外层函数导数 dy/du = cos(u)，符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "未乘以内层函数导数 du/dx = 2x，直接替换变量导致结果缺失系数 2x。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "链式法则要求 dy/dx = dy/du · du/dx"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导法则应用错误",
+            "root_cause_hypothesis": "学生可能混淆了单变量替换与链式法则的完整步骤，遗漏了内层函数导数的乘法环节。",
+            "supporting_evidence": "步骤3直接代入 u = x² 得到 cos(x²)，未体现 du/dx = 2x 的计算过程。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求 y = cos(3x) 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "基础链式法则应用，强化外层三角函数与线性内层函数的导数乘积计算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 y = e^{x^3} 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "指数函数与多项式复合，需正确处理内层导数 3x² 的乘法。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 y = ln(√(x²+1)) 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "多层复合函数求导，需逐步分解对数、根号与多项式结构的导数链。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "正确完成变量代换与外层求导，但链式法则应用不完整，遗漏内层导数乘积项。",
+          "likely_cause": "对链式法则 dy/dx = (dy/du)(du/dx) 的乘法结构记忆不牢或步骤跳跃。",
+          "review_concepts": [
+            "链式法则完整步骤",
+            "复合函数导数结构分解"
+          ],
+          "next_action": "重新练习链式法则标准流程，明确标注内外层导数相乘步骤。",
+          "caution_note": "复合函数求导时，务必检查是否包含所有中间变量的导数乘积。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "295b37e1-568a-43ea-a8f2-536c71300203",
+          "started_at": "2026-06-23T00:23:25.658259+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确设置中间变量 u = x²，将原函数转化为 y = sin(u)，符合复合函数结构。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确计算外层函数导数 dy/du = cos(u)，符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "未乘以内层函数导数 du/dx = 2x，直接替换变量导致结果缺失系数 2x。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "链式法则要求 dy/dx = dy/du · du/dx"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "CHAIN_RULE_MISUSE",
+            "category": "求导法则应用错误",
+            "root_cause_hypothesis": "学生可能混淆了单变量替换与链式法则的完整步骤，遗漏了内层函数导数的乘法环节。",
+            "supporting_evidence": "步骤3直接代入 u = x² 得到 cos(x²)，未体现 du/dx = 2x 的计算过程。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "正确完成变量代换与外层求导，但链式法则应用不完整，遗漏内层导数乘积项。",
+          "likely_cause": "对链式法则 dy/dx = (dy/du)(du/dx) 的乘法结构记忆不牢或步骤跳跃。",
+          "review_concepts": [
+            "链式法则完整步骤",
+            "复合函数导数结构分解"
+          ],
+          "next_action": "重新练习链式法则标准流程，明确标注内外层导数相乘步骤。",
+          "caution_note": "复合函数求导时，务必检查是否包含所有中间变量的导数乘积。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求 y = cos(3x) 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "基础链式法则应用，强化外层三角函数与线性内层函数的导数乘积计算。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 y = e^{x^3} 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "指数函数与多项式复合，需正确处理内层导数 3x² 的乘法。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 y = ln(√(x²+1)) 的导数。",
+            "related_weakness_code": "CHAIN_RULE_MISUSE",
+            "rationale": "多层复合函数求导，需逐步分解对数、根号与多项式结构的导数链。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "295b37e1-568a-43ea-a8f2-536c71300203",
+          "started_at": "2026-06-23T00:23:25.658259+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S3"
+      }
+    },
+    {
+      "seq": 11,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-002",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S3",
+        "gold_diagnosis_codes": [
+          "PRODUCT_RULE_MISUSE"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂函数求导法则，(x²)' = 2x 符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用对数函数求导法则，(ln x)' = 1/x 符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "错误地将两个导数直接相乘，未使用乘积法则 (uv)' = u'v + uv'。正确结果应为 2x·ln x + x²·(1/x) = 2x ln x + x。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "乘积法则"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "PRODUCT_RULE_MISUSE",
+            "category": "求导法则应用错误",
+            "root_cause_hypothesis": "学生可能混淆了乘积法则与导数乘积的概念，误认为 (uv)' = u'v' 而非 u'v + uv'。",
+            "supporting_evidence": "步骤3中直接计算 2x * (1/x) 而遗漏了交叉项，表明未掌握乘积法则的结构。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求 f(x) = x·sin x 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "基础乘积法则应用，巩固 u'v + uv' 结构。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 f(x) = x²·e^x 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "结合指数函数与幂函数，强化乘积法则熟练度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 f(x) = (x³ + 2x)·ln(x² + 1) 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "复合函数与乘积法则结合，提升综合应用能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "乘积法则应用错误导致导数计算不完整。",
+          "likely_cause": "对乘积法则公式记忆不准确或理解偏差。",
+          "review_concepts": [
+            "乘积法则 (uv)' = u'v + uv'",
+            "基本初等函数导数公式"
+          ],
+          "next_action": "重新推导乘积法则并练习含乘积结构的函数求导。",
+          "caution_note": "注意区分导数运算与代数运算的规则差异。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "341ae496-86b8-44ed-a883-fbbbc1e0d78a",
+          "started_at": "2026-06-23T00:23:53.865928+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂函数求导法则，(x²)' = 2x 符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用对数函数求导法则，(ln x)' = 1/x 符合基本导数公式。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "错误地将两个导数直接相乘，未使用乘积法则 (uv)' = u'v + uv'。正确结果应为 2x·ln x + x²·(1/x) = 2x ln x + x。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "乘积法则"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "PRODUCT_RULE_MISUSE",
+            "category": "求导法则应用错误",
+            "root_cause_hypothesis": "学生可能混淆了乘积法则与导数乘积的概念，误认为 (uv)' = u'v' 而非 u'v + uv'。",
+            "supporting_evidence": "步骤3中直接计算 2x * (1/x) 而遗漏了交叉项，表明未掌握乘积法则的结构。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "乘积法则应用错误导致导数计算不完整。",
+          "likely_cause": "对乘积法则公式记忆不准确或理解偏差。",
+          "review_concepts": [
+            "乘积法则 (uv)' = u'v + uv'",
+            "基本初等函数导数公式"
+          ],
+          "next_action": "重新推导乘积法则并练习含乘积结构的函数求导。",
+          "caution_note": "注意区分导数运算与代数运算的规则差异。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求 f(x) = x·sin x 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "基础乘积法则应用，巩固 u'v + uv' 结构。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 f(x) = x²·e^x 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "结合指数函数与幂函数，强化乘积法则熟练度。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 f(x) = (x³ + 2x)·ln(x² + 1) 的导数。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "复合函数与乘积法则结合，提升综合应用能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "341ae496-86b8-44ed-a883-fbbbc1e0d78a",
+          "started_at": "2026-06-23T00:23:53.865928+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S3"
+      }
+    },
+    {
+      "seq": 12,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-003",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S3",
+        "gold_diagnosis_codes": [
+          "QUOTIENT_RULE_MISUSE"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确识别分子函数及其导数",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确识别分母函数及其导数",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "除法法则公式应用错误，应为(u'v - uv')/v²，但学生使用了加号",
+            "confidence": 1.0,
+            "violated_principles": [
+              "QUOTIENT_RULE_MISUSE"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "基于S3的错误表达式进行化简，导致结果错误",
+            "confidence": 1.0,
+            "violated_principles": [
+              "QUOTIENT_RULE_MISUSE"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "QUOTIENT_RULE_MISUSE",
+            "category": "公式应用错误",
+            "root_cause_hypothesis": "混淆了除法法则中分子部分的符号，误将减号写为加号",
+            "supporting_evidence": "正确公式应为(2x(x-1) - (x²+1))/(x-1)²，学生步骤中符号错误导致后续计算偏差",
+            "confidence": 1.0
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求 h(x) = (3x - 2)/(x + 4) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "基础商法则应用练习，强化公式记忆",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 k(x) = (x³ + 2x)/(x² - 1) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "增加分子分母复杂度，训练符号处理与化简能力",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 m(x) = (sin x)/(x² + 1) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "结合三角函数与多项式，综合检验商法则掌握程度",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "在应用除法法则时符号处理错误，导致导数表达式不正确",
+          "likely_cause": "对商法则公式记忆不准确或代入时粗心",
+          "review_concepts": [
+            "商法则公式",
+            "代数符号处理"
+          ],
+          "next_action": "重新推导商法则公式并练习带符号的分子展开",
+          "caution_note": "注意区分(u/v)'与(uv)'的公式差异，符号错误会直接影响结果"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "848c045d-d2f6-4894-96b0-a92f0ec933c5",
+          "started_at": "2026-06-23T00:24:20.155820+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确识别分子函数及其导数",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确识别分母函数及其导数",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "除法法则公式应用错误，应为(u'v - uv')/v²，但学生使用了加号",
+            "confidence": 1.0,
+            "violated_principles": [
+              "QUOTIENT_RULE_MISUSE"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "基于S3的错误表达式进行化简，导致结果错误",
+            "confidence": 1.0,
+            "violated_principles": [
+              "QUOTIENT_RULE_MISUSE"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "QUOTIENT_RULE_MISUSE",
+            "category": "公式应用错误",
+            "root_cause_hypothesis": "混淆了除法法则中分子部分的符号，误将减号写为加号",
+            "supporting_evidence": "正确公式应为(2x(x-1) - (x²+1))/(x-1)²，学生步骤中符号错误导致后续计算偏差",
+            "confidence": 1.0
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "在应用除法法则时符号处理错误，导致导数表达式不正确",
+          "likely_cause": "对商法则公式记忆不准确或代入时粗心",
+          "review_concepts": [
+            "商法则公式",
+            "代数符号处理"
+          ],
+          "next_action": "重新推导商法则公式并练习带符号的分子展开",
+          "caution_note": "注意区分(u/v)'与(uv)'的公式差异，符号错误会直接影响结果"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求 h(x) = (3x - 2)/(x + 4) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "基础商法则应用练习，强化公式记忆",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 k(x) = (x³ + 2x)/(x² - 1) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "增加分子分母复杂度，训练符号处理与化简能力",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 m(x) = (sin x)/(x² + 1) 的导数",
+            "related_weakness_code": "QUOTIENT_RULE_MISUSE",
+            "rationale": "结合三角函数与多项式，综合检验商法则掌握程度",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "848c045d-d2f6-4894-96b0-a92f0ec933c5",
+          "started_at": "2026-06-23T00:24:20.155820+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S3"
+      }
+    },
+    {
+      "seq": 13,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-004",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S2",
+        "gold_diagnosis_codes": [
+          "SIGN_ARITHMETIC_ERROR"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "x^3的导数正确应用幂法则得到3x^2",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "-2x^2的导数应为-4x，学生错误计算为+4x",
+            "confidence": 1.0,
+            "violated_principles": [
+              "幂函数求导法则",
+              "系数符号处理"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "x的导数为1，常数项导数为0正确",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "因S2错误导致最终结果符号错误，正确应为3x^2-4x+1",
+            "confidence": 1.0,
+            "violated_principles": [
+              "代数项合并规则"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S2",
+            "error_code": "SIGN_ARITHMETIC_ERROR",
+            "category": "符号处理错误",
+            "root_cause_hypothesis": "学生在应用幂法则时未正确处理负号系数，可能将-2x^2误认为2x^2进行求导",
+            "supporting_evidence": "正确导数应为d/dx(-2x^2)=-4x，学生得出+4x",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求f(x) = -3x^4 + 5x^2 - 7的导数",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "强化负系数多项式求导训练",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求g(x) = (1/2)x^3 - √2 x + π的导数",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "混合系数类型求导练习",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "验证h(x) = -x^5 + 4x^3 - 2x的导数在x=1处的值",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "结合求导与数值计算的综合应用",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "步骤2中负系数处理错误导致最终导数符号错误",
+          "likely_cause": "幂函数求导时未保留原函数系数符号",
+          "review_concepts": [
+            "幂函数求导法则",
+            "多项式逐项求导",
+            "系数符号处理"
+          ],
+          "next_action": "重新计算-2x^2的导数，注意保持负号参与运算",
+          "caution_note": "求导时需逐项处理系数符号，建议用括号明确标注负号项"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "10b04655-e159-46d7-ab24-9dc98b027459",
+          "started_at": "2026-06-23T00:24:46.577658+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "x^3的导数正确应用幂法则得到3x^2",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "-2x^2的导数应为-4x，学生错误计算为+4x",
+            "confidence": 1.0,
+            "violated_principles": [
+              "幂函数求导法则",
+              "系数符号处理"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "x的导数为1，常数项导数为0正确",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "因S2错误导致最终结果符号错误，正确应为3x^2-4x+1",
+            "confidence": 1.0,
+            "violated_principles": [
+              "代数项合并规则"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S2",
+            "error_code": "SIGN_ARITHMETIC_ERROR",
+            "category": "符号处理错误",
+            "root_cause_hypothesis": "学生在应用幂法则时未正确处理负号系数，可能将-2x^2误认为2x^2进行求导",
+            "supporting_evidence": "正确导数应为d/dx(-2x^2)=-4x，学生得出+4x",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "步骤2中负系数处理错误导致最终导数符号错误",
+          "likely_cause": "幂函数求导时未保留原函数系数符号",
+          "review_concepts": [
+            "幂函数求导法则",
+            "多项式逐项求导",
+            "系数符号处理"
+          ],
+          "next_action": "重新计算-2x^2的导数，注意保持负号参与运算",
+          "caution_note": "求导时需逐项处理系数符号，建议用括号明确标注负号项"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求f(x) = -3x^4 + 5x^2 - 7的导数",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "强化负系数多项式求导训练",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求g(x) = (1/2)x^3 - √2 x + π的导数",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "混合系数类型求导练习",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "验证h(x) = -x^5 + 4x^3 - 2x的导数在x=1处的值",
+            "related_weakness_code": "SIGN_ARITHMETIC_ERROR",
+            "rationale": "结合求导与数值计算的综合应用",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "10b04655-e159-46d7-ab24-9dc98b027459",
+          "started_at": "2026-06-23T00:24:46.577658+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S2"
+      }
+    },
+    {
+      "seq": 14,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-005",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S3",
+        "gold_diagnosis_codes": [
+          "COEFFICIENT_OMISSION"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用换元法，u = x² 的导数计算准确，du = 2x dx 推导正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "将原积分中的 6x dx 替换为 6*(du/2) 符合代换逻辑，表达式转换正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "6*(du/2) 应简化为 3 du，但学生错误地简化为 1 du，导致系数丢失。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "代数化简规则"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "基于 S3 的错误系数，积分结果应为 3 sin(u) + C，但学生遗漏了系数 3。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "积分常数因子处理规则"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "COEFFICIENT_OMISSION",
+            "category": "代数化简错误",
+            "root_cause_hypothesis": "学生在替换变量后未正确计算系数 6*(1/2)=3，误将系数简化为 1。",
+            "supporting_evidence": "步骤 S3 中 6∫cos(u)*(du/2) 错误简化为 ∫cos(u) du，而非 3∫cos(u) du。",
+            "confidence": 1.0
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫ 4x e^{x^2} dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "巩固换元法中系数处理，需正确提取 2x dx 与系数的关系。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫ 3x^2 sin(x^3) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化高次幂换元时的系数匹配训练。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫ (2x+1) cos(x^2+x) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "综合练习线性组合换元，检验系数分配能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "换元过程中系数计算错误导致最终结果缺少倍数因子。",
+          "likely_cause": "代数化简时疏忽系数乘法运算。",
+          "review_concepts": [
+            "换元积分法",
+            "系数处理规则",
+            "不定积分基本公式"
+          ],
+          "next_action": "重新练习含系数的换元积分题，重点检查代换后的系数化简步骤。",
+          "caution_note": "换元后务必逐项验证系数是否完整保留，避免算术简化失误。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "486b0d3f-544f-4ec9-8585-5cafa8939e63",
+          "started_at": "2026-06-23T00:25:10.756313+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用换元法，u = x² 的导数计算准确，du = 2x dx 推导正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "将原积分中的 6x dx 替换为 6*(du/2) 符合代换逻辑，表达式转换正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "6*(du/2) 应简化为 3 du，但学生错误地简化为 1 du，导致系数丢失。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "代数化简规则"
+            ]
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "基于 S3 的错误系数，积分结果应为 3 sin(u) + C，但学生遗漏了系数 3。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "积分常数因子处理规则"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "COEFFICIENT_OMISSION",
+            "category": "代数化简错误",
+            "root_cause_hypothesis": "学生在替换变量后未正确计算系数 6*(1/2)=3，误将系数简化为 1。",
+            "supporting_evidence": "步骤 S3 中 6∫cos(u)*(du/2) 错误简化为 ∫cos(u) du，而非 3∫cos(u) du。",
+            "confidence": 1.0
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "换元过程中系数计算错误导致最终结果缺少倍数因子。",
+          "likely_cause": "代数化简时疏忽系数乘法运算。",
+          "review_concepts": [
+            "换元积分法",
+            "系数处理规则",
+            "不定积分基本公式"
+          ],
+          "next_action": "重新练习含系数的换元积分题，重点检查代换后的系数化简步骤。",
+          "caution_note": "换元后务必逐项验证系数是否完整保留，避免算术简化失误。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫ 4x e^{x^2} dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "巩固换元法中系数处理，需正确提取 2x dx 与系数的关系。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫ 3x^2 sin(x^3) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化高次幂换元时的系数匹配训练。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫ (2x+1) cos(x^2+x) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "综合练习线性组合换元，检验系数分配能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "486b0d3f-544f-4ec9-8585-5cafa8939e63",
+          "started_at": "2026-06-23T00:25:10.756313+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S3"
+      }
+    },
+    {
+      "seq": 15,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-006",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S3",
+        "gold_diagnosis_codes": [
+          "INTEGRATION_CONSTANT_OMISSION"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "∫2x dx 的原函数为 x²，计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "∫e^x dx 的原函数为 e^x，计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "不定积分结果必须包含任意常数 C，学生答案遗漏了该常数。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "不定积分需包含积分常数"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S3",
+            "error_code": "INTEGRATION_CONSTANT_OMISSION",
+            "category": "概念性错误",
+            "root_cause_hypothesis": "学生可能未掌握不定积分必须包含任意常数 C 的基本规则，或误认为分项积分后常数可省略。",
+            "supporting_evidence": "最终答案 x² + e^x 缺少 +C，而正确形式应为 x² + e^x + C。",
+            "confidence": 1.0
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(3x² - 4) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "巩固多项式积分及常数项添加习惯。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(sin x + 2e^x) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "结合三角函数与指数函数，强化常数项意识。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "若 ∫f(x) dx = x³ + e^x + C，求 f(x) 的表达式。",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "通过逆向求导验证积分结果，理解常数项在求导时消失的特性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "积分计算步骤正确，但遗漏了不定积分必需的常数项 C。",
+          "likely_cause": "对不定积分结果必须包含任意常数的规则理解不足。",
+          "review_concepts": [
+            "不定积分的定义与性质",
+            "积分常数的作用"
+          ],
+          "next_action": "重新练习基础不定积分题目，强制标注 +C 并验证导数是否还原被积函数。",
+          "caution_note": "所有不定积分结果必须显式写出 +C，否则答案不完整。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "044592d4-548f-4ed9-835f-244d31095a44",
+          "started_at": "2026-06-23T00:25:40.641760+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "∫2x dx 的原函数为 x²，计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "∫e^x dx 的原函数为 e^x，计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math",
+            "evidence": "不定积分结果必须包含任意常数 C，学生答案遗漏了该常数。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "不定积分需包含积分常数"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S3",
+            "error_code": "INTEGRATION_CONSTANT_OMISSION",
+            "category": "概念性错误",
+            "root_cause_hypothesis": "学生可能未掌握不定积分必须包含任意常数 C 的基本规则，或误认为分项积分后常数可省略。",
+            "supporting_evidence": "最终答案 x² + e^x 缺少 +C，而正确形式应为 x² + e^x + C。",
+            "confidence": 1.0
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S3",
+          "concise_summary": "积分计算步骤正确，但遗漏了不定积分必需的常数项 C。",
+          "likely_cause": "对不定积分结果必须包含任意常数的规则理解不足。",
+          "review_concepts": [
+            "不定积分的定义与性质",
+            "积分常数的作用"
+          ],
+          "next_action": "重新练习基础不定积分题目，强制标注 +C 并验证导数是否还原被积函数。",
+          "caution_note": "所有不定积分结果必须显式写出 +C，否则答案不完整。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(3x² - 4) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "巩固多项式积分及常数项添加习惯。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(sin x + 2e^x) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "结合三角函数与指数函数，强化常数项意识。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "若 ∫f(x) dx = x³ + e^x + C，求 f(x) 的表达式。",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "通过逆向求导验证积分结果，理解常数项在求导时消失的特性。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "044592d4-548f-4ed9-835f-244d31095a44",
+          "started_at": "2026-06-23T00:25:40.641760+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S3"
+      }
+    },
+    {
+      "seq": 16,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-007",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S3",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S1",
+        "gold_diagnosis_codes": [
+          "SUBSTITUTION_MAPPING_MISMATCH"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "du 的计算错误。正确应为 du = 2x dx，但学生写为 du = x dx，遗漏了系数 2。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "微分计算规则"
+            ]
+          },
+          {
+            "step_id": "S2",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "基于 S1 的错误 du，替换后的积分表达式应为 ∫√u du，但学生错误地保留了系数 2，导致后续计算偏差。",
+            "confidence": 0.9,
+            "violated_principles": [
+              "变量代换一致性"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "积分计算步骤正确，但基于错误的替换前提。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "correct",
+            "evidence": "代回原变量步骤正确，但结果因前置错误导致系数错误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S1",
+            "error_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "category": "变量代换错误",
+            "root_cause_hypothesis": "学生在求导时遗漏了链式法则中的系数 2，导致 du 与 dx 的关系错误。",
+            "supporting_evidence": "正确微分应为 du/dx = 2x，故 du = 2x dx，但学生写为 du = x dx。",
+            "confidence": 1.0
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫ 3x²√(1+x³) dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "强化换元时微分系数的正确匹配，需识别 du = 3x² dx。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫ x/(1+x²)² dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "练习处理分母含平方项的换元，注意系数调整。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫ (2x+1)√(x²+x) dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "综合应用换元法，需正确推导 du 并处理线性组合项。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "变量代换时微分关系计算错误，导致积分系数偏差。",
+          "likely_cause": "链式法则应用疏忽，未正确计算 du 的系数。",
+          "review_concepts": [
+            "换元积分法",
+            "微分计算",
+            "链式法则"
+          ],
+          "next_action": "重新练习换元积分步骤，重点验证 du 与 dx 的对应关系。",
+          "caution_note": "换元时需严格检查微分关系，避免系数遗漏或错误。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "948515cc-7186-4d32-9bdf-49199c593e54",
+          "started_at": "2026-06-23T00:26:04.665776+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "du 的计算错误。正确应为 du = 2x dx，但学生写为 du = x dx，遗漏了系数 2。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "微分计算规则"
+            ]
+          },
+          {
+            "step_id": "S2",
+            "label": "inconsistent_or_unsupported",
+            "evidence": "基于 S1 的错误 du，替换后的积分表达式应为 ∫√u du，但学生错误地保留了系数 2，导致后续计算偏差。",
+            "confidence": 0.9,
+            "violated_principles": [
+              "变量代换一致性"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "积分计算步骤正确，但基于错误的替换前提。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "correct",
+            "evidence": "代回原变量步骤正确，但结果因前置错误导致系数错误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S1",
+            "error_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "category": "变量代换错误",
+            "root_cause_hypothesis": "学生在求导时遗漏了链式法则中的系数 2，导致 du 与 dx 的关系错误。",
+            "supporting_evidence": "正确微分应为 du/dx = 2x，故 du = 2x dx，但学生写为 du = x dx。",
+            "confidence": 1.0
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "变量代换时微分关系计算错误，导致积分系数偏差。",
+          "likely_cause": "链式法则应用疏忽，未正确计算 du 的系数。",
+          "review_concepts": [
+            "换元积分法",
+            "微分计算",
+            "链式法则"
+          ],
+          "next_action": "重新练习换元积分步骤，重点验证 du 与 dx 的对应关系。",
+          "caution_note": "换元时需严格检查微分关系，避免系数遗漏或错误。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫ 3x²√(1+x³) dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "强化换元时微分系数的正确匹配，需识别 du = 3x² dx。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫ x/(1+x²)² dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "练习处理分母含平方项的换元，注意系数调整。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫ (2x+1)√(x²+x) dx。",
+            "related_weakness_code": "SUBSTITUTION_MAPPING_MISMATCH",
+            "rationale": "综合应用换元法，需正确推导 du 并处理线性组合项。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "948515cc-7186-4d32-9bdf-49199c593e54",
+          "started_at": "2026-06-23T00:26:04.665776+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 0.25,
+        "lenient_verify_acc": 0.25,
+        "error_step_accuracy": 0.5,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 0.5,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S1"
+      }
+    },
+    {
+      "seq": 17,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-008",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S1",
+        "gold_diagnosis_codes": [
+          "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "选取 $u=\\cos x, dv=x dx$ 会使后续积分 $\\int v du$ 的幂次升高，违背分部积分简化问题的原则。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "分部积分选取原则 (LIATE)"
+            ]
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "求导 $du = -\\sin x dx$ 与积分 $v = x^2/2$ 计算无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "代入分部积分公式 $\\int u dv = uv - \\int v du$ 后的代数变形正确（负负得正）。",
+            "confidence": 0.95,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "直接丢弃了未计算的积分项 $\\int (x^2/2)\\sin x dx$，且不定积分结果遗漏了积分常数 $C$。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "不定积分定义",
+              "积分运算完整性"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S1",
+            "error_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "category": "策略错误",
+            "root_cause_hypothesis": "学生未掌握分部积分中 $u$ 和 $dv$ 的选取原则（如 LIATE 法则），盲目将三角函数设为 $u$ 导致积分复杂化。",
+            "supporting_evidence": "步骤1中选择了 $u=\\cos x, dv=x dx$，使得新积分 $\\int (x^2/2)\\sin x dx$ 比原积分更难计算。",
+            "confidence": 0.95
+          },
+          {
+            "step_id": "S4",
+            "error_code": "INTEGRATION_CONSTANT_OMISSION",
+            "category": "概念遗漏",
+            "root_cause_hypothesis": "对不定积分的概念理解不深，忽略了任意常数 $C$ 的必要性，且缺乏完成积分运算的耐心或方法。",
+            "supporting_evidence": "步骤4直接给出 $(x^2/2)\\cos x$ 作为最终结果，既未处理剩余积分项，也未添加常数 $C$。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算不定积分 $\\int x e^x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "基础练习，强化 $u$ 选多项式、$dv$ 选指数函数的正确选取原则。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算不定积分 $\\int x \\sin x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "与原题结构高度相似，用于巩固正确的 $u, dv$ 分配策略。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算不定积分 $\\int x^2 \\cos x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "需要连续两次使用分部积分法，进一步巩固选取原则和计算耐心。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "分部积分中 $u$ 与 $dv$ 的选取不当导致积分复杂化，且最终结果遗漏了积分常数 $C$ 并随意丢弃了未积出的项。",
+          "likely_cause": "不熟悉分部积分的选取原则（如 LIATE 法则），以及对不定积分结果必须包含任意常数 $C$ 的概念掌握不牢。",
+          "review_concepts": [
+            "分部积分法选取原则 (LIATE)",
+            "不定积分的常数 C",
+            "分部积分公式 $\\int u dv = uv - \\int v du$"
+          ],
+          "next_action": "重新练习分部积分法，重点掌握 $u$ 和 $dv$ 的选取策略，并养成检查积分常数 $C$ 的习惯。",
+          "caution_note": "分部积分的目的是简化积分，若发现新积分比原积分更复杂，通常说明 $u$ 和 $dv$ 选反了。"
+        },
+        "uncertainty_flags": [
+          "学生可能在步骤4中因无法计算复杂积分而放弃，需确认其是否掌握后续积分技巧。"
+        ],
+        "run_meta": {
+          "run_id": "a152bc5d-1639-4801-9f76-c3f1ab925d14",
+          "started_at": "2026-06-23T00:26:34.066459+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "incorrect_math",
+            "evidence": "选取 $u=\\cos x, dv=x dx$ 会使后续积分 $\\int v du$ 的幂次升高，违背分部积分简化问题的原则。",
+            "confidence": 0.95,
+            "violated_principles": [
+              "分部积分选取原则 (LIATE)"
+            ]
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "求导 $du = -\\sin x dx$ 与积分 $v = x^2/2$ 计算无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "代入分部积分公式 $\\int u dv = uv - \\int v du$ 后的代数变形正确（负负得正）。",
+            "confidence": 0.95,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "直接丢弃了未计算的积分项 $\\int (x^2/2)\\sin x dx$，且不定积分结果遗漏了积分常数 $C$。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "不定积分定义",
+              "积分运算完整性"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S1",
+            "error_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "category": "策略错误",
+            "root_cause_hypothesis": "学生未掌握分部积分中 $u$ 和 $dv$ 的选取原则（如 LIATE 法则），盲目将三角函数设为 $u$ 导致积分复杂化。",
+            "supporting_evidence": "步骤1中选择了 $u=\\cos x, dv=x dx$，使得新积分 $\\int (x^2/2)\\sin x dx$ 比原积分更难计算。",
+            "confidence": 0.95
+          },
+          {
+            "step_id": "S4",
+            "error_code": "INTEGRATION_CONSTANT_OMISSION",
+            "category": "概念遗漏",
+            "root_cause_hypothesis": "对不定积分的概念理解不深，忽略了任意常数 $C$ 的必要性，且缺乏完成积分运算的耐心或方法。",
+            "supporting_evidence": "步骤4直接给出 $(x^2/2)\\cos x$ 作为最终结果，既未处理剩余积分项，也未添加常数 $C$。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S1",
+          "concise_summary": "分部积分中 $u$ 与 $dv$ 的选取不当导致积分复杂化，且最终结果遗漏了积分常数 $C$ 并随意丢弃了未积出的项。",
+          "likely_cause": "不熟悉分部积分的选取原则（如 LIATE 法则），以及对不定积分结果必须包含任意常数 $C$ 的概念掌握不牢。",
+          "review_concepts": [
+            "分部积分法选取原则 (LIATE)",
+            "不定积分的常数 C",
+            "分部积分公式 $\\int u dv = uv - \\int v du$"
+          ],
+          "next_action": "重新练习分部积分法，重点掌握 $u$ 和 $dv$ 的选取策略，并养成检查积分常数 $C$ 的习惯。",
+          "caution_note": "分部积分的目的是简化积分，若发现新积分比原积分更复杂，通常说明 $u$ 和 $dv$ 选反了。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算不定积分 $\\int x e^x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "基础练习，强化 $u$ 选多项式、$dv$ 选指数函数的正确选取原则。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算不定积分 $\\int x \\sin x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "与原题结构高度相似，用于巩固正确的 $u, dv$ 分配策略。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算不定积分 $\\int x^2 \\cos x dx$。",
+            "related_weakness_code": "INTEGRATION_BY_PARTS_WRONG_ASSIGNMENT",
+            "rationale": "需要连续两次使用分部积分法，进一步巩固选取原则和计算耐心。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [
+          "学生可能在步骤4中因无法计算复杂积分而放弃，需确认其是否掌握后续积分技巧。"
+        ],
+        "run_meta": {
+          "run_id": "a152bc5d-1639-4801-9f76-c3f1ab925d14",
+          "started_at": "2026-06-23T00:26:34.066459+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S1"
+      }
+    },
+    {
+      "seq": 18,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-009",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S4",
+        "gold_diagnosis_codes": [
+          "DOMAIN_CONDITION_IGNORED"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确因式分解并约分，得到x≠1时的简化表达式x+1。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "极限计算正确，lim(x→1)(x+1)=2。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确指出原函数在x=1处无定义（0/0形式）。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "错误地将极限值2等同于f(1)的值，但原函数在x=1处实际未定义。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "连续性需满足函数在该点有定义、极限存在且两者相等"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S4",
+            "error_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "category": "概念混淆",
+            "root_cause_hypothesis": "学生混淆了极限存在与函数值存在的概念，误认为极限值可直接作为函数值使用。",
+            "supporting_evidence": "步骤3已正确指出f(1)未定义，但步骤4却断言f(1)=2，逻辑矛盾。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "讨论函数g(x) = (x^3 - 8)/(x - 2)在x=2处的连续性。若间断，说明类型并补充定义使其连续。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "巩固极限与函数值区分的概念，练习可去间断点的处理。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "判断函数h(x) = { sin(x)/x, x≠0; 1, x=0 }在x=0处是否连续，并说明理由。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "强化对分段函数连续性的分析能力，明确定义与极限的关系。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "若函数k(x) = (x^2 - 4)/(x - 2)在x=2处连续，求k(2)应补充的值。若原函数未定义，说明其间断点类型。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "综合考察定义域限制与连续性条件的结合应用。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S4",
+          "concise_summary": "正确计算了极限并识别出原函数在x=1处无定义，但错误地将极限值当作函数值，导致连续性判断错误。",
+          "likely_cause": "未严格区分极限存在与函数在该点有定义的条件。",
+          "review_concepts": [
+            "函数连续性的三要素",
+            "可去间断点的定义与处理",
+            "极限与函数值的关系"
+          ],
+          "next_action": "重新复习连续性定义，明确函数在某点连续必须同时满足：①函数在该点有定义；②极限存在；③极限值等于函数值。",
+          "caution_note": "化简后的表达式仅在x≠1时等价于原函数，不可直接用于x=1处的函数值计算。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "b271cea5-db34-4b96-830a-8dba70f6cedb",
+          "started_at": "2026-06-23T00:28:29.699465+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确因式分解并约分，得到x≠1时的简化表达式x+1。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "极限计算正确，lim(x→1)(x+1)=2。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确指出原函数在x=1处无定义（0/0形式）。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "错误地将极限值2等同于f(1)的值，但原函数在x=1处实际未定义。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "连续性需满足函数在该点有定义、极限存在且两者相等"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S4",
+            "error_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "category": "概念混淆",
+            "root_cause_hypothesis": "学生混淆了极限存在与函数值存在的概念，误认为极限值可直接作为函数值使用。",
+            "supporting_evidence": "步骤3已正确指出f(1)未定义，但步骤4却断言f(1)=2，逻辑矛盾。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S4",
+          "concise_summary": "正确计算了极限并识别出原函数在x=1处无定义，但错误地将极限值当作函数值，导致连续性判断错误。",
+          "likely_cause": "未严格区分极限存在与函数在该点有定义的条件。",
+          "review_concepts": [
+            "函数连续性的三要素",
+            "可去间断点的定义与处理",
+            "极限与函数值的关系"
+          ],
+          "next_action": "重新复习连续性定义，明确函数在某点连续必须同时满足：①函数在该点有定义；②极限存在；③极限值等于函数值。",
+          "caution_note": "化简后的表达式仅在x≠1时等价于原函数，不可直接用于x=1处的函数值计算。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "讨论函数g(x) = (x^3 - 8)/(x - 2)在x=2处的连续性。若间断，说明类型并补充定义使其连续。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "巩固极限与函数值区分的概念，练习可去间断点的处理。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "判断函数h(x) = { sin(x)/x, x≠0; 1, x=0 }在x=0处是否连续，并说明理由。",
+            "related_weakness_code": "OBJECT_CONFUSION_LIMIT_DERIVATIVE_INTEGRAL",
+            "rationale": "强化对分段函数连续性的分析能力，明确定义与极限的关系。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "若函数k(x) = (x^2 - 4)/(x - 2)在x=2处连续，求k(2)应补充的值。若原函数未定义，说明其间断点类型。",
+            "related_weakness_code": "DOMAIN_CONDITION_IGNORED",
+            "rationale": "综合考察定义域限制与连续性条件的结合应用。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "b271cea5-db34-4b96-830a-8dba70f6cedb",
+          "started_at": "2026-06-23T00:28:29.699465+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 0.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 0.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S4"
+      }
+    },
+    {
+      "seq": 19,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-010",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math"
+          }
+        ],
+        "gold_first_error_step": "S2",
+        "gold_diagnosis_codes": [
+          "FINAL_CALCULATION_ERROR"
+        ]
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "原函数 F(x) = x³ + x² 正确，符合幂函数积分规则 ∫xⁿ dx = xⁿ⁺¹/(n+1) + C。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "F(1) 计算错误：1³ + 1² = 1 + 1 = 2，但学生得出 3。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "基本算术运算规则"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "F(0) = 0³ + 0² = 0 计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "因 S2 错误导致最终结果错误，正确值应为 2 - 0 = 2。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "定积分牛顿-莱布尼茨公式应用"
+            ]
+          }
+        ],
+        "diagnoses": [
+          {
+            "step_id": "S2",
+            "error_code": "FINAL_CALCULATION_ERROR",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生在代入 x=1 时发生算术加法错误，可能因粗心或心算失误导致 1+1 误算为 3。",
+            "supporting_evidence": "1³ + 1² 的正确结果为 2，与学生给出的 3 不符。",
+            "confidence": 0.95
+          }
+        ],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(0到2) (2x + 1) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "巩固线性函数积分与代入计算，强化基础算术准确性。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(1到3) (x² - 2x) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "引入负系数与区间偏移，训练多步骤代入计算。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫(-1到1) (4x³ + 3x²) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "结合奇偶函数性质与对称区间，提升复杂表达式代入能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "原函数求解正确，但代入上限时发生算术错误，导致最终结果偏差。",
+          "likely_cause": "基础算术运算粗心失误",
+          "review_concepts": [
+            "定积分计算步骤",
+            "数值代入验证方法"
+          ],
+          "next_action": "重新计算 F(1) 并核对每一步算术过程，建议使用草稿纸分步书写。",
+          "caution_note": "定积分结果对代入值敏感，需逐项验证幂次运算与加法。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "ab0552fb-e13e-4b38-b462-0cfc39dd23ae",
+          "started_at": "2026-06-23T00:29:05.872738+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "原函数 F(x) = x³ + x² 正确，符合幂函数积分规则 ∫xⁿ dx = xⁿ⁺¹/(n+1) + C。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "incorrect_math",
+            "evidence": "F(1) 计算错误：1³ + 1² = 1 + 1 = 2，但学生得出 3。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "基本算术运算规则"
+            ]
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "F(0) = 0³ + 0² = 0 计算正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S4",
+            "label": "incorrect_math",
+            "evidence": "因 S2 错误导致最终结果错误，正确值应为 2 - 0 = 2。",
+            "confidence": 1.0,
+            "violated_principles": [
+              "定积分牛顿-莱布尼茨公式应用"
+            ]
+          }
+        ],
+        "diagnosis_results": [
+          {
+            "step_id": "S2",
+            "error_code": "FINAL_CALCULATION_ERROR",
+            "category": "计算错误",
+            "root_cause_hypothesis": "学生在代入 x=1 时发生算术加法错误，可能因粗心或心算失误导致 1+1 误算为 3。",
+            "supporting_evidence": "1³ + 1² 的正确结果为 2，与学生给出的 3 不符。",
+            "confidence": 0.95
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": "S2",
+          "concise_summary": "原函数求解正确，但代入上限时发生算术错误，导致最终结果偏差。",
+          "likely_cause": "基础算术运算粗心失误",
+          "review_concepts": [
+            "定积分计算步骤",
+            "数值代入验证方法"
+          ],
+          "next_action": "重新计算 F(1) 并核对每一步算术过程，建议使用草稿纸分步书写。",
+          "caution_note": "定积分结果对代入值敏感，需逐项验证幂次运算与加法。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(0到2) (2x + 1) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "巩固线性函数积分与代入计算，强化基础算术准确性。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(1到3) (x² - 2x) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "引入负系数与区间偏移，训练多步骤代入计算。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫(-1到1) (4x³ + 3x²) dx",
+            "related_weakness_code": "FINAL_CALCULATION_ERROR",
+            "rationale": "结合奇偶函数性质与对称区间，提升复杂表达式代入能力。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "ab0552fb-e13e-4b38-b462-0cfc39dd23ae",
+          "started_at": "2026-06-23T00:29:05.872738+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": "S2"
+      }
+    },
+    {
+      "seq": 20,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-011",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          }
+        ],
+        "gold_first_error_step": null,
+        "gold_diagnosis_codes": []
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂函数积分公式 ∫xⁿ dx = xⁿ⁺¹/(n+1) + C，3x² 积分后为 x³，系数处理正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用幂函数积分公式，2x 积分后为 x²，系数与指数处理无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确合并积分结果并补充积分常数 C，符合不定积分规范。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(4x³ - 5x) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化多项式积分中系数与幂次同步处理的熟练度。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(2x² + 3x + 1) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "增加项数检验积分常数 C 的规范书写习惯。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫(x + 1)² dx",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "需先展开平方项再积分，训练步骤完整性意识。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题过程完全正确，准确应用了幂函数积分法则并规范补充了积分常数。",
+          "likely_cause": null,
+          "review_concepts": [
+            "幂函数积分公式",
+            "不定积分常数 C 的必要性",
+            "线性积分性质"
+          ],
+          "next_action": "可尝试含三角函数或复合函数的积分练习以巩固基础。",
+          "caution_note": "注意复杂积分中系数与指数的同步处理，避免遗漏常数项。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "f014ddc4-f387-4447-90db-32a3113bc7f0",
+          "started_at": "2026-06-23T00:29:34.915804+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂函数积分公式 ∫xⁿ dx = xⁿ⁺¹/(n+1) + C，3x² 积分后为 x³，系数处理正确。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用幂函数积分公式，2x 积分后为 x²，系数与指数处理无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确合并积分结果并补充积分常数 C，符合不定积分规范。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题过程完全正确，准确应用了幂函数积分法则并规范补充了积分常数。",
+          "likely_cause": null,
+          "review_concepts": [
+            "幂函数积分公式",
+            "不定积分常数 C 的必要性",
+            "线性积分性质"
+          ],
+          "next_action": "可尝试含三角函数或复合函数的积分练习以巩固基础。",
+          "caution_note": "注意复杂积分中系数与指数的同步处理，避免遗漏常数项。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "计算 ∫(4x³ - 5x) dx",
+            "related_weakness_code": "COEFFICIENT_OMISSION",
+            "rationale": "强化多项式积分中系数与幂次同步处理的熟练度。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "计算 ∫(2x² + 3x + 1) dx",
+            "related_weakness_code": "INTEGRATION_CONSTANT_OMISSION",
+            "rationale": "增加项数检验积分常数 C 的规范书写习惯。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "计算 ∫(x + 1)² dx",
+            "related_weakness_code": "UNSUPPORTED_JUMP",
+            "rationale": "需先展开平方项再积分，训练步骤完整性意识。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "f014ddc4-f387-4447-90db-32a3113bc7f0",
+          "started_at": "2026-06-23T00:29:34.915804+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": null
+      }
+    },
+    {
+      "seq": 21,
+      "phase": "phase2_planted_error",
+      "case_id": "planted-012",
+      "gold_labels": {
+        "gold_verification": [
+          {
+            "step_id": "S1",
+            "label": "correct"
+          },
+          {
+            "step_id": "S2",
+            "label": "correct"
+          },
+          {
+            "step_id": "S3",
+            "label": "correct"
+          }
+        ],
+        "gold_first_error_step": null,
+        "gold_diagnosis_codes": []
+      },
+      "run_summary": {
+        "status": "success",
+        "steps": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂法则：d/dx[x^n] = nx^{n-1}，此处n=4，导数为4x^3。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用常数乘法法则与幂法则：d/dx[2x^2] = 2·2x = 4x。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确应用导数的线性性质：和的导数等于导数的和，合并结果无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnoses": [],
+        "reference_solution": null,
+        "review_problems": [
+          {
+            "problem_text": "求 g(x) = 3x^5 - 2x^3 + 7x 的导数。",
+            "related_weakness_code": "POWER_RULE_APPLICATION",
+            "rationale": "巩固多项式逐项求导与系数处理的基础能力。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 h(x) = (1/2)x^4 + 5x^{-1} - \\sqrt{x} 的导数。",
+            "related_weakness_code": "POWER_RULE_APPLICATION",
+            "rationale": "练习分数指数与负指数的幂法则应用。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 k(x) = (x^2 + 3x)(2x - 1) 的导数（需先展开或使用乘法法则）。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "过渡到乘积法则应用，为后续复杂函数求导做准备。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题过程完全正确，准确应用了幂法则与导数线性性质。",
+          "likely_cause": null,
+          "review_concepts": [
+            "幂法则",
+            "导数的线性性质",
+            "多项式求导"
+          ],
+          "next_action": "可尝试含复合函数或隐函数的求导练习以拓展能力。",
+          "caution_note": "注意高阶导数计算时保持指数递减的规律，避免符号遗漏。"
+        },
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "ba14b307-9021-4419-aab8-df979a523074",
+          "started_at": "2026-06-23T00:29:57.635896+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        }
+      },
+      "raw_output": {
+        "verification_results": [
+          {
+            "step_id": "S1",
+            "label": "correct",
+            "evidence": "正确应用幂法则：d/dx[x^n] = nx^{n-1}，此处n=4，导数为4x^3。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S2",
+            "label": "correct",
+            "evidence": "正确应用常数乘法法则与幂法则：d/dx[2x^2] = 2·2x = 4x。",
+            "confidence": 1.0,
+            "violated_principles": []
+          },
+          {
+            "step_id": "S3",
+            "label": "correct",
+            "evidence": "正确应用导数的线性性质：和的导数等于导数的和，合并结果无误。",
+            "confidence": 1.0,
+            "violated_principles": []
+          }
+        ],
+        "diagnosis_results": [],
+        "final_feedback": {
+          "first_critical_step_id": null,
+          "concise_summary": "解题过程完全正确，准确应用了幂法则与导数线性性质。",
+          "likely_cause": null,
+          "review_concepts": [
+            "幂法则",
+            "导数的线性性质",
+            "多项式求导"
+          ],
+          "next_action": "可尝试含复合函数或隐函数的求导练习以拓展能力。",
+          "caution_note": "注意高阶导数计算时保持指数递减的规律，避免符号遗漏。"
+        },
+        "review_problems": [
+          {
+            "problem_text": "求 g(x) = 3x^5 - 2x^3 + 7x 的导数。",
+            "related_weakness_code": "POWER_RULE_APPLICATION",
+            "rationale": "巩固多项式逐项求导与系数处理的基础能力。",
+            "difficulty_label": "easy"
+          },
+          {
+            "problem_text": "求 h(x) = (1/2)x^4 + 5x^{-1} - \\sqrt{x} 的导数。",
+            "related_weakness_code": "POWER_RULE_APPLICATION",
+            "rationale": "练习分数指数与负指数的幂法则应用。",
+            "difficulty_label": "medium"
+          },
+          {
+            "problem_text": "求 k(x) = (x^2 + 3x)(2x - 1) 的导数（需先展开或使用乘法法则）。",
+            "related_weakness_code": "PRODUCT_RULE_MISUSE",
+            "rationale": "过渡到乘积法则应用，为后续复杂函数求导做准备。",
+            "difficulty_label": "hard"
+          }
+        ],
+        "uncertainty_flags": [],
+        "run_meta": {
+          "run_id": "ba14b307-9021-4419-aab8-df979a523074",
+          "started_at": "2026-06-23T00:29:57.635896+00:00",
+          "provider": "openai-compatible",
+          "model": "qwen/qwen3.6-plus",
+          "ocr_model": "qwen/qwen3.6-plus",
+          "subject_id": "calculus",
+          "mode": "baseline_qwen",
+          "workflow_version": "v1",
+          "depth": "with_ref",
+          "node_stats": {},
+          "provider_events": [],
+          "attempt": 1,
+          "max_attempts": 2,
+          "failed": false
+        },
+        "fail_reason": null,
+        "global_budget": null
+      },
+      "computed": {
+        "verification_accuracy": 1.0,
+        "lenient_verify_acc": 1.0,
+        "error_step_accuracy": 1.0,
+        "correct_step_accuracy": 1.0,
+        "diagnosis_hit": 1.0,
+        "error_step_recall": 1.0,
+        "taxonomy_category_hit": 1.0,
+        "first_error_hit": 1.0,
+        "predicted_first_error_step": null
+      }
+    }
+  ]
+}

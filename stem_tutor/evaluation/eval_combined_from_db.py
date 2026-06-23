@@ -23,6 +23,9 @@ from stem_tutor.evaluation.runner import (
     _feedback_proxy,
     _review_relevance_proxy,
     _normalize_items,
+    _error_step_accuracy,
+    _correct_step_accuracy,
+    _lenient_verification_accuracy,
 )
 
 _NON_CORRECT = {"incorrect_math", "inconsistent_or_unsupported", "unclear"}
@@ -130,6 +133,9 @@ def eval_phase2_case(gold: dict, run_data: dict | None) -> dict:
     expected_first = gold.get("gold_first_error_step")
 
     verify_acc = _verification_accuracy(vr, gold_verify)
+    lenient_acc = _lenient_verification_accuracy(vr, gold_verify)
+    error_step_acc = _error_step_accuracy(vr, gold_verify)
+    correct_step_acc = _correct_step_accuracy(vr, gold_verify)
     diag_hit = _diagnosis_hit(dr, gold_codes)
     error_recall = _error_step_recall(vr, gold_verify)
     cat_hit = _taxonomy_category_hit(dr, gold_codes)
@@ -143,6 +149,9 @@ def eval_phase2_case(gold: dict, run_data: dict | None) -> dict:
     return {
         "case_id": gold.get("case_id", "?"),
         "verification_accuracy": verify_acc,
+        "lenient_verification_accuracy": lenient_acc,
+        "error_step_accuracy": error_step_acc,
+        "correct_step_accuracy": correct_step_acc,
         "diagnosis_hit": diag_hit,
         "error_step_recall": error_recall,
         "taxonomy_category_hit": cat_hit,
@@ -193,7 +202,9 @@ def evaluate_mode(runs: dict, gold: dict) -> dict:
         p2_results.append(eval_phase2_case(g, run_data))
 
     p2_keys = [
-        "verification_accuracy", "diagnosis_hit", "error_step_recall",
+        "verification_accuracy", "lenient_verification_accuracy",
+        "error_step_accuracy", "correct_step_accuracy",
+        "diagnosis_hit", "error_step_recall",
         "taxonomy_category_hit", "first_error_hit", "feedback_proxy",
         "review_relevance_proxy", "error_detection_rate", "correct_confirmation_rate",
     ]
@@ -227,7 +238,10 @@ def print_comparison(wf: dict, bl: dict) -> None:
     print("=" * 70)
     p2w, p2b = wf["phase2"], bl["phase2"]
     labels = {
-        "verification_accuracy": "Verification Accuracy",
+        "error_step_accuracy": "Error-Step Accuracy",
+        "correct_step_accuracy": "Correct-Step Accuracy",
+        "lenient_verification_accuracy": "Lenient Verify Acc",
+        "verification_accuracy": "Strict Verify Acc",
         "diagnosis_hit": "Diagnosis Hit",
         "error_step_recall": "Error Step Recall",
         "taxonomy_category_hit": "Category Hit",

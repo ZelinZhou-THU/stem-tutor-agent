@@ -136,6 +136,74 @@ def _correct_confirmation_rate(pred: list[dict[str, Any]], gold: list[dict[str, 
     return 0.0 if pred_has_error else 1.0
 
 
+def _error_step_accuracy(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -> float:
+    """Step-level: of gold error steps, how many did pred also flag as non-correct?
+
+    Isolates 'can the system find real errors?' from
+    'does the system over-flag correct steps?'.
+    Returns 1.0 if no gold error steps (N/A).
+    """
+    gold_errors = [g for g in gold if g.get("label") != "correct"]
+    if not gold_errors:
+        return 1.0
+    pred_map = {p["step_id"]: p["label"] for p in pred}
+    total = 0
+    hit = 0
+    for g in gold_errors:
+        sid = g["step_id"]
+        if sid in pred_map:
+            total += 1
+            if pred_map[sid] != "correct":
+                hit += 1
+    return hit / total if total else 0.0
+
+
+def _correct_step_accuracy(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -> float:
+    """Step-level: of gold-correct steps, how many did pred also confirm as correct?
+
+    Measures false-alarm rate at step level.
+    Returns 1.0 if no gold correct steps (N/A).
+    """
+    gold_corrects = [g for g in gold if g.get("label") == "correct"]
+    if not gold_corrects:
+        return 1.0
+    pred_map = {p["step_id"]: p["label"] for p in pred}
+    total = 0
+    hit = 0
+    for g in gold_corrects:
+        sid = g["step_id"]
+        if sid in pred_map:
+            total += 1
+            if pred_map[sid] == "correct":
+                hit += 1
+    return hit / total if total else 0.0
+
+
+def _lenient_verification_accuracy(pred: list[dict[str, Any]], gold: list[dict[str, Any]]) -> float:
+    """Step-level: same as verification_accuracy but 'unclear' gets 0.5 partial credit.
+
+    Rewards uncertainty awareness — 'unclear' is not a wrong answer, it's an honest
+    admission of uncertainty.
+    """
+    if not gold:
+        return 1.0
+    pred_map = {p["step_id"]: p["label"] for p in pred}
+    total = 0
+    score = 0.0
+    for g in gold:
+        sid = g["step_id"]
+        if sid not in pred_map:
+            continue
+        total += 1
+        gold_label = g["label"]
+        pred_label = pred_map[sid]
+        if pred_label == gold_label:
+            score += 1.0
+        elif pred_label == "unclear":
+            score += 0.5
+    return score / total if total else 0.0
+
+
 def evaluate_cases(provider: Any, cases_file: Path, mode: str = "workflow_r1") -> dict[str, Any]:
     payload = json.loads(cases_file.read_text(encoding="utf-8"))
     cases = payload.get("cases", [])
